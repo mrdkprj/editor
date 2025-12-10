@@ -1,0 +1,280 @@
+
+.viewport{
+    background-color: var(--main-bgcolor);
+    color:var(--menu-color);
+    height:100%;
+    width: 100%;
+    cursor: default;
+    display: flex;
+    flex-direction: column;
+}
+
+.title-bar{
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    height: 35px;
+    min-height: 35px;
+    width: 100%;
+    color: var(--main-color);
+    background-color: var(--bar-bg-color);
+    border-bottom: 1px solid var(--bar-border-color);
+    -webkit-app-region: drag;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.title{
+    flex: 1 1 auto;
+    text-align: center;
+    height: 100%;
+    line-height: 25px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-area{
+    font-size: var(--font-size);
+    display: flex;
+    justify-content: left;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    position: absolute;
+    left: 10px;
+    top: 0;
+    height: 35px;
+    -webkit-app-region: drag;
+    width: 35px;
+}
+
+.icon-area svg{
+    width: 16px;
+    height: 16px;
+}
+
+.menu-bar-area{
+    left: 35px;
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.window-area{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+}
+
+.minimize,
+.maximize,
+.close{
+    width: 45px;
+    height: 100%;
+    text-align: center;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+    -webkit-app-region: no-drag;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.maximize{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1;
+}
+
+.minimize:hover,
+.maximize:hover{
+    background-color: var(--menu-hover-color);;
+}
+
+.minbtn,
+.maxbtn{
+    position: relative;
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--menu-color);
+    pointer-events: none;
+    background-color: var(--bar-bg-color);
+}
+
+.minbtn::after{
+    content: "";
+    width: 7px;
+    height: 7px;
+    position: absolute;
+    top: -3px;
+    left: 1px;
+    z-index: -1;
+    border: 1px solid var(--menu-color);
+}
+
+.maximize:hover .minbtn,
+.maximize:hover .maxbtn,
+.maximize:hover .maxbtn::after{
+    background-color: var(--menu-hover-color);
+}
+
+.close:hover{
+    background-color: var(--close-hover-bgcolor);
+    color: var(--close-hover-color);
+}
+
+.viewport{
+    display:flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+}
+
+#root {
+    width: 100%;
+    height: 100%;
+    top: 0px;
+    position: relative;
+}
+
+
+.mp-dialog-overlay {
+    background-color: transparent;
+    width: 100%;
+    height: calc(100% - 36px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    z-index: 9999;
+    top: 36px;
+    left: 0px;
+    outline: none;
+}
+.mp-dialog-container {
+    background-color: var(--main-bgcolor);
+    color: var(--menu-color);
+    display: flex;
+    min-width: 540px;
+    min-height: 200px;
+    width: fit-content;
+    height: fit-content;
+    flex-direction: column;
+    box-shadow: 7px 5px 5px var(--dialog-shadow);
+    outline: 1px solid var(--dialog-border-color);
+    border-radius: 8px;
+}
+.mp-dialog-header {
+    width: 100%;
+    height: 30px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.mp-dialog {
+    width: calc(100% - 40px);
+    height: calc(100% - 30px);
+    overflow: auto;
+    padding: 0 20px 20px 20px;
+}
+.mp-dialog-item-block {
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+.mp-dialog-separator {
+    height: 1px;
+    border-top: 1px solid var(--dialog-separator);
+    margin: 20px 0 20px 0;
+}
+.mp-dialog-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.mp-dialog-title-block {
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0 0 10px 0;
+}
+
+.mp-dialog button {
+    background-color: var(--button-bgcolor);
+    color: var(--button-color);
+    border: 1px solid var(--dialog-border-color);
+    border-radius: 4px;
+}
+
+.mp-dialog-action {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.mp-dialog-btn-lg {
+    padding: 8px 20px;
+}
+
+.mp-dialog-btn-lg:hover {
+    background-color: var(--button-hover-color);
+}
+
+.mp-dialog-action button:first-child {
+    margin-right: 10px;
+}
+
+.mp-dialog-close {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    width: 45px;
+    height: 100%;
+    text-align: center;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+    -webkit-app-region: no-drag;
+    line-height: 35px;
+    border-top-right-radius: 4px;
+}
+
+.mp-dialog-close:hover {
+    background-color: var(--close-hover-bgcolor);
+    color: var(--close-hover-color);
+}
+
+.mp-dialog input[type="text"] {
+    width: 100%;
+    line-height: 22px;
+    text-indent: 5px;
+    font-size: 14px;
+    border-radius: 2px;
+    border:1px solid #ccc;
+    padding: 4px;
+}
+
+.mp-dialog input[type="text"]:focus,
+.mp-dialog input[type="text"]:focus-visible {
+    outline: 1px solid var(--input-focus-outline);
+}
+
+.mp-dialog input[type="checkbox"] {
+    margin: 5px;
+}
+
+.mp-dialog-text{
+    position: relative;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 500px;
+}

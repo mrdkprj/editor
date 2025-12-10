@@ -1,0 +1,108 @@
+:root{
+    --font: "Segoe UI", "Yu Gothic UI";
+    --font-size: 12px;
+    --arrow-color:#7277dd;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --main-bgcolor: #181818;
+        --main-color: #fff;
+
+        --bar-bg-color: #1d1d1e;
+        --bar-border-color: #42453d;
+
+        --menu-bgcolor: #212337;
+        --menu-color: #eceef3;
+        --menu-hover-color: #3b3a3a;
+        --menu-shadow: #211f1f;
+        --menu-accel-color:#8f8787;
+        --menu-shadow:rgba(0, 0, 0, 0.2);
+        --menu-icon-color:#eceef3;
+
+        --close-hover-bgcolor: #da0707c4;
+        --close-hover-color: #fff;
+
+        --dialog-bgcolor:#000;
+        --dialog-border-color:#413e3e;
+        --dialog-shadow:#181717;
+        --dialog-separator:#ccc;
+
+        --input-bgcolor: #1f1e1e;
+        --input-color: #fff;
+        --input-focus-outline: blue;
+
+        --button-border-color: #504949;
+        --button-bgcolor: #fff;
+        --button-color: #000;
+        --button-disabled: #9f8e8e;
+        --button-hover-color:#837aef;
+    }
+}
+
+@media (prefers-color-scheme: light) {
+    :root{
+        --main-bgcolor: #fff;
+        --main-color: #0e0e0e;
+
+        --bar-bg-color:#e5dddd;
+        --bar-border-color: #cdc2c2;
+
+        --menu-bgcolor: #eceef3;
+        --menu-color: #0e0e0e;
+        --menu-hover-color: #d1c1c1;
+        --menu-shadow:#ccc;
+        --menu-accel-color:#757272;
+        --menu-shadow:rgba(0, 0, 0, 0.2);
+        --menu-icon-color:#0e0e0e;
+
+        --close-hover-bgcolor: #da0707c4;
+        --close-hover-color: #fff;
+
+        --dialog-bgcolor:#fff;
+        --dialog-border-color:#ccc;
+        --dialog-shadow:#e3dddd;
+        --dialog-separator:#ccc;
+
+        --input-bgcolor: #fff;
+        --input-color: #000;
+        --input-focus-outline: blue;
+
+        --button-border-color: #504949;
+        --button-bgcolor: #fff;
+        --button-color: #000;
+        --button-disabled: #9f8e8e;
+        --button-hover-color:#f5eeee;
+    }
+}
+
+@media print
+{
+    .no-print, .no-print *
+    {
+        display: none !important;
+    }
+}
+
+html, body, #root{
+    width:100%;
+    height:100%;
+    -webkit-font-smoothing: antialiased;
+}
+
+body{
+    margin:0;
+    font-family: var(--font);
+}
+
+div:focus-visible{
+    outline: none;
+}
+
+.highlight {
+    color: yellow !important;
+}
+
+.disable-unexpected-closing-bracket .unexpected-closing-bracket {
+    color: inherit !important;
+}

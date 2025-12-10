@@ -1,0 +1,25 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "",
+        "label": "View",
+        "minHeight":400,
+        "minWidth":400,
+        "fullscreen": false,
+        "resizable": true,
+        "maximizable":true,
+        "minimizable":true,
+        "closable":true,
+        "focus":true,
+        "visible":false,
+        "decorations":false,
+        "skipTaskbar":false,
+        "transparent":false,
+        "dragDropEnabled":true,
+        "shadow":true,
+        "url":"src/view/index.html"
+      }
+    ]
+  }
+}

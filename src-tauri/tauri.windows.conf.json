@@ -1,0 +1,45 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "",
+        "label": "View",
+        "minHeight":400,
+        "minWidth":400,
+        "fullscreen": false,
+        "resizable": true,
+        "maximizable":true,
+        "minimizable":true,
+        "closable":true,
+        "focus":true,
+        "visible":false,
+        "decorations":false,
+        "skipTaskbar":false,
+        "transparent":false,
+        "dragDropEnabled":false,
+        "shadow":true,
+        "theme":"Dark",
+        "url":"src/view/index.html"
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "targets": "nsis",
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      }
+    },
+    "fileAssociations":[
+      {
+        "ext":[".txt", ".abap", ".cls", ".azcli", ".bat", ".cmd", ".bicep", ".mligo", ".clj", ".cljs", ".cljc", ".edn", ".coffee", ".c", ".h", ".cs", ".csx", ".cake", ".csp", ".css", ".cypher", ".cyp", ".dart", ".dockerfile", ".ecl", ".ex", ".exs", ".flow", ".ftl", ".ftlh", ".ftlx", ".fs", ".fsi", ".ml", ".mli", ".fsx", ".fsscript", ".go", ".graphql", ".gql", ".handlebars", ".hbs", ".tf", ".tfvars", ".hcl", ".html", ".htm", ".shtml", ".xhtml", ".mdoc", ".jsp", ".asp", ".aspx", ".jshtm", ".ini", ".properties", ".gitconfig", ".java", ".jav", ".js", ".es6", ".jsx", ".mjs", ".cjs", ".jl", ".kt", ".kts", ".less", ".lex", ".liquid", ".html.liquid", ".lua", ".m3", ".i3", ".mg", ".ig", ".md", ".markdown", ".mdown", ".mkdn", ".mkd", ".mdwn", ".mdtxt", ".mdtext", ".mdx", ".s", ".dax", ".msdax", ".m", ".pas", ".p", ".pp", ".ligo", ".pl", ".pm", ".php", ".php4", ".php5", ".phtml", ".ctp", ".pla", ".dats", ".sats", ".hats", ".pq", ".pqm", ".ps1", ".psm1", ".psd1", ".proto", ".jade", ".pug", ".py", ".rpy", ".pyw", ".cpy", ".gyp", ".gypi", ".qs", ".r", ".rhistory", ".rmd", ".rprofile", ".rt", ".cshtml", ".redis", ".rst", ".rb", ".rbx", ".rjs", ".gemspec", ".pp", ".rs", ".rlib", ".sb", ".scala", ".sc", ".sbt", ".scm", ".ss", ".sch", ".rkt", ".scss", ".sh", ".bash", ".sol", ".aes", ".rq", ".sql", ".st", ".iecst", ".iecplc", ".lc3lib", ".TcPOU", ".TcDUT", ".TcGVL", ".TcIO", ".swift", ".sv", ".svh", ".tcl", ".twig", ".ts", ".tsx", ".cts", ".mts", ".tsp", ".vb", ".wgsl", ".xml", ".yaml", ".yml"]
+      }
+    ]
+  }
+}
