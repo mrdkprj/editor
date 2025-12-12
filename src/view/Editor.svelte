@@ -104,9 +104,16 @@
     };
 
     const requestSave = async (saveAs: boolean) => {
+        dispatch({ type: "suspendWatch", value: true });
+
         await editor.getAction("editor.action.formatDocument")?.run();
         const currentPath = $appState.fullPath;
         const saved = await save(saveAs);
+
+        if (!saved) {
+            dispatch({ type: "suspendWatch", value: false });
+        }
+
         if (saved && currentPath != $appState.fullPath) {
             const state = editor.saveViewState();
             updateModel();
@@ -115,6 +122,11 @@
     };
 
     const onWatchEvent = async (e: Mp.WatchEvent) => {
+        if ($appState.suspendWatch) {
+            dispatch({ type: "suspendWatch", value: false });
+            return;
+        }
+
         if ($appState.fullPath == e.file_path) {
             dispatch({ type: "showWatchDialog", value: true });
 
@@ -557,7 +569,8 @@
                         {
                             label: `</${tag}>`,
                             kind: Monaco.languages.CompletionItemKind.EnumMember,
-                            insertText: `</${tag}>`,
+                            insertTextRules: Monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                            insertText: `$1</${tag}>`,
                             range: {
                                 startLineNumber: position.lineNumber,
                                 endLineNumber: position.lineNumber,

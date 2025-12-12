@@ -273,10 +273,7 @@
             ?.replaceAll(/<|>|:|"|\/|\\|\||\?|\*|%/g, "");
 
     const save = async (saveAs: boolean) => {
-        dispatch({ type: "suspendWatch", value: true });
-        const saved = saveAs ? await trySaveAs() : await trySaveFile();
-        dispatch({ type: "suspendWatch", value: false });
-        return saved;
+        return saveAs ? await trySaveAs() : await trySaveFile();
     };
 
     const trySaveFile = async () => {
