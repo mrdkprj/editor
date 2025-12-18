@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use crate::watcher::WatcherCommand;
 use dialog::DialogOptions;
 use serde::{Deserialize, Serialize};
 use std::{env, path::PathBuf};
@@ -10,6 +11,8 @@ mod helper;
 mod menu;
 mod session;
 mod watcher;
+
+pub struct WatchTx(tokio::sync::mpsc::UnboundedSender<WatcherCommand>);
 
 #[cfg(target_os = "linux")]
 fn get_window_handel(window: &WebviewWindow) -> isize {
@@ -127,13 +130,21 @@ async fn open_list_context_menu(window: WebviewWindow, payload: menu::Position) 
 }
 
 #[tauri::command]
-async fn watch(window: WebviewWindow, payload: String) {
-    let _ = watcher::watch(&window, payload).await;
+fn watch(app: AppHandle, payload: String) -> Result<(), String> {
+    if let Some(tx) = app.try_state::<WatchTx>() {
+        tx.inner().0.send(WatcherCommand::Watch(payload)).map_err(|e| e.to_string())
+    } else {
+        Ok(())
+    }
 }
 
 #[tauri::command]
-fn unwatch(payload: String) {
-    watcher::unwatch(payload);
+fn unwatch(app: AppHandle, payload: String) -> Result<(), String> {
+    if let Some(tx) = app.try_state::<WatchTx>() {
+        tx.inner().0.send(WatcherCommand::Unwatch(payload)).map_err(|e| e.to_string())
+    } else {
+        Ok(())
+    }
 }
 
 #[tauri::command]

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
     import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-    import { appState, dispatch, initSettings, settings, textState } from "./appStateReducer.svelte";
+    import { appState, dispatch, initSettings, settings, temporal, textState, updatePreferences } from "./appStateReducer.svelte";
     import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, OS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
@@ -15,6 +15,7 @@
     import GrepProgress from "./GrepProgressDialog.svelte";
     import Statusbar from "./Statusbar.svelte";
     import Settings from "../settings";
+    import Preference from "./Preference.svelte";
 
     const ipc = new IPC("View");
     let settingStore = new Settings();
@@ -22,6 +23,7 @@
     // Linux only
     let handleKeyUp = false;
     let ready = $state(false);
+    let emitted = false;
 
     const openContextMenu = async (e: MouseEvent) => {
         e.preventDefault();
@@ -33,14 +35,6 @@
             await helper.openContextMenu({ x: e.clientX, y: e.clientY });
         }
     };
-
-    // const onUnmaximize = () => {
-    //     settings.isMaximized = false;
-    // };
-
-    // const onMaximize = () => {
-    //     settings.isMaximized = true;
-    // };
 
     const toggleMaximize = async () => {
         const view = WebviewWindow.getCurrent();
@@ -76,42 +70,45 @@
                 await openFile();
                 break;
             }
-            case "Theme":
-                const theme = e.value == "dark" ? "dark" : "light";
-                dispatch({ type: "theme", value: theme });
-                settings.theme = theme;
-                await helper.changeTheme(theme);
-                break;
             case "Print":
                 console.log("print");
                 break;
 
+            case "Theme":
+                const theme = e.value == "dark" ? "dark" : "light";
+                settings.theme = theme;
+                await helper.changeTheme(theme);
+                onSettingsChange();
+                break;
+
             case "ShowLineNumber":
-                settings.preference[textState.textType].showLineNumber = !settings.preference[textState.textType].showLineNumber;
+                console.log(settings.preference[textState.textType].showLineNumber);
+                temporal[textState.textType].showLineNumber = !temporal[textState.textType].showLineNumber;
+                console.log(settings.preference[textState.textType].showLineNumber);
                 break;
             case "AutoIndent":
-                settings.preference[textState.textType].autoIndent = !settings.preference[textState.textType].autoIndent;
+                temporal[textState.textType].autoIndent = !temporal[textState.textType].autoIndent;
                 break;
             case "Wordwrap":
-                settings.preference[textState.textType].wordWrap = !settings.preference[textState.textType].wordWrap;
+                temporal[textState.textType].wordWrap = !temporal[textState.textType].wordWrap;
                 break;
             case "fontSize":
-                settings.preference[textState.textType].fontSize = Number(e.value);
+                temporal[textState.textType].fontSize = Number(e.value);
                 break;
             case "lineHighlight":
-                settings.preference[textState.textType].lineHighlight = !settings.preference[textState.textType].lineHighlight;
+                temporal[textState.textType].lineHighlight = !temporal[textState.textType].lineHighlight;
                 break;
 
             case "indentBySpaces": {
-                settings.preference[textState.textType].indentBySpaces = !settings.preference[textState.textType].indentBySpaces;
+                temporal[textState.textType].indentBySpaces = !temporal[textState.textType].indentBySpaces;
                 break;
             }
             case "indentSize": {
-                settings.preference[textState.textType].indentSize = Number(e.value);
+                temporal[textState.textType].indentSize = Number(e.value);
                 break;
             }
             case "renderWhitespace": {
-                settings.preference[textState.textType].renderWhitespace = e.value as Mp.WhiteSpaceRenderMode;
+                temporal[textState.textType].renderWhitespace = e.value as Mp.WhiteSpaceRenderMode;
                 break;
             }
 
@@ -136,6 +133,10 @@
 
             case "copyFilePath":
                 helper.writeTextToClipboard($appState.fullPath);
+                break;
+
+            case "preference":
+                showPreference();
                 break;
         }
     };
@@ -188,6 +189,10 @@
                     e.preventDefault();
                     startGrep();
                     return;
+                case "w":
+                    e.preventDefault();
+                    showPreference();
+                    return;
             }
         }
     };
@@ -197,6 +202,11 @@
             dispatch({ type: "hoverMenuItemGroup", value: "" });
             dispatch({ type: "visibleMenubarItem", value: "" });
         }
+    };
+
+    const showPreference = () => {
+        if ($appState.mode == "grep") return;
+        dispatch({ type: "showPreference", value: true });
     };
 
     const startGrep = () => {
@@ -255,12 +265,13 @@
         dispatch({ type: "init", value: { filePath, content, mode: "editor" } });
         await helper.startWatch(filePath);
         updateHistory(filePath);
-        await ipc.sendTo("View", "load", {});
+        await ipc.sendTo("View", "load", false);
         await setTitle();
     };
 
     const onFileDrop = async (e: Mp.FileDropEvent) => {
         if (!e.paths.length) return;
+        await openFile(e.paths.shift());
         e.paths.forEach((filePath) => helper.openNewWindow(filePath));
     };
 
@@ -396,19 +407,43 @@
         await view.close();
     };
 
+    const onSettingsChange = async () => {
+        emitted = true;
+        settingStore.update(settings);
+        await settingStore.save();
+        await settingStore.emit();
+    };
+
+    const onWatchEvent = async (e: Mp.WatchEvent) => {
+        if (emitted) {
+            emitted = false;
+            return;
+        }
+
+        if (e.file_path == settingStore.watchFile) {
+            const theme = settings.theme;
+            await settingStore.reload();
+            updatePreferences(settingStore.data);
+            ipc.sendTo("View", "refelect_settings", {});
+            if (theme != settings.theme) {
+                await helper.changeTheme(settings.theme);
+            }
+        }
+    };
+
     const prepare = async () => {
         const e = await helper.onMainReady("root");
 
-        await settingStore.init();
+        await settingStore.init(e.appDataDir);
         initSettings(settingStore.data);
         textState.encoding = e.encoding ?? DEFAULT_ENCODING;
+        await helper.startWatch(settingStore.watchFile);
 
         if (e.filePath) {
             updateHistory(e.filePath);
         }
 
         dispatch({ type: "init", value: { filePath: e.filePath ?? "", content: e.content ?? "", mode: e.mode, startLine: e.startLine } });
-        dispatch({ type: "theme", value: settings.theme });
         await helper.changeTheme(settings.theme);
 
         await setTitle();
@@ -433,6 +468,8 @@
         ipc.receiveTauri("tauri://resize", onWindowSizeChanged);
         ipc.receive("contextmenu_event", handleContextMenuEvent);
         ipc.receiveTauri<Mp.FileDropEvent>("tauri://drag-drop", onFileDrop);
+        ipc.receive("settingChanged", onSettingsChange);
+        ipc.receive("watch_event", onWatchEvent);
 
         return () => {
             ipc.release();
@@ -454,6 +491,9 @@
         {/if}
         {#if $appState.showGrepProgress}
             <GrepProgress {abortGrep} />
+        {/if}
+        {#if $appState.showPreference}
+            <Preference />
         {/if}
 
         <Editor

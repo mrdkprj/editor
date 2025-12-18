@@ -1,4 +1,4 @@
-import { DEFAULT_ENCODING, DEFAULT_GREP_REQUEST } from "../constants";
+import { DEFAULT_ENCODING, DEFAULT_GREP_REQUEST, DEFAULT_PREFERENCE } from "../constants";
 import { defaultSettings } from "../settings";
 import { writable } from "svelte/store";
 
@@ -14,7 +14,6 @@ type AppState = {
     isDirty: boolean;
     isMaximized: boolean;
     isFullScreen: boolean;
-    theme: Mp.Theme;
     openingMenu: boolean;
     visibleMenubarItem: string;
     showWatchDialog: boolean;
@@ -30,6 +29,7 @@ type AppState = {
     lineEnding: string;
     language: string;
     hoverMenuItemGroup: string;
+    showPreference: boolean;
 };
 
 export const initialAppState: AppState = {
@@ -38,7 +38,6 @@ export const initialAppState: AppState = {
     content: "",
     isMaximized: false,
     isFullScreen: false,
-    theme: "system",
     isDirty: false,
     openingMenu: false,
     visibleMenubarItem: "",
@@ -55,6 +54,7 @@ export const initialAppState: AppState = {
     lineEnding: "CRLF",
     language: "",
     hoverMenuItemGroup: "",
+    showPreference: false,
 };
 
 export const textState: Mp.TextState = $state({ textType: "plain", encoding: DEFAULT_ENCODING });
@@ -66,12 +66,29 @@ export const initSettings = (data: Mp.Settings) => {
     settings.isMaximized = data.isMaximized;
     settings.preference = data.preference;
     settings.theme = data.theme;
+    settings.color = data.color;
+    temporal.code = data.preference["code"];
+    temporal.plain = data.preference["plain"];
 };
+export const updatePreferences = (data: Mp.Settings) => {
+    settings.theme = data.theme;
+    settings.color = data.color;
+    temporal.code = data.preference["code"];
+    temporal.plain = data.preference["plain"];
+};
+export const temporal: Mp.TypedPreference = $state({
+    plain: DEFAULT_PREFERENCE,
+    code: DEFAULT_PREFERENCE,
+});
+
+type SelectedPreferenceTab = {
+    tab: Mp.PreferenceTab;
+};
+export const selectedPreference: SelectedPreferenceTab = $state({ tab: "view" });
 
 type AppAction =
     | { type: "mode"; value: Mp.Mode }
     | { type: "init"; value: { filePath: string; content: string; mode: Mp.Mode; startLine?: Mp.Position } }
-    | { type: "theme"; value: Mp.Theme }
     | { type: "fullPath"; value: string }
     | { type: "content"; value: string }
     | { type: "isMaximized"; value: boolean }
@@ -90,7 +107,9 @@ type AppAction =
     | { type: "lineEnding"; value: string }
     | { type: "language"; value: string }
     | { type: "hoverMenuItemGroup"; value: string }
+    | { type: "showPreference"; value: boolean }
     | { type: "isFullScreen"; value: boolean };
+
 const updater = (state: AppState, action: AppAction): AppState => {
     switch (action.type) {
         case "mode":
@@ -108,9 +127,6 @@ const updater = (state: AppState, action: AppAction): AppState => {
 
         case "content":
             return { ...state, content: action.value };
-
-        case "theme":
-            return { ...state, theme: action.value };
 
         case "openingMenu":
             return { ...state, openingMenu: action.value };
@@ -156,6 +172,9 @@ const updater = (state: AppState, action: AppAction): AppState => {
 
         case "hoverMenuItemGroup":
             return { ...state, hoverMenuItemGroup: action.value };
+
+        case "showPreference":
+            return { ...state, showPreference: action.value };
 
         case "isMaximized":
             return { ...state, isMaximized: action.value };

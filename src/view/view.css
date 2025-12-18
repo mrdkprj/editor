@@ -228,7 +228,7 @@
     background-color: var(--button-hover-color);
 }
 
-.mp-dialog-action button:first-child {
+.mp-dialog-action button:not(:last-child) {
     margin-right: 10px;
 }
 

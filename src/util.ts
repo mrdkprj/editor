@@ -36,7 +36,7 @@ class Util {
         return args.join(" ");
     }
 
-    getFileMenubarItems(settings: Mp.Settings, encoding: string): Mp.MenuItem[] {
+    getFileMenubarItems(history: string[], encoding: string): Mp.MenuItem[] {
         return [
             {
                 id: "New",
@@ -94,7 +94,7 @@ class Util {
                 label: "History",
                 type: "submenu",
                 submenuId: "History",
-                items: settings.history
+                items: history
                     .map((history) => {
                         return {
                             id: "History",
@@ -119,8 +119,7 @@ class Util {
         ];
     }
 
-    getViewMenubarItems(settings: Mp.Settings, textType: Mp.TextType): Mp.MenuItem[] {
-        const preference = settings.preference[textType];
+    getViewMenubarItems(theme: Mp.Theme, preference: Mp.Preference): Mp.MenuItem[] {
         return [
             {
                 id: "ShowLineNumber",
@@ -292,7 +291,7 @@ class Util {
                         id: "Theme",
                         label: "Light",
                         type: "radio",
-                        checked: settings.theme == "light",
+                        checked: theme == "light",
                         value: "light",
                         submenuId: "Theme",
                     },
@@ -300,11 +299,16 @@ class Util {
                         id: "Theme",
                         label: "Dark",
                         type: "radio",
-                        checked: settings.theme == "dark",
+                        checked: theme == "dark",
                         value: "dark",
                         submenuId: "Theme",
                     },
                 ],
+            },
+            {
+                id: "preference",
+                type: "text",
+                label: "Preference",
             },
         ];
     }

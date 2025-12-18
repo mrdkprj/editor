@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { appState, dispatch, textState, settings } from "./appStateReducer.svelte";
+    import { appState, dispatch, textState, temporal, settings } from "./appStateReducer.svelte";
     import { EDIT_MENU_ITEMS, handleKeyEvent } from "../constants";
     import util from "../util";
     import Menu from "./Menu.svelte";
 
-    let fileMenuItems = $derived(util.getFileMenubarItems(settings, textState.encoding));
-    let viewMenuItems = $derived(util.getViewMenubarItems(settings, textState.textType));
+    let fileMenuItems = $derived(util.getFileMenubarItems(settings.history, textState.encoding));
+    let viewMenuItems = $derived(util.getViewMenubarItems(settings.theme, temporal[textState.textType]));
 
     const onMenuBarItemMousedown = (e: MouseEvent) => {
         if (!e.target || !(e.target instanceof HTMLElement)) return;

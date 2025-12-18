@@ -8,7 +8,7 @@ export const OS = {
 };
 
 export const SEPARATOR = navigator.userAgent.includes(OS.windows) ? "\\" : "/";
-
+export const DEFAULT_FONT = "Consolas";
 export const BROWSER_SHORTCUT_KEYS = ["g", "r", "+", "-", "u", "j"];
 export const SINGLE_BROWSER_SHORTCUT_KEYS = ["F7", "F12"];
 export const DEFAULT_ENCODING = "UTF-8";
@@ -26,6 +26,17 @@ export const DEFAULT_GREP_REQUEST: Mp.GrepRequest = {
     case_sensitive: false,
     regexp: false,
     recursive: true,
+};
+export const DEFAULT_PREFERENCE: Mp.Preference = {
+    indentSize: 4,
+    indentBySpaces: true,
+    showLineNumber: true,
+    autoIndent: true,
+    wordWrap: false,
+    fontFamily: DEFAULT_FONT,
+    fontSize: 14,
+    renderWhitespace: "selection",
+    lineHighlight: true,
 };
 
 export const EDIT_MENU_ITEMS: Mp.MenuItem[] = [

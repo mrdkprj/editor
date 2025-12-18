@@ -1,7 +1,7 @@
 use crate::{
     fgrep::{self, GrepRequest},
     session::Session,
-    WriteFileInfo,
+    watcher, WatchTx, WriteFileInfo,
 };
 use encoding_rs::Encoding;
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,10 @@ pub fn setup(app: &mut tauri::App, args: Vec<String>) {
     if let Ok(session) = crate::session::start(id) {
         app.manage(session);
     }
+
+    let (tx_cmd, rx_cmd) = tokio::sync::mpsc::unbounded_channel();
+    app.manage(WatchTx(tx_cmd));
+    watcher::spwan_watcher(app.app_handle(), rx_cmd).unwrap();
 
     if args.len() == 1 {
         app.manage(FileArg::default());
@@ -71,6 +75,7 @@ pub struct InitArgs {
     file: Option<FileArg>,
     grep: Option<GrepRequest>,
     locales: Vec<String>,
+    app_data_dir: String,
     restore_position: bool,
 }
 
@@ -80,6 +85,7 @@ pub fn get_init_args(app: AppHandle) -> Result<InitArgs, String> {
     let mut args = InitArgs {
         locales: vec![locale],
         restore_position,
+        app_data_dir: app.path().app_data_dir().unwrap_or_default().to_string_lossy().to_string(),
         ..Default::default()
     };
 

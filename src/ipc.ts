@@ -35,6 +35,7 @@ type InitArgs = {
     grep?: Mp.GrepRequest;
     locales: string[];
     restore_position: boolean;
+    app_data_dir: string;
 };
 
 type ReadResult = {
@@ -111,7 +112,7 @@ export class IPC extends IPCBase {
         this.funcs.push(fn);
     };
 
-    send = async <K extends keyof MainChannelEventMap>(channel: K, data: MainChannelEventMap[K]) => {
+    send = async <K extends keyof RendererChannelEventMap>(channel: K, data: RendererChannelEventMap[K]) => {
         await emit(channel, data);
     };
 

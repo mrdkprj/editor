@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState, dispatch, textState, settings } from "./appStateReducer.svelte";
+    import { appState, dispatch, textState, settings, temporal } from "./appStateReducer.svelte";
     import type monaco from "monaco-editor";
     import { onMount } from "svelte";
     import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
@@ -13,6 +13,7 @@
     import { BROWSER_SHORTCUT_KEYS, LANGUAGES, LINE_ENDINGS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
     import { KeyCode, KeyMod } from "monaco-editor";
     import util from "../util";
+    import { getThemeData } from "../theme";
 
     let {
         startLine,
@@ -33,8 +34,8 @@
     } = $props();
 
     const ipc = new IPC("View");
-    const DARK = "vs-dark";
-    const LIGHT = "vs";
+    const DARK = "custom-dark";
+    const LIGHT = "custom-light";
     const headerLineCount = 9;
     const decorationMap: { [key: string]: monaco.editor.IModelDeltaDecoration } = {};
     const matchRegexp = util.isWin() ? new RegExp(/(^(?=.*\\).*)\(([0-9]*),([0-9]*)\)/) : new RegExp(/(^(?=.*\/).*)\(([0-9]*),([0-9]*)\)/);
@@ -46,6 +47,7 @@
     let watchDialogPromise: Deferred<Mp.WatchConfirmEvent> | null;
     let state: monaco.editor.ICodeEditorViewState | null = null;
     let supressChangeDetection = false;
+    let useTemporal = false;
 
     const onDialogEvent = (open: boolean) => {
         if (open) {
@@ -267,11 +269,9 @@
                 break;
             }
             case "AutoIndent": {
-                if ($appState.mode == "grep") return;
-                const option = editor.getOption(Monaco.editor.EditorOption.autoIndent);
-                const autoIndent = option == Monaco.editor.EditorAutoIndentStrategy.Advanced ? false : true;
-                settings.preference[textState.textType].autoIndent = autoIndent;
-                updateModel();
+                useTemporal = true;
+                updateModel(true);
+                useTemporal = false;
                 break;
             }
             case "Wordwrap": {
@@ -407,12 +407,21 @@
         supressChangeDetection = false;
     };
 
-    const updateModel = () => {
+    const updateModel = (restoreDecoration = false) => {
         const state = editor.saveViewState();
+        const decorations = restoreDecoration ? model.getAllDecorations() : null;
         model.dispose();
         editor.dispose();
         createEditor();
         editor.restoreViewState(state);
+        if (decorations) {
+            model.deltaDecorations([], decorations);
+        }
+    };
+
+    const reflectSettings = (changeType: Mp.SettingChangeType) => {
+        const restoreDecoration = changeType != "color";
+        updateModel(restoreDecoration);
     };
 
     const createEditor = async () => {
@@ -435,6 +444,9 @@
             },
         };
 
+        Monaco.editor.defineTheme(DARK, getThemeData("dark", settings.color["dark"]));
+        Monaco.editor.defineTheme(LIGHT, getThemeData("light", settings.color["light"]));
+
         const content = $appState.content;
 
         model = Monaco.editor.createModel(content, undefined, Monaco.Uri.file(path.basename($appState.fullPath)));
@@ -442,11 +454,14 @@
         const isPlainText = $appState.mode == "grep" || language == "plaintext";
         textState.textType = isPlainText ? "plain" : "code";
 
-        model.updateOptions({ indentSize: settings.preference[textState.textType].indentSize, insertSpaces: settings.preference[textState.textType].indentBySpaces });
+        const preference = settings.preference[textState.textType];
+        model.updateOptions({ indentSize: preference.indentSize, insertSpaces: preference.indentBySpaces });
+
+        const shouldAutoIndent = useTemporal ? temporal[textState.textType].autoIndent : preference.autoIndent;
 
         editor = Monaco.editor.create(root, {
             model,
-            theme: $appState.theme == "dark" ? DARK : LIGHT,
+            theme: settings.theme == "dark" ? DARK : LIGHT,
             hover: { enabled: false },
             contextmenu: false,
             minimap: { enabled: false },
@@ -454,11 +469,16 @@
             automaticLayout: true,
             emptySelectionClipboard: false,
             suggest: isPlainText ? { showWords: false } : { showWords: true },
-            autoIndent: settings.preference[textState.textType].autoIndent ? "advanced" : "none",
+            autoIndent: shouldAutoIndent ? "advanced" : "none",
             folding: !isPlainText,
-            wordWrap: settings.preference[textState.textType].wordWrap ? "on" : "off",
+            wordWrap: preference.wordWrap ? "on" : "off",
+            lineNumbers: preference.showLineNumber ? "on" : "off",
+            fontFamily: preference.fontFamily,
+            fontSize: preference.fontSize,
+            colorDecorators: !isPlainText,
             /* Prevent wordwrap at space */
             wordWrapBreakAfterCharacters: "",
+            wordWrapBreakBeforeCharacters: "",
             /* Use "ctrlCmd" because "alt" blocks columnSelection */
             multiCursorModifier: "ctrlCmd",
             copyWithSyntaxHighlighting: true,
@@ -476,10 +496,11 @@
             showDeprecated: false,
             trimWhitespaceOnDelete: false,
             occurrencesHighlight: isPlainText ? "off" : "singleFile",
-            renderWhitespace: settings.preference[textState.textType].renderWhitespace,
+            renderWhitespace: preference.renderWhitespace,
             guides: { indentation: false },
             formatOnType: false,
-            renderLineHighlight: settings.preference[textState.textType].lineHighlight ? "line" : "none",
+            links: !isPlainText,
+            renderLineHighlight: preference.lineHighlight ? "line" : "none",
             find: { seedSearchStringFromSelection: "selection" },
         });
 
@@ -587,13 +608,15 @@
 
     onMount(() => {
         init();
-        ipc.receive("load", updateModel);
+        ipc.receive("load", () => updateModel());
         ipc.receive("contextmenu_event", handleContextMenuEvent);
         ipc.receive("watch_event", onWatchEvent);
         ipc.receive("watch_confirm_event", resolvePromise);
         ipc.receive("dialog", onDialogEvent);
         ipc.receive("grep_end", onGrepResults);
         ipc.receive("encoding_changed", onEncodingChanged);
+        ipc.receive("settingChanged", reflectSettings);
+        ipc.receive("refelect_settings", () => updateModel(true));
 
         return () => {
             ipc.release();

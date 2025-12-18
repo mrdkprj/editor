@@ -1,93 +1,98 @@
-use async_std::{
-    channel::{self, Receiver},
-    sync::Mutex,
-    task::block_on,
-};
+#![allow(unused_imports)]
+use crate::helper;
 use notify_debouncer_full::{
     new_debouncer,
     notify::{event::ModifyKind, EventKind, ReadDirectoryChangesWatcher, RecursiveMode},
     DebounceEventResult, DebouncedEvent, Debouncer, FileIdMap,
 };
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
-use tauri::{Emitter, EventTarget, WebviewWindow};
-
-use crate::helper;
-
-static WATCHER: Lazy<Mutex<Option<Debouncer<ReadDirectoryChangesWatcher, FileIdMap>>>> = Lazy::new(|| Mutex::new(None));
-static HANDLED: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
+use tauri::{AppHandle, Emitter as _, EventTarget, WebviewWindow};
+use tokio::sync::{
+    mpsc::{self, UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 
 const WATCH_EVENT_NAME: &str = "watch_event";
 
-fn async_watcher() -> notify_debouncer_full::notify::Result<(Debouncer<ReadDirectoryChangesWatcher, FileIdMap>, Receiver<DebouncedEvent>)> {
-    let (tx, rx) = channel::bounded(1);
-
-    let watcher = new_debouncer(std::time::Duration::from_millis(50), None, move |result: DebounceEventResult| match result {
-        Ok(events) => events.iter().for_each(|event| {
-            block_on(async {
-                let _ = tx.send(event.clone()).await;
-            })
-        }),
-        Err(errors) => errors.iter().for_each(|error| println!("{error:?}")),
-    })?;
-
-    Ok((watcher, rx))
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct WatchEvent {
-    file_path: String,
-    content: String,
-    encoding: String,
+pub struct WatchEvent {
+    pub file_path: String,
+    pub content: String,
+    pub encoding: String,
 }
 
-pub async fn watch(window: &WebviewWindow, file_path: String) -> notify_debouncer_full::notify::Result<()> {
-    let (mut watcher, rx) = async_watcher()?;
+pub enum WatcherCommand {
+    Watch(String),
+    Unwatch(String),
+}
 
-    // Add a path to be watched. All files and directories at that path and
-    // below will be monitored for changes.
-    watcher.watch(Path::new(&file_path), RecursiveMode::NonRecursive)?;
+pub fn spwan_watcher(app_handle: &AppHandle, mut cmd_rx: UnboundedReceiver<WatcherCommand>) -> Result<(), String> {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    {
-        let mut inner = WATCHER.try_lock().unwrap();
-        *inner = Some(watcher);
-    }
+    let mut watcher = new_debouncer(Duration::from_millis(100), None, move |res| tx.send(res).unwrap_or_default()).map_err(|e| e.to_string())?;
+    let app_handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::select! {
+                cmd = cmd_rx.recv() => {
+                    match cmd {
+                        Some(WatcherCommand::Watch(path)) => {
+                            let _ = watcher.watch(path, RecursiveMode::NonRecursive);
+                        },
+                        Some(WatcherCommand::Unwatch(path)) => {
+                            let _ = watcher.unwatch(path);
+                        },
+                        None => {
+                            println!("Command channel closed. Shutting down watcher.");
+                            break;
+                        }
+                    }
+                }
 
-    while let Ok(event) = rx.recv().await {
-        if is_modified(event.kind) {
-            let mut handled = HANDLED.try_lock().unwrap();
-
-            let result = helper::read_to_string(event.paths[0].to_str().unwrap()).map_err(|e| notify_debouncer_full::notify::Error::generic(&e))?;
-
-            window
-                .emit_to(
-                    EventTarget::WebviewWindow {
-                        label: window.label().to_string(),
-                    },
-                    WATCH_EVENT_NAME,
-                    WatchEvent {
-                        file_path: event.paths[0].to_string_lossy().to_string(),
-                        content: result.content,
-                        encoding: result.encoding,
-                    },
-                )
-                .unwrap();
-            *handled = false;
+                event_result = rx.recv() => {
+                    if let Some(event_result) = event_result {
+                        match event_result {
+                            Ok(events) => {
+                                for event in events {
+                                    if is_modified(event.kind) {
+                                       handle_event(&app_handle, &event).unwrap();
+                                    }
+                                }
+                            },
+                            Err(errors) => {
+                                for error in errors {
+                                    eprintln!("[FS_ERR] Watcher error: {:?}", error);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-    }
+    });
 
     Ok(())
 }
 
-fn is_modified(event_kind: EventKind) -> bool {
-    matches!(event_kind, EventKind::Modify(ModifyKind::Any) | EventKind::Modify(ModifyKind::Data(_)) | EventKind::Modify(ModifyKind::Metadata(_)) | EventKind::Modify(ModifyKind::Other))
+fn handle_event(app: &AppHandle, event: &DebouncedEvent) -> Result<(), String> {
+    let result = helper::read_to_string(event.paths[0].to_str().unwrap()).map_err(|e| notify_debouncer_full::notify::Error::generic(&e)).map_err(|e| e.to_string())?;
+
+    app.emit(
+        WATCH_EVENT_NAME,
+        WatchEvent {
+            file_path: event.paths[0].to_string_lossy().to_string(),
+            content: result.content,
+            encoding: result.encoding,
+        },
+    )
+    .map_err(|e| e.to_string())
 }
 
-pub fn unwatch(file_path: String) {
-    if let Some(mut inner) = WATCHER.try_lock() {
-        if let Some(watcher) = inner.as_mut() {
-            let _ = watcher.unwatch(Path::new(&file_path));
-        }
-    }
+fn is_modified(event_kind: EventKind) -> bool {
+    matches!(event_kind, EventKind::Modify(ModifyKind::Any) | EventKind::Modify(ModifyKind::Data(_)) | EventKind::Modify(ModifyKind::Metadata(_)) | EventKind::Modify(ModifyKind::Other))
 }

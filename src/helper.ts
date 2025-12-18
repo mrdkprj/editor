@@ -32,6 +32,7 @@ class Helper {
             locale,
             encoding: args.file?.encoding,
             restorePosition: args.restore_position,
+            appDataDir: args.app_data_dir,
         };
     };
 

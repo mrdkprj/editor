@@ -1,1 +1,1 @@
-explite
+editor

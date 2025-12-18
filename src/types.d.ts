@@ -5,15 +5,8 @@ declare global {
 
     type RendererName = "View";
 
-    type MainChannelEventMap = {
-        minimize: Mp.AnyEvent;
-        "toggle-maximize": Mp.AnyEvent;
-        close: Mp.AnyEvent;
-        "open-list-context-menu": Mp.Position;
-    };
-
     type RendererChannelEventMap = {
-        load: Mp.AnyEvent;
+        load: boolean;
         "after-toggle-maximize": Mp.SettingsChangeEvent;
         contextmenu_event: Mp.ContextMenuEvent;
         watch_event: Mp.WatchEvent;
@@ -22,6 +15,8 @@ declare global {
         grep_end: Mp.AnyEvent;
         dialog: boolean;
         encoding_changed: Mp.AnyEvent;
+        refelect_settings: Mp.AnyEvent;
+        settingChanged: Mp.SettingChangeType;
     };
 
     namespace Mp {
@@ -29,6 +24,24 @@ declare global {
         type Mode = "editor" | "grep" | "none";
         type TextType = "plain" | "code";
         type WhiteSpaceRenderMode = "none" | "all" | "boundary" | "selection" | "trailing" | undefined;
+        type PreferenceTab = "view" | "color";
+        type ColorKey =
+            | "color"
+            | "background"
+            | "caret"
+            | "lineHightlightBackground"
+            | "lineHightlightBorder"
+            | "lineNumber"
+            | "space"
+            | "bracketMatchBackground"
+            | "bracketMatchBorder"
+            | "selection"
+            | "selectionBackground"
+            | "search"
+            | "searchBackground"
+            | "searchHighlight"
+            | "searchHighlightBackground"
+            | "link";
 
         type TextState = {
             textType: Mp.TextType;
@@ -77,6 +90,7 @@ declare global {
             fontSize: number;
             renderWhitespace: null;
             lineHighlight: null;
+            preference: null;
         };
 
         type Bounds = {
@@ -98,13 +112,15 @@ declare global {
             bottom: number;
         };
 
+        type TypedPreference = { [key in TextType]: Preference };
         type Settings = {
             bounds: Bounds;
             isMaximized: boolean;
             history: string[];
             theme: Mp.Theme;
             grepHistory: Mp.GrepRequest;
-            preference: { [key in TextType]: Preference };
+            preference: TypedPreference;
+            color: { [key in Mp.Theme]: IColors };
         };
 
         type Preference = {
@@ -113,9 +129,16 @@ declare global {
             showLineNumber: boolean;
             autoIndent: boolean;
             wordWrap: boolean;
+            fontFamily: string;
             fontSize: number;
             renderWhitespace: WhiteSpaceRenderMode;
             lineHighlight: boolean;
+        };
+
+        type SettingChangeType = "both" | "preference" | "color";
+
+        type IColors = {
+            [colorId in string]: string;
         };
 
         type OpenFileResult = {
@@ -137,6 +160,7 @@ declare global {
             locale: Mp.LocaleName;
             encoding?: string;
             restorePosition: boolean;
+            appDataDir: string;
         };
 
         type ClipboardData = {

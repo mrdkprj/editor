@@ -7,7 +7,7 @@
     import icon from "../asset/icon.png";
 
     let { beforeClose, toggleMaximize }: { beforeClose: () => void; toggleMaximize: () => void } = $props();
-    let disabled = $derived($appState.showGrepDialog || $appState.showGrepProgress);
+    let disabled = $derived($appState.showGrepDialog || $appState.showGrepProgress || $appState.showPreference || $appState.showWatchDialog);
 
     const onmousedown = (e: MouseEvent) => {
         if (disabled) {
