@@ -1,12 +1,10 @@
-use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, EventTarget, WebviewWindow};
+use tauri::{Emitter, Manager};
 use wcpopup::{
     config::{ColorScheme, Config, MenuSize, Theme, ThemeColor, DEFAULT_DARK_COLOR_SCHEME},
     Menu, MenuBuilder,
 };
 
-static MENU: OnceCell<Menu> = OnceCell::new();
 const MENU_EVENT_NAME: &str = "contextmenu_event";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,17 +19,16 @@ struct ContextMenuEvent {
     value: Option<String>,
 }
 
-pub async fn popup_menu(window: &WebviewWindow, position: Position) {
-    let menu = MENU.get().unwrap();
+struct AppMenu(Menu);
+
+pub async fn popup_menu(app_handle: &tauri::AppHandle, position: Position) {
+    let menu = &app_handle.state::<AppMenu>().inner().0;
 
     let result = menu.popup_at_async(position.x, position.y).await;
 
     if let Some(item) = result {
-        window
-            .emit_to(
-                EventTarget::WebviewWindow {
-                    label: window.label().to_string(),
-                },
+        app_handle
+            .emit(
                 MENU_EVENT_NAME,
                 ContextMenuEvent {
                     id: item.id,
@@ -61,15 +58,17 @@ fn get_menu_config(theme: Theme) -> Config {
     }
 }
 
-pub fn create(window_handle: isize) {
-    create_list_menu(window_handle);
+pub fn create(app_handle: &tauri::AppHandle, window_handle: isize) {
+    let menu = create_list_menu(window_handle);
+    app_handle.manage(AppMenu(menu));
 }
 
-pub fn change_menu_theme(theme: Theme) {
-    MENU.get().unwrap().set_theme(theme);
+pub fn change_menu_theme(app_handle: &tauri::AppHandle, theme: Theme) {
+    let menu = &app_handle.state::<AppMenu>().inner().0;
+    menu.set_theme(theme);
 }
 
-fn create_list_menu(window_handle: isize) {
+fn create_list_menu(window_handle: isize) -> Menu {
     let config = get_menu_config(Theme::System);
     let mut builder = MenuBuilder::new_from_config(window_handle, config);
     builder.text_with_accelerator("Copy", "Copy", false, "Ctrl+C");
@@ -89,7 +88,5 @@ fn create_list_menu(window_handle: isize) {
     builder.separator();
     builder.text("Format", "Format", false);
 
-    let menu = builder.build().unwrap();
-
-    MENU.get_or_init(|| menu);
+    builder.build().unwrap()
 }

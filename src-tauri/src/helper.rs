@@ -1,7 +1,8 @@
 use crate::{
     fgrep::{self, GrepRequest},
     session::Session,
-    watcher, WatchTx, WriteFileInfo,
+    watcher::{self, WatchTx},
+    WriteFileInfo,
 };
 use encoding_rs::Encoding;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,7 @@ pub fn setup(app: &mut tauri::App, args: Vec<String>) {
         app.manage(session);
     }
 
-    let (tx_cmd, rx_cmd) = tokio::sync::mpsc::unbounded_channel();
+    let (tx_cmd, rx_cmd) = crossbeam_channel::bounded(1);
     app.manage(WatchTx(tx_cmd));
     watcher::spwan_watcher(app.app_handle(), rx_cmd).unwrap();
 

@@ -215,6 +215,7 @@
 
     const executeGrep = async (request: Mp.GrepRequest) => {
         dispatch({ type: "grepRequest", value: request });
+        settings.grepHistory = request;
 
         if ($appState.fullPath || $appState.isDirty) {
             return await openNewWindow("", request, undefined);

@@ -1,17 +1,15 @@
-#![allow(clippy::map_entry)]
 use globset::Glob;
 use grep::{
     matcher::Matcher,
     regex::{RegexMatcher, RegexMatcherBuilder},
     searcher::{sinks::Lossy, MmapChoice, SearcherBuilder},
 };
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Mutex};
 use tauri::{Emitter, EventTarget};
 use zouni::Dirent;
 
-static CANCEL: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+static CANCEL: Mutex<bool> = Mutex::new(false);
 const GREP_EVENT_NAME: &str = "grep_progress";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,8 +99,8 @@ pub async fn run_grep(window: &tauri::WebviewWindow, e: GrepRequest) -> Result<V
                         let full_path = file.full_path.clone();
                         let mut key = full_path.clone();
                         key.push_str(&line_number.to_string());
-                        if results.contains_key(&key) {
-                            results.get_mut(&key).unwrap().ranges.push((matched.start(), matched.end()));
+                        if let Some(result) = results.get_mut(&key) {
+                            result.ranges.push((matched.start(), matched.end()));
                         } else {
                             let result = GrepResult {
                                 full_path,
@@ -112,7 +110,6 @@ pub async fn run_grep(window: &tauri::WebviewWindow, e: GrepRequest) -> Result<V
                             };
                             results.insert(key, result);
                         }
-
                         true
                     })?;
 

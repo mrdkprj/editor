@@ -13,9 +13,15 @@
     let current = $state(0);
 
     const onkeydown = (e: KeyboardEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (e.key == "Escape") {
             close();
         }
+    };
+
+    const setKeyboardFocus = (node: HTMLDivElement) => {
+        node.focus();
     };
 
     const close = async () => {
@@ -38,7 +44,7 @@
     });
 </script>
 
-<div class="mp-dialog-overlay" {onkeydown} role="button" tabindex="-1">
+<div class="mp-dialog-overlay" {onkeydown} role="button" tabindex="-1" use:setKeyboardFocus>
     <div class="mp-dialog-container">
         <div class="mp-dialog-header">
             <div class="mp-dialog-close" onclick={close} onkeydown={handleKeyEvent} role="button" tabindex="-1">&times;</div>

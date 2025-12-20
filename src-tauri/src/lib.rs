@@ -1,5 +1,4 @@
-#![allow(dead_code)]
-use crate::watcher::WatcherCommand;
+use crate::watcher::{WatchTx, WatcherCommand};
 use dialog::DialogOptions;
 use serde::{Deserialize, Serialize};
 use std::{env, path::PathBuf};
@@ -11,8 +10,6 @@ mod helper;
 mod menu;
 mod session;
 mod watcher;
-
-pub struct WatchTx(tokio::sync::mpsc::UnboundedSender<WatcherCommand>);
 
 #[cfg(target_os = "linux")]
 fn get_window_handel(window: &WebviewWindow) -> isize {
@@ -96,7 +93,7 @@ fn write_text_file(payload: WriteFileInfo) -> Result<(), String> {
 #[tauri::command]
 fn prepare_menu(window: WebviewWindow) {
     let window_handle = get_window_handel(&window);
-    menu::create(window_handle);
+    menu::create(window.app_handle(), window_handle);
 }
 
 #[tauri::command]
@@ -107,22 +104,21 @@ fn change_theme(window: WebviewWindow, payload: String) {
         _ => (tauri::Theme::Light, wcpopup::config::Theme::System),
     };
     let _ = window.set_theme(Some(tauri_them));
-    menu::change_menu_theme(menu_theme);
+    menu::change_menu_theme(window.app_handle(), menu_theme);
 }
 
 #[tauri::command]
 async fn open_list_context_menu(window: WebviewWindow, payload: menu::Position) {
     #[cfg(target_os = "windows")]
     {
-        menu::popup_menu(&window, payload).await;
+        menu::popup_menu(window.app_handle(), payload).await;
     }
     #[cfg(target_os = "linux")]
     {
-        let gtk_window = window.clone();
         window
             .run_on_main_thread(move || {
                 gtk::glib::spawn_future_local(async move {
-                    menu::popup_menu(&gtk_window, payload).await;
+                    menu::popup_menu(window.app_handle(), payload).await;
                 });
             })
             .unwrap();
