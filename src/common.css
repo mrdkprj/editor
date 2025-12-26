@@ -38,6 +38,10 @@
         --button-hover-color:#8f8ac9;
 
         --tab-border:#4f4a4a;
+
+        --scrollbar-track:#272626;
+        --scrollbar-thumb:#7979791a;
+        --scrollbar-thumb-hover:#79797966;
     }
 }
 
@@ -76,6 +80,10 @@
         --button-hover-color:#f5eeee;
 
         --tab-border:#876f6f;
+
+        --scrollbar-track: #fff;
+        --scrollbar-thumb: #7979791a;
+        --scrollbar-thumb-hover: #79797966;
     }
 }
 

@@ -8,6 +8,7 @@
     let { items, submenu, id }: { items: Mp.MenuItem[]; submenu: boolean; id?: string } = $props();
 
     const ipc = new IPC("View");
+
     let canvas: HTMLCanvasElement;
     let width = $state(0);
     let hasCheckmark = $state(false);
@@ -103,7 +104,7 @@
     });
 </script>
 
-<div class:menu-container={!submenu} class:submenu class:has-checkmark={hasCheckmark} style="min-width: {width}px; visibility:{visible ? 'visible' : 'hidden'}">
+<div class:menu-container={!submenu} class:submenu class:has-checkmark={hasCheckmark} style="min-width: {width}px; visibility:{visible ? 'visible' : 'hidden'}; ">
     {#each items as item}
         {#if item.type == "submenu"}
             <div
@@ -194,6 +195,7 @@
         left: 5px;
         box-shadow: 3px 3px 3px 3px var(--menu-shadow);
         padding: 5px 0;
+        max-height: 100vh;
     }
 
     .menu-item {
@@ -254,6 +256,8 @@
         transition-property: visibility;
         box-shadow: 3px 3px 3px 3px var(--menu-shadow);
         padding: 5px 0;
+        overflow: auto;
+        max-height: 50vh;
     }
 
     .submenu-container::before {
@@ -279,5 +283,20 @@
         border-right: 1px solid var(--menu-icon-color);
         left: 16px;
         top: 8px;
+    }
+    ::-webkit-scrollbar {
+        width: auto;
+    }
+
+    ::-webkit-scrollbar-track {
+        background-color: var(--scrollbar-track);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: var(--scrollbar-thumb);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: var(--scrollbar-thumb-hover);
     }
 </style>
