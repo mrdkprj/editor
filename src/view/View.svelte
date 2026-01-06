@@ -71,7 +71,7 @@
                 break;
             }
             case "Print":
-                console.log("print");
+                window.print();
                 break;
 
             case "Theme":
