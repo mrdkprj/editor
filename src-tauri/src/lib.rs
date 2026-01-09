@@ -2,7 +2,9 @@ use crate::watcher::{WatchTx, WatcherCommand};
 use dialog::DialogOptions;
 use serde::{Deserialize, Serialize};
 use std::{env, path::PathBuf};
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
+#[cfg(target_os = "windows")]
+use tauri::Emitter;
+use tauri::{AppHandle, Manager, WebviewWindow};
 use zouni::*;
 mod dialog;
 mod fgrep;
@@ -115,7 +117,8 @@ async fn open_list_context_menu(window: WebviewWindow, payload: menu::Position) 
     }
     #[cfg(target_os = "linux")]
     {
-        window
+        let app_handle = window.app_handle().clone();
+        app_handle
             .run_on_main_thread(move || {
                 gtk::glib::spawn_future_local(async move {
                     menu::popup_menu(window.app_handle(), payload).await;
