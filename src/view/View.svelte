@@ -89,24 +89,18 @@
             case "AutoIndent":
                 temporal[textState.textType].autoIndent = !temporal[textState.textType].autoIndent;
                 break;
+            case "indentBySpaces": {
+                temporal[textState.textType].indentBySpaces = !temporal[textState.textType].indentBySpaces;
+                break;
+            }
+
             case "Wordwrap":
                 temporal[textState.textType].wordWrap = !temporal[textState.textType].wordWrap;
-                break;
-            case "fontSize":
-                temporal[textState.textType].fontSize = Number(e.value);
                 break;
             case "lineHighlight":
                 temporal[textState.textType].lineHighlight = !temporal[textState.textType].lineHighlight;
                 break;
 
-            case "indentBySpaces": {
-                temporal[textState.textType].indentBySpaces = !temporal[textState.textType].indentBySpaces;
-                break;
-            }
-            case "indentSize": {
-                temporal[textState.textType].indentSize = Number(e.value);
-                break;
-            }
             case "renderWhitespace": {
                 temporal[textState.textType].renderWhitespace = e.value as Mp.WhiteSpaceRenderMode;
                 break;

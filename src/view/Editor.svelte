@@ -274,6 +274,11 @@
                 useTemporal = false;
                 break;
             }
+            case "indentBySpaces": {
+                model.updateOptions({ insertSpaces: !model.getOptions().insertSpaces });
+                break;
+            }
+
             case "Wordwrap": {
                 const option = editor.getOption(Monaco.editor.EditorOption.wordWrap);
                 if (option == "on") {
@@ -294,19 +299,6 @@
                 } else {
                     editor.updateOptions({ renderLineHighlight: "line" });
                 }
-                break;
-            }
-
-            case "indentSize": {
-                model.updateOptions({ indentSize: Number(e.value) });
-                break;
-            }
-            case "indentBySpaces": {
-                model.updateOptions({ insertSpaces: !model.getOptions().insertSpaces });
-                break;
-            }
-            case "fontSize": {
-                editor.updateOptions({ fontSize: Number(e.value) });
                 break;
             }
 

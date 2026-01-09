@@ -32,38 +32,29 @@ pub fn spwan_watcher(app_handle: &AppHandle, cmd_rx: Receiver<WatcherCommand>) -
     let app_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         loop {
-            crossbeam_channel::select! {
-                recv(cmd_rx) -> cmd  => {
-                    if let Ok(cmd) = cmd {
-                        match cmd {
-                            WatcherCommand::Watch(path) => {
-                                let _ = watcher.watch(path, RecursiveMode::NonRecursive);
-                            },
-                            WatcherCommand::Unwatch(path) => {
-                                let _ = watcher.unwatch(path);
-                            }
-                        }
-                    }else {
-                        println!("Command channel closed. Shutting down watcher.");
-                        break;
+            if let Ok(cmd) = cmd_rx.try_recv() {
+                match cmd {
+                    WatcherCommand::Watch(path) => {
+                        let _ = watcher.watch(path, RecursiveMode::NonRecursive);
+                    }
+                    WatcherCommand::Unwatch(path) => {
+                        let _ = watcher.unwatch(path);
                     }
                 }
+            }
 
-                recv(rx) -> event_result => {
-                    if let Ok(event_result) = event_result {
-                        match event_result {
-                            Ok(events) => {
-                                for event in events {
-                                    if is_modified(event.kind) {
-                                       handle_event(&app_handle, &event).unwrap();
-                                    }
-                                }
-                            },
-                            Err(errors) => {
-                                for error in errors {
-                                    eprintln!("[FS_ERR] Watcher error: {:?}", error);
-                                }
+            if let Ok(event_result) = rx.try_recv() {
+                match event_result {
+                    Ok(events) => {
+                        for event in events {
+                            if is_modified(event.kind) {
+                                handle_event(&app_handle, &event).unwrap();
                             }
+                        }
+                    }
+                    Err(errors) => {
+                        for error in errors {
+                            eprintln!("Watcher error: {:?}", error);
                         }
                     }
                 }

@@ -82,12 +82,10 @@ declare global {
             transformToKebabcase: null;
             Format: null;
             Theme: null;
-            indentSize: number;
             indentBySpaces: null;
             encoding: string;
             clearHistory: null;
             copyFilePath: null;
-            fontSize: number;
             renderWhitespace: null;
             lineHighlight: null;
             preference: null;
