@@ -94,17 +94,13 @@ export default class Settings {
             const value = rawSettings[key];
 
             if (typeof value === "object" && !Array.isArray(value)) {
-                this.createSettings(rawSettings, value);
+                this.createSettings(value, config[key]);
             } else {
                 config[key] = value;
             }
         });
 
         return config;
-    }
-
-    update(data: Mp.Settings) {
-        this.data = data;
     }
 
     async reload() {

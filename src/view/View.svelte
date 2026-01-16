@@ -389,22 +389,22 @@
     };
 
     const close = async () => {
+        settingStore.data = $state.snapshot(settings);
         const view = WebviewWindow.getCurrent();
         if (!settings.isMaximized) {
             const position = await view.innerPosition();
             const size = await view.innerSize();
-            settings.bounds = util.toBounds(position, size);
+            settingStore.data.bounds = util.toBounds(position, size);
         }
-        settings.grepHistory = $appState.grepRequest;
+        settingStore.data.grepHistory = $appState.grepRequest;
         await helper.unlistenAll();
-        settingStore.data = settings;
         await settingStore.save();
         await view.close();
     };
 
     const onSettingsChange = async () => {
         emitted = true;
-        settingStore.update(settings);
+        settingStore.data = $state.snapshot(settings);
         await settingStore.save();
         await settingStore.emit();
     };
