@@ -45,7 +45,7 @@ pub fn start(id: &str) -> Result<Session, String> {
 
     #[cfg(target_os = "linux")]
     {
-        if let Ok(connection) = Builder::session().unwrap().name(&id).unwrap().replace_existing_names(false).allow_name_replacements(false).build() {
+        if let Ok(connection) = Builder::session().unwrap().name(id.clone()).unwrap().replace_existing_names(false).allow_name_replacements(false).build() {
             Ok(Session {
                 connection,
                 id,
@@ -64,5 +64,5 @@ pub fn end(session: &Session) {
     }
 
     #[cfg(target_os = "linux")]
-    let _ = session.connection.release_name(&session.id);
+    let _ = session.connection.release_name(session.id.clone());
 }
