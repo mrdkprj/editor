@@ -64,7 +64,7 @@
     const handleContextMenuEvent = async (e: Mp.ContextMenuEvent) => {
         switch (e.id) {
             case "New":
-                await helper.openNewWindow("");
+                await openNewWindow("");
                 break;
             case "Open": {
                 await openFile();
@@ -173,7 +173,7 @@
             switch (e.key) {
                 case "n":
                     e.preventDefault();
-                    await helper.openNewWindow("");
+                    await openNewWindow("");
                     return;
                 case "o":
                     e.preventDefault();
@@ -267,7 +267,7 @@
     const onFileDrop = async (e: Mp.FileDropEvent) => {
         if (!e.paths.length) return;
         await openFile(e.paths.shift());
-        e.paths.forEach((filePath) => helper.openNewWindow(filePath));
+        e.paths.forEach((filePath) => openNewWindow(filePath));
     };
 
     /* Replace reserved/disallowed characters */
@@ -477,7 +477,7 @@
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
     {#if ready}
-        <Bar {beforeClose} {toggleMaximize} />
+        <Bar {openNewWindow} {beforeClose} {toggleMaximize} />
         {#if $appState.showWatchDialog}
             <WatchDialog />
         {/if}

@@ -6,7 +6,11 @@
     import Menubar from "./Menubar.svelte";
     import icon from "../asset/icon.png";
 
-    let { beforeClose, toggleMaximize }: { beforeClose: () => void; toggleMaximize: () => void } = $props();
+    let {
+        openNewWindow,
+        beforeClose,
+        toggleMaximize,
+    }: { openNewWindow: (filePath: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position) => Promise<void>; beforeClose: () => void; toggleMaximize: () => void } = $props();
     let disabled = $derived($appState.showGrepDialog || $appState.showGrepProgress || $appState.showPreference || $appState.showWatchDialog);
 
     const onmousedown = (e: MouseEvent) => {
@@ -21,7 +25,7 @@
 </script>
 
 <div class="title-bar no-print" data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null} class:bar-disabled={disabled}>
-    <div class="icon-area" {onmousedown} role="button" tabindex="-1">
+    <div class="icon-area" {onmousedown} onclick={() => openNewWindow("")} onkeydown={handleKeyEvent} role="button" tabindex="-1">
         <img src={icon} alt="" width="20" height="20" />
     </div>
     <div class="menu-bar-area" {onmousedown} role="button" tabindex="-1">
