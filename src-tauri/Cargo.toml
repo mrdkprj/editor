@@ -14,8 +14,8 @@ serde = { version = "1", features = ["derive"] }
 crossbeam-channel = "0.5.15"
 notify-debouncer-full = "0.6.0"
 grep = "0.4.1"
-wcpopup = { version = "0.8.0", features = ["webview"] }
-zouni = { version = "0.1.25", features = ["webview2"] }
+wcpopup = { version = "0.9", features = ["webview"] }
+zouni = { version = "0.1", features = ["webview2"] }
 globset = "0.4.18"
 chardetng = "0.1.17"
 encoding_rs = "0.8.35"

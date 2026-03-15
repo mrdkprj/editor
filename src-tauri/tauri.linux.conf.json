@@ -25,7 +25,7 @@
   "bundle": {
     "active": true,
     "category": "DeveloperTool",
-    "targets": ["deb", "rpm"],
+    "targets": ["deb"],
     "icon": [
       "icons/icon.png"
     ],
