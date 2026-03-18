@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
-    import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+    import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { appState, dispatch, initSettings, settings, temporal, textState, updatePreferences } from "./appStateReducer.svelte";
     import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, OS, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
@@ -37,7 +37,7 @@
     };
 
     const toggleMaximize = async () => {
-        const view = WebviewWindow.getCurrent();
+        const view = getCurrentWebviewWindow();
         const maximized = await view.isMaximized();
         if (maximized) {
             view.unmaximize();
@@ -53,12 +53,20 @@
     };
 
     const onWindowSizeChanged = async () => {
-        const isMaximized = await WebviewWindow.getCurrent().isMaximized();
+        const isMaximized = await getCurrentWebviewWindow().isMaximized();
         dispatch({ type: "isMaximized", value: isMaximized });
     };
 
+    const minimize = async () => {
+        const view = getCurrentWebviewWindow();
+        const position = await view.innerPosition();
+        const size = await view.innerSize();
+        settings.bounds = util.toBounds(position, size);
+        await view.minimize();
+    };
+
     const setTitle = async () => {
-        await WebviewWindow.getCurrent().setTitle($appState.fullPath);
+        await getCurrentWebviewWindow().setTitle($appState.fullPath);
     };
 
     const handleContextMenuEvent = async (e: Mp.ContextMenuEvent) => {
@@ -373,23 +381,33 @@
     };
 
     const beforeClose = async () => {
-        if (!$appState.isDirty) return close();
+        if (!$appState.isDirty) return destroy();
 
+        const isMinimized = await getCurrentWebviewWindow().isMinimized();
+        if (isMinimized) {
+            await getCurrentWebviewWindow().unminimize();
+        }
         const name = $appState.fullPath ? path.basename($appState.fullPath) : UNTITLED;
         const shouldSave = await helper.confirm(`"${name}" is changed. Do you want to save?`);
 
         if (shouldSave.cancelled) return;
-
-        if (shouldSave.button == "No") return close();
+        if (shouldSave.button == "No") return destroy();
 
         const saved = await trySaveFile();
-        if (saved) return close();
+        if (saved) {
+            await destroy();
+        }
     };
 
     const close = async () => {
+        await getCurrentWebviewWindow().close();
+    };
+
+    const destroy = async () => {
         settingStore.data = $state.snapshot(settings);
-        const view = WebviewWindow.getCurrent();
-        if (!settings.isMaximized) {
+        const view = getCurrentWebviewWindow();
+        const isMinimized = await view.isMinimized();
+        if (!settings.isMaximized && !isMinimized) {
             const position = await view.innerPosition();
             const size = await view.innerSize();
             settingStore.data.bounds = util.toBounds(position, size);
@@ -397,7 +415,8 @@
         settingStore.data.grepHistory = $appState.grepRequest;
         await helper.unlistenAll();
         await settingStore.save();
-        await view.close();
+
+        getCurrentWebviewWindow().destroy();
     };
 
     const onSettingsChange = async () => {
@@ -448,7 +467,8 @@
             executeGrep(e.grep);
         }
 
-        const webview = WebviewWindow.getCurrent();
+        const webview = getCurrentWebviewWindow();
+
         await webview.setSize(util.toPhysicalSize(settings.bounds));
         if (e.restorePosition) {
             await webview.setPosition(util.toPhysicalPosition(settings.bounds));
@@ -458,6 +478,7 @@
 
     onMount(() => {
         prepare();
+        ipc.receiveTauri("tauri://close-requested", beforeClose);
         ipc.receiveTauri("tauri://resize", onWindowSizeChanged);
         ipc.receive("contextmenu_event", handleContextMenuEvent);
         ipc.receiveTauri<Mp.FileDropEvent>("tauri://drag-drop", onFileDrop);
@@ -475,7 +496,7 @@
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
     {#if ready}
-        <Bar {openNewWindow} {beforeClose} {toggleMaximize} />
+        <Bar {openNewWindow} {close} {toggleMaximize} {minimize} />
         {#if $appState.showWatchDialog}
             <WatchDialog />
         {/if}

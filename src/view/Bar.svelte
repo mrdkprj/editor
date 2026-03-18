@@ -1,26 +1,22 @@
 <script lang="ts">
     import { appState } from "./appStateReducer.svelte";
     import { GREP, handleKeyEvent, OS, UNTITLED } from "../constants";
-    import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { path } from "../path";
     import Menubar from "./Menubar.svelte";
     import icon from "../asset/icon.png";
 
     let {
         openNewWindow,
-        beforeClose,
+        close,
         toggleMaximize,
-    }: { openNewWindow: (filePath: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position) => Promise<void>; beforeClose: () => void; toggleMaximize: () => void } = $props();
+        minimize,
+    }: { openNewWindow: (filePath: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position) => Promise<void>; close: () => void; toggleMaximize: () => void; minimize: () => void } = $props();
     let disabled = $derived($appState.showGrepDialog || $appState.showGrepProgress || $appState.showPreference || $appState.showWatchDialog);
 
     const onmousedown = (e: MouseEvent) => {
         if (disabled) {
             e.preventDefault();
         }
-    };
-
-    const minimize = async () => {
-        await WebviewWindow.getCurrent().minimize();
     };
 </script>
 
@@ -39,7 +35,7 @@
         <div class="maximize" onclick={toggleMaximize} onkeydown={handleKeyEvent} role="button" tabindex="-1">
             <div class:minbtn={$appState.isMaximized} class:maxbtn={!$appState.isMaximized}></div>
         </div>
-        <div class="close" onclick={beforeClose} onkeydown={handleKeyEvent} role="button" tabindex="-1">&times;</div>
+        <div class="close" onclick={close} onkeydown={handleKeyEvent} role="button" tabindex="-1">&times;</div>
     </div>
 </div>
 
