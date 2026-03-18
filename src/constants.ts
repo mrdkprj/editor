@@ -18,6 +18,8 @@ export const LINE_ENDINGS = {
     1: "CRLF",
 };
 export const DEFAULT_LINE_ENDING = "CRLF";
+export const UNTITLED = "Untitled";
+export const GREP = "Grep";
 export const DEFAULT_GREP_REQUEST: Mp.GrepRequest = {
     condition: "",
     start_directory: "",

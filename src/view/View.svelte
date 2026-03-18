@@ -2,7 +2,7 @@
     import { onMount, tick } from "svelte";
     import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { appState, dispatch, initSettings, settings, temporal, textState, updatePreferences } from "./appStateReducer.svelte";
-    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, OS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
+    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, OS, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
     import util from "../util";
@@ -82,12 +82,7 @@
                 break;
 
             case "ShowLineNumber":
-                console.log(settings.preference[textState.textType].showLineNumber);
                 temporal[textState.textType].showLineNumber = !temporal[textState.textType].showLineNumber;
-                console.log(settings.preference[textState.textType].showLineNumber);
-                break;
-            case "AutoIndent":
-                temporal[textState.textType].autoIndent = !temporal[textState.textType].autoIndent;
                 break;
             case "indentBySpaces": {
                 temporal[textState.textType].indentBySpaces = !temporal[textState.textType].indentBySpaces;
@@ -273,10 +268,12 @@
     /* Replace reserved/disallowed characters */
     const getNewFileName = () =>
         $appState.content
-            .slice(0, 100)
-            .split(/\n|\r\n/)
-            .find((a) => a)
-            ?.replaceAll(/<|>|:|"|\/|\\|\||\?|\*|%/g, "");
+            ? $appState.content
+                  .slice(0, 100)
+                  .split(/\n|\r\n/)
+                  .find((a) => a)
+                  ?.replaceAll(/<|>|:|"|\/|\\|\||\?|\*|%/g, "")
+            : UNTITLED;
 
     const save = async (saveAs: boolean) => {
         return saveAs ? await trySaveAs() : await trySaveFile();
@@ -378,7 +375,8 @@
     const beforeClose = async () => {
         if (!$appState.isDirty) return close();
 
-        const shouldSave = await helper.confirm(`${path.basename($appState.fullPath)} is changed. Do you want to save?`);
+        const name = $appState.fullPath ? path.basename($appState.fullPath) : UNTITLED;
+        const shouldSave = await helper.confirm(`"${name}" is changed. Do you want to save?`);
 
         if (shouldSave.cancelled) return;
 

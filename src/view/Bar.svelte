@@ -1,6 +1,6 @@
 <script lang="ts">
     import { appState } from "./appStateReducer.svelte";
-    import { handleKeyEvent, OS } from "../constants";
+    import { GREP, handleKeyEvent, OS, UNTITLED } from "../constants";
     import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { path } from "../path";
     import Menubar from "./Menubar.svelte";
@@ -32,7 +32,7 @@
         <Menubar />
     </div>
     <div class="title" data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null} {onmousedown} role="button" tabindex="-1">
-        {$appState.fullPath ? path.basename($appState.fullPath) : $appState.mode == "grep" ? "Grep" : "Untitled"}{$appState.isDirty ? "*" : ""}
+        {$appState.fullPath ? path.basename($appState.fullPath) : $appState.mode == "grep" ? GREP : UNTITLED}{$appState.isDirty ? "*" : ""}
     </div>
     <div class="window-area">
         <div class="minimize" onclick={minimize} onkeydown={handleKeyEvent} role="button" tabindex="-1">&minus;</div>

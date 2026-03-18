@@ -269,6 +269,7 @@
                 break;
             }
             case "AutoIndent": {
+                temporal[textState.textType].autoIndent = !temporal[textState.textType].autoIndent;
                 useTemporal = true;
                 updateModel(true);
                 useTemporal = false;
