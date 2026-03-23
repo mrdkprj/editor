@@ -6,7 +6,7 @@
     import { IPC } from "../ipc";
     import helper from "../helper";
     import util from "../util";
-    import { path } from "../path";
+    import path from "../path";
 
     import Bar from "./Bar.svelte";
     import Editor from "./Editor.svelte";
@@ -66,7 +66,8 @@
     };
 
     const setTitle = async () => {
-        await getCurrentWebviewWindow().setTitle($appState.fullPath);
+        const title = settings.showFullpathOnTitlebar ? $appState.fullPath : path.basename($appState.fullPath);
+        await getCurrentWebviewWindow().setTitle(title);
     };
 
     const handleContextMenuEvent = async (e: Mp.ContextMenuEvent) => {
@@ -139,6 +140,7 @@
     };
 
     const onclick = () => {
+        console.log($appState.openingMenu);
         if ($appState.openingMenu) {
             dispatch({ type: "openingMenu", value: false });
             return;
@@ -424,6 +426,7 @@
         settingStore.data = $state.snapshot(settings);
         await settingStore.save();
         await settingStore.emit();
+        await setTitle();
     };
 
     const onWatchEvent = async (e: Mp.WatchEvent) => {

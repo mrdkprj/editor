@@ -23,7 +23,9 @@ pub fn setup(app: &mut tauri::App, args: Vec<String>) {
         return;
     }
 
-    if args[1] == "-g" {
+    if args[1].is_empty() {
+        app.manage(FileArg::default());
+    } else if args[1] == "-g" {
         let req = fgrep::GrepRequest {
             condition: args[2].to_string(),
             start_directory: args[3].to_string(),

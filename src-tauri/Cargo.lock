@@ -5587,9 +5587,9 @@ dependencies = [
 
 [[package]]
 name = "wcpopup"
-version = "0.9.2"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6722188974322707334b77d4178c73292fdf74cdac6573aea7069ad5b9c721df"
+checksum = "6763d68d4e6dedd1887fa742e6988384b548a551dad953f6427dd63f6ee789a7"
 dependencies = [
  "gtk",
  "librsvg",
@@ -6461,9 +6461,9 @@ dependencies = [
 
 [[package]]
 name = "zouni"
-version = "0.1.25"
+version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05e7b648a9ce25abe37f7de97063abc06db091941a390a9fbc52cbc3464f29d8"
+checksum = "7d7acfd863c6d29ec96ada7aef5961c44814f65995ca57e04c11eafb6236492e"
 dependencies = [
  "bstr",
  "gio",

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { appState } from "./appStateReducer.svelte";
     import { GREP, handleKeyEvent, OS, UNTITLED } from "../constants";
-    import { path } from "../path";
+    import path from "../path";
     import Menubar from "./Menubar.svelte";
     import icon from "../asset/icon.png";
 

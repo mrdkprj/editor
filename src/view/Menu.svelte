@@ -19,6 +19,7 @@
     };
 
     const ignore = (e: MouseEvent) => {
+        console.log(111);
         e.preventDefault();
         e.stopPropagation();
         dispatch({ type: "openingMenu", value: true });
@@ -104,7 +105,17 @@
     });
 </script>
 
-<div class:menu-container={!submenu} class:submenu class:has-checkmark={hasCheckmark} style="min-width: {width}px; visibility:{visible ? 'visible' : 'hidden'}; ">
+<div
+    class:menu-container={!submenu}
+    class:submenu
+    class:has-checkmark={hasCheckmark}
+    style="min-width: {width}px; visibility:{visible ? 'visible' : 'hidden'}; "
+    onmousedown={ignore}
+    onmouseup={ignore}
+    role="button"
+    tabindex="-1"
+    onkeydown={handleKeyEvent}
+>
     {#each items as item}
         {#if item.type == "submenu"}
             <div

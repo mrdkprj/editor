@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=editor
+Comment=Text Editor
+Icon=editor
+Exec=editor %F
+StartupWMClass=editor
+Terminal=false
+Type=Application
+Categories=Development;
+MimeType=text/plain;text/*;application/octet-stream;

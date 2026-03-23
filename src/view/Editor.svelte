@@ -7,7 +7,7 @@
     import cssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
     import htmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
     import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
-    import { path } from "../path";
+    import path from "../path";
     import { IPC } from "../ipc";
     import Deferred from "../deferred";
     import { BROWSER_SHORTCUT_KEYS, LANGUAGES, LINE_ENDINGS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
