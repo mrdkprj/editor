@@ -27,7 +27,7 @@
     <div class="menu-bar-area" {onmousedown} role="button" tabindex="-1">
         <Menubar />
     </div>
-    <div class="title" data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null} {onmousedown} role="button" tabindex="-1">
+    <div class="title" title={$appState.fullPath} data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null} {onmousedown} role="button" tabindex="-1">
         {$appState.fullPath ? path.basename($appState.fullPath) : $appState.mode == "grep" ? GREP : UNTITLED}{$appState.isDirty ? "*" : ""}
     </div>
     <div class="window-area">

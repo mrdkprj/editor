@@ -116,7 +116,6 @@ declare global {
             isMaximized: boolean;
             history: string[];
             theme: Mp.Theme;
-            showFullpathOnTitlebar: boolean;
             grepHistory: Mp.GrepRequest;
             preference: TypedPreference;
             color: { [key in Mp.Theme]: IColors };

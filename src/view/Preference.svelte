@@ -10,7 +10,6 @@
     const indentSizes = [1, 2, 3, 4, 5, 6, 7, 8];
     let themeColors = $state(settings.theme == "dark" ? $state.snapshot(settings.color["dark"]) : $state.snapshot(settings.color["light"]));
     let preference = $state($state.snapshot(settings.preference[textState.textType]));
-    let showFullpathOnTitlebar = $state($state.snapshot(settings.showFullpathOnTitlebar));
 
     const setKeyboardFocus = (node: HTMLDivElement) => {
         node.focus();
@@ -35,11 +34,6 @@
             settings.preference[textState.textType] = preference;
             /* Prevent reactivity */
             temporal[textState.textType] = $state.snapshot(preference);
-            preferenceChanged = true;
-        }
-
-        if (showFullpathOnTitlebar != settings.showFullpathOnTitlebar) {
-            settings.showFullpathOnTitlebar = showFullpathOnTitlebar;
             preferenceChanged = true;
         }
 
@@ -128,7 +122,6 @@
                                 {/each}
                             </select>
                         </div>
-                        <div class="mp-dialog-item"><input type="checkbox" id="showFullpath" bind:checked={showFullpathOnTitlebar} /></div>
                     </div>
                 </div>
             {/if}

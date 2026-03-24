@@ -66,8 +66,7 @@
     };
 
     const setTitle = async () => {
-        const title = settings.showFullpathOnTitlebar ? $appState.fullPath : path.basename($appState.fullPath);
-        await getCurrentWebviewWindow().setTitle(title);
+        await getCurrentWebviewWindow().setTitle(path.basename($appState.fullPath));
     };
 
     const handleContextMenuEvent = async (e: Mp.ContextMenuEvent) => {
@@ -140,7 +139,6 @@
     };
 
     const onclick = () => {
-        console.log($appState.openingMenu);
         if ($appState.openingMenu) {
             dispatch({ type: "openingMenu", value: false });
             return;
@@ -426,7 +424,6 @@
         settingStore.data = $state.snapshot(settings);
         await settingStore.save();
         await settingStore.emit();
-        await setTitle();
     };
 
     const onWatchEvent = async (e: Mp.WatchEvent) => {

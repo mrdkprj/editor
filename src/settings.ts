@@ -13,7 +13,6 @@ export const defaultSettings: Mp.Settings = {
     history: [],
     theme: "dark",
     grepHistory: DEFAULT_GREP_REQUEST,
-    showFullpathOnTitlebar: false,
     preference: {
         plain: {
             indentSize: 4,
