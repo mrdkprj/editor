@@ -2,7 +2,7 @@
 name = "editor"
 version = "0.1.0"
 description = "editor"
-authors = ["you"]
+authors = ["mrdkprj"]
 edition = "2021"
 
 [build-dependencies]
@@ -15,7 +15,7 @@ crossbeam-channel = "0.5.15"
 notify-debouncer-full = "0.6.0"
 grep = "0.4.1"
 wcpopup = { version = "0.9.3", features = ["webview"] }
-zouni = { version = "0.1.29", features = ["webview2"] }
+zouni = { version = "0.1.30", features = ["webview2"] }
 globset = "0.4.18"
 chardetng = "0.1.17"
 encoding_rs = "0.8.35"
