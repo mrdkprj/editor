@@ -14,7 +14,7 @@ pub fn setup(app: &mut tauri::App, args: Vec<String>) {
         app.manage(session);
     }
 
-    let (tx_cmd, rx_cmd) = crossbeam_channel::bounded(1);
+    let (tx_cmd, rx_cmd) = smol::channel::bounded(1);
     app.manage(WatchTx(tx_cmd));
     watcher::spwan_watcher(app.app_handle(), rx_cmd).unwrap();
 

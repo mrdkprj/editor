@@ -494,7 +494,7 @@
             formatOnType: false,
             links: !isPlainText,
             renderLineHighlight: preference.lineHighlight ? "line" : "none",
-            find: { seedSearchStringFromSelection: "selection" },
+            find: { seedSearchStringFromSelection: "selection", addExtraSpaceOnTop: true, loop: true },
         });
 
         if (startLine) {

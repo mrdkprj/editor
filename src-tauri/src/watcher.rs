@@ -1,11 +1,11 @@
 use crate::helper;
-use crossbeam_channel::{bounded, Receiver, Sender};
 use notify_debouncer_full::{
     new_debouncer,
     notify::{event::ModifyKind, EventKind, RecursiveMode},
     DebouncedEvent,
 };
 use serde::{Deserialize, Serialize};
+use smol::channel::{bounded, Receiver, Sender};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
@@ -25,36 +25,49 @@ pub enum WatcherCommand {
     Unwatch(String),
 }
 
+enum Signal<L, R> {
+    Command(L),
+    Watcher(R),
+}
+
 pub fn spwan_watcher(app_handle: &AppHandle, cmd_rx: Receiver<WatcherCommand>) -> Result<(), String> {
     let (tx, rx) = bounded(1);
 
-    let mut watcher = new_debouncer(Duration::from_millis(100), None, move |res| tx.send(res).unwrap_or_default()).map_err(|e| e.to_string())?;
+    let mut watcher = new_debouncer(Duration::from_millis(100), None, move |res| tx.try_send(res).unwrap_or_default()).map_err(|e| e.to_string())?;
     let app_handle = app_handle.clone();
+
     tauri::async_runtime::spawn(async move {
         loop {
-            if let Ok(cmd) = cmd_rx.try_recv() {
-                match cmd {
-                    WatcherCommand::Watch(path) => {
-                        let _ = watcher.watch(path, RecursiveMode::NonRecursive);
-                    }
-                    WatcherCommand::Unwatch(path) => {
-                        let _ = watcher.unwatch(path);
-                    }
-                }
-            }
-
-            if let Ok(event_result) = rx.try_recv() {
-                match event_result {
-                    Ok(events) => {
-                        for event in events {
-                            if is_modified(event.kind) {
-                                handle_event(&app_handle, &event).unwrap();
+            let event = smol::future::race(async { Signal::Command(cmd_rx.recv().await) }, async { Signal::Watcher(rx.recv().await) }).await;
+            match event {
+                Signal::Command(result) => {
+                    if let Ok(cmd) = result {
+                        match cmd {
+                            WatcherCommand::Watch(path) => {
+                                let _ = watcher.watch(path, RecursiveMode::NonRecursive);
+                            }
+                            WatcherCommand::Unwatch(path) => {
+                                let _ = watcher.unwatch(path);
                             }
                         }
                     }
-                    Err(errors) => {
-                        for error in errors {
-                            eprintln!("Watcher error: {:?}", error);
+                }
+
+                Signal::Watcher(result) => {
+                    if let Ok(event_result) = result {
+                        match event_result {
+                            Ok(events) => {
+                                for event in events {
+                                    if is_modified(event.kind) {
+                                        handle_event(&app_handle, &event).unwrap();
+                                    }
+                                }
+                            }
+                            Err(errors) => {
+                                for error in errors {
+                                    eprintln!("Watcher error: {:?}", error);
+                                }
+                            }
                         }
                     }
                 }

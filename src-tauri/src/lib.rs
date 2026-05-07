@@ -129,18 +129,18 @@ async fn open_list_context_menu(window: WebviewWindow, payload: menu::Position) 
 }
 
 #[tauri::command]
-fn watch(app: AppHandle, payload: String) -> Result<(), String> {
+async fn watch(app: AppHandle, payload: String) -> Result<(), String> {
     if let Some(tx) = app.try_state::<WatchTx>() {
-        tx.inner().0.send(WatcherCommand::Watch(payload)).map_err(|e| e.to_string())
+        tx.inner().0.send(WatcherCommand::Watch(payload)).await.map_err(|e| e.to_string())
     } else {
         Ok(())
     }
 }
 
 #[tauri::command]
-fn unwatch(app: AppHandle, payload: String) -> Result<(), String> {
+async fn unwatch(app: AppHandle, payload: String) -> Result<(), String> {
     if let Some(tx) = app.try_state::<WatchTx>() {
-        tx.inner().0.send(WatcherCommand::Unwatch(payload)).map_err(|e| e.to_string())
+        tx.inner().0.send(WatcherCommand::Unwatch(payload)).await.map_err(|e| e.to_string())
     } else {
         Ok(())
     }

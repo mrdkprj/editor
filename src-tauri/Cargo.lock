@@ -1019,13 +1019,13 @@ name = "editor"
 version = "0.1.0"
 dependencies = [
  "chardetng",
- "crossbeam-channel",
  "encoding_rs",
  "globset",
  "grep",
  "gtk",
  "notify-debouncer-full",
  "serde",
+ "smol",
  "tauri",
  "tauri-build",
  "wcpopup",
@@ -6461,9 +6461,9 @@ dependencies = [
 
 [[package]]
 name = "zouni"
-version = "0.1.30"
+version = "0.1.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cec6efcde65988114df539f22039c0ddf2d745e2e34f573c81e130a4c0d20279"
+checksum = "2cc894b3a39dc138b12c61f9364a21b77d231d2041ba2e813c1437651d5e5b86"
 dependencies = [
  "bstr",
  "gio",
