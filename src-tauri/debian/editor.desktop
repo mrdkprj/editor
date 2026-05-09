@@ -6,5 +6,5 @@ Exec=editor %F
 StartupWMClass=editor
 Terminal=false
 Type=Application
-Categories=Development;
-MimeType=text/plain;text/*;application/octet-stream;
+Categories=Development;Utility;TextEditor;
+MimeType=text/plain;text/*;application/octet-stream;application/x-zerosize;
