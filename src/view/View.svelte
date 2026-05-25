@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { onMount, tick } from "svelte";
+    import { onMount, tick, untrack } from "svelte";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-    import { appState, dispatch, initSettings, settings, temporal, textState, updatePreferences } from "./appStateReducer.svelte";
-    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, OS, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
+    import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences } from "./appStateReducer.svelte";
+    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, OS, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
     import util from "../util";
@@ -16,14 +16,13 @@
     import Statusbar from "./Statusbar.svelte";
     import Settings from "../settings";
     import Preference from "./Preference.svelte";
+    import TabControl from "./TabControl.svelte";
 
-    const ipc = new IPC("View");
+    const ipc = new IPC(getCurrentWebviewWindow().label);
     let settingStore = new Settings();
-
+    let ready = $state(false);
     // Linux only
     let handleKeyUp = false;
-    let ready = $state(false);
-    let emitted = false;
 
     const openContextMenu = async (e: MouseEvent) => {
         e.preventDefault();
@@ -37,6 +36,10 @@
     };
 
     const toggleMaximize = async () => {
+        if (settings.tabMode) {
+            return ipc.sendTo("Main", "toggleMaximize", {});
+        }
+
         const view = getCurrentWebviewWindow();
         const maximized = await view.isMaximized();
         if (maximized) {
@@ -53,11 +56,17 @@
     };
 
     const onWindowSizeChanged = async () => {
+        if (settings.tabMode) return;
+
         const isMaximized = await getCurrentWebviewWindow().isMaximized();
         dispatch({ type: "isMaximized", value: isMaximized });
     };
 
     const minimize = async () => {
+        if (settings.tabMode) {
+            return ipc.sendTo("Main", "minimize", {});
+        }
+
         const view = getCurrentWebviewWindow();
         const position = await view.innerPosition();
         const size = await view.innerSize();
@@ -65,15 +74,33 @@
         await view.minimize();
     };
 
-    const setTitle = async () => {
-        await getCurrentWebviewWindow().setTitle(path.basename($appState.fullPath));
+    $effect(() => {
+        const idDirty = contentState.isDirty;
+        untrack(() => updateTitle(idDirty));
+    });
+
+    const updateTitle = async (_isDirty = false) => {
+        const label = getCurrentWebviewWindow().label;
+        const title = getTitle();
+        const webviewTitle = { title, path: contentState.fullPath };
+        tabs.webviews[label] = webviewTitle;
+        ipc.invoke("update_webview_label", webviewTitle);
+        ipc.sendOthers("updateTitle", { label, webviewTitle });
+        await getCurrentWebviewWindow().setTitle(title);
+    };
+
+    const getTitle = () => {
+        const mark = contentState.isDirty ? "*" : "";
+        const title = contentState.fullPath ? `${path.basename(contentState.fullPath)}${mark}` : $appState.mode == "grep" ? `${GREP}${mark}` : `${UNTITLED}${mark}`;
+        return title;
     };
 
     const handleContextMenuEvent = async (e: Mp.ContextMenuEvent) => {
         switch (e.id) {
-            case "New":
+            case "New": {
                 await openNewWindow("");
                 break;
+            }
             case "Open": {
                 await openFile();
                 break;
@@ -129,16 +156,21 @@
                 break;
 
             case "copyFilePath":
-                helper.writeTextToClipboard($appState.fullPath);
+                helper.writeTextToClipboard(contentState.fullPath);
                 break;
 
             case "preference":
                 showPreference();
                 break;
+
+            case "tab":
+                toggleTabMode();
+                break;
         }
     };
 
-    const onclick = () => {
+    const onclick = (e: MouseEvent) => {
+        e.preventDefault();
         if ($appState.openingMenu) {
             dispatch({ type: "openingMenu", value: false });
             return;
@@ -214,7 +246,7 @@
         dispatch({ type: "grepRequest", value: request });
         settings.grepHistory = request;
 
-        if ($appState.fullPath || $appState.isDirty) {
+        if (contentState.fullPath || contentState.isDirty) {
             return await openNewWindow("", request, undefined);
         }
 
@@ -244,13 +276,23 @@
     };
 
     const openFile = async (filePath?: string) => {
-        const data = filePath ? await helper.readFile(filePath) : await helper.openFile();
-        if (!data) return;
+        if (!filePath) {
+            return await helper.openFile();
+        }
 
-        if (!$appState.fullPath && !$appState.isDirty && $appState.mode != "grep") {
-            await loadFileContent(data.file_path, data.content, data.encoding);
+        if (!contentState.fullPath && !contentState.isDirty && $appState.mode != "grep") {
+            /* If any window already opens the file, bring it to front */
+            const openedWindowLabel = await ipc.invoke("is_file_opened", filePath);
+            if (openedWindowLabel) {
+                return ipc.sendTo(openedWindowLabel, "bring_to_frong", {});
+            }
+
+            const data = await helper.readFile(filePath);
+            if (data) {
+                await loadFileContent(data.file_path, data.content, data.encoding);
+            }
         } else {
-            await openNewWindow(data.file_path);
+            await openNewWindow(filePath);
         }
     };
 
@@ -264,7 +306,7 @@
         await helper.startWatch(filePath);
         updateHistory(filePath);
         await ipc.sendTo("View", "load", false);
-        await setTitle();
+        await updateTitle();
     };
 
     const onFileDrop = async (e: Mp.FileDropEvent) => {
@@ -288,7 +330,7 @@
     };
 
     const trySaveFile = async () => {
-        let target: string | null = $appState.fullPath;
+        let target: string | null = contentState.fullPath;
         if (!target) {
             target = await helper.showSaveDialog("", `${getNewFileName()}.txt`);
         }
@@ -306,7 +348,7 @@
     };
 
     const trySaveAs = async () => {
-        const fileName = $appState.fullPath ? path.basename($appState.fullPath) : `${getNewFileName()}.txt`;
+        const fileName = contentState.fullPath ? path.basename(contentState.fullPath) : `${getNewFileName()}.txt`;
         const target = await helper.showSaveDialog("", fileName);
 
         if (!target) {
@@ -328,7 +370,7 @@
         if (encoding == textState.encoding) return;
 
         /* Before save, change encoding value only */
-        if (!$appState.fullPath) {
+        if (!contentState.fullPath) {
             textState.encoding = encoding;
             return;
         }
@@ -337,7 +379,7 @@
         const reopen = await helper.confirm("Encoding is being changed. Do you reopen this file?");
         if (reopen.cancelled || reopen.button == "No") return;
 
-        if ($appState.isDirty) {
+        if (contentState.isDirty) {
             const shouldSave = await helper.confirm("Changes will be discarded. Do you save this file before?");
             if (shouldSave.cancelled) return;
 
@@ -351,7 +393,7 @@
 
     const applyEncoding = async (encoding: string) => {
         try {
-            const content = await helper.changeEncoding($appState.fullPath, encoding);
+            const content = await helper.changeEncoding(contentState.fullPath, encoding);
             textState.encoding = encoding;
             dispatch({ type: "content", value: content });
             ipc.sendTo("View", "encoding_changed", {});
@@ -380,66 +422,160 @@
         await helper.abortWatch();
     };
 
+    const onAnotherWindowClose = (label: string) => {
+        delete tabs.webviews[label];
+    };
+
     const beforeClose = async () => {
-        if (!$appState.isDirty) return destroy();
+        if (!contentState.isDirty) return tryDestory();
 
         const isMinimized = await getCurrentWebviewWindow().isMinimized();
         if (isMinimized) {
             await getCurrentWebviewWindow().unminimize();
         }
-        const name = $appState.fullPath ? path.basename($appState.fullPath) : UNTITLED;
+        const name = contentState.fullPath ? path.basename(contentState.fullPath) : UNTITLED;
         const shouldSave = await helper.confirm(`"${name}" is changed. Do you want to save?`);
 
         if (shouldSave.cancelled) return;
-        if (shouldSave.button == "No") return destroy();
+        if (shouldSave.button == "No") return tryDestory();
 
         const saved = await trySaveFile();
         if (saved) {
-            await destroy();
+            await tryDestory();
         }
     };
 
-    const close = async () => {
-        await getCurrentWebviewWindow().close();
+    const tryClose = async () => {
+        if (settings.tabMode) {
+            await ipc.sendTo("Main", "closeAll", {});
+        } else {
+            await getCurrentWebviewWindow().close();
+        }
     };
 
-    const destroy = async () => {
+    const tryDestory = async () => {
+        if (settings.tabMode) {
+            // Switch tab before "destroy" to prevent flickering
+            const currentWindow = getCurrentWebviewWindow();
+            await ipc.sendOthers("closed", currentWindow.label);
+        } else {
+            destroy();
+        }
+    };
+
+    const destroy = async (host?: Mp.TabbedWebview) => {
+        const currentWindow = getCurrentWebviewWindow();
+        await ipc.invoke("restore_webview", currentWindow.label);
+
         settingStore.data = $state.snapshot(settings);
-        const view = getCurrentWebviewWindow();
-        const isMinimized = await view.isMinimized();
-        if (!settings.isMaximized && !isMinimized) {
-            const position = await view.innerPosition();
-            const size = await view.innerSize();
-            settingStore.data.bounds = util.toBounds(position, size);
+
+        if (host) {
+            settingStore.data.isMaximized = host.isMaximized;
+            settingStore.data.bounds = host.bounds;
+        } else {
+            const isMinimized = await currentWindow.isMinimized();
+            if (!settings.isMaximized && !isMinimized) {
+                const position = await currentWindow.innerPosition();
+                const size = await currentWindow.innerSize();
+                settingStore.data.bounds = util.toBounds(position, size);
+            }
         }
         settingStore.data.grepHistory = $appState.grepRequest;
         await helper.unlistenAll();
         await settingStore.save();
 
-        getCurrentWebviewWindow().destroy();
+        currentWindow.destroy();
     };
 
     const onSettingsChange = async () => {
-        emitted = true;
         settingStore.data = $state.snapshot(settings);
         await settingStore.save();
-        await settingStore.emit();
+        await ipc.sendOthers("reloadSettings", {});
     };
 
-    const onWatchEvent = async (e: Mp.WatchEvent) => {
-        if (emitted) {
-            emitted = false;
-            return;
+    const onReloadSettings = async () => {
+        const theme = settings.theme;
+        await settingStore.reload();
+        updatePreferences(settingStore.data);
+        await ipc.sendTo(getCurrentWebviewWindow().label, "refelect_settings", {});
+        if (theme != settings.theme) {
+            await helper.changeTheme(settings.theme);
         }
+    };
 
-        if (e.file_path == settingStore.watchFile) {
-            const theme = settings.theme;
-            await settingStore.reload();
-            updatePreferences(settingStore.data);
-            ipc.sendTo("View", "refelect_settings", {});
-            if (theme != settings.theme) {
-                await helper.changeTheme(settings.theme);
+    const saveTabMode = async () => {
+        settingStore.data = $state.snapshot(settings);
+        settingStore.data.tabMode = !settingStore.data.tabMode;
+        await settingStore.save();
+    };
+
+    const toggleTabMode = async () => {
+        if (settings.tabMode) {
+            saveTabMode();
+            await ipc.sendTo("Main", "endTabMode", {});
+        } else {
+            saveTabMode();
+            await ipc.sendTo("Main", "startTabMode", getCurrentWebviewWindow().label);
+        }
+    };
+
+    // Keep labelMap order
+    const sortLabelMap = (unordered: Mp.Tabs) => {
+        return Object.keys(unordered)
+            .sort()
+            .reduce((obj: Mp.Tabs, key) => {
+                obj[key] = unordered[key];
+                return obj;
+            }, {});
+    };
+
+    const onEnterTabMode = async (labelMap: Mp.Tabs) => {
+        tabs.webviews = sortLabelMap(labelMap);
+        dispatch({ type: "toggleTabMode", value: true });
+    };
+
+    const onExitTabMode = (isMaximized: boolean) => {
+        dispatch({ type: "toggleTabMode", value: false });
+        dispatch({ type: "isMaximized", value: isMaximized });
+
+        // Clean up tabs
+        tabs.webviews = {};
+    };
+
+    const switchTab = (label: string) => {
+        ipc.sendTo("Main", "switchTab", label);
+    };
+
+    const closeTab = () => {
+        ipc.sendTo("Main", "closeTab", getCurrentWebviewWindow().label);
+    };
+
+    const onTabScroll = (scrollLeft: number) => {
+        ipc.sendOthers("scrollTab", scrollLeft);
+    };
+
+    const scrollTab = (scrollLeft: number) => {
+        tabs.scrollLeft = scrollLeft;
+    };
+
+    const onUpdateTitle = (e: Mp.UpdateTitleRequest) => {
+        tabs.webviews[e.label] = e.webviewTitle;
+    };
+
+    const onTabWindowSizeChangeEvent = (isMaximized: boolean) => {
+        dispatch({ type: "isMaximized", value: isMaximized });
+    };
+
+    const bringToFront = async () => {
+        if (settings.tabMode) {
+            switchTab(getCurrentWebviewWindow().label);
+        } else {
+            const thiswindow = getCurrentWebviewWindow();
+            const minimized = await thiswindow.isMinimized();
+            if (minimized) {
+                await thiswindow.show();
             }
+            thiswindow.setFocus();
         }
     };
 
@@ -449,7 +585,6 @@
         await settingStore.init(e.appDataDir);
         initSettings(settingStore.data);
         textState.encoding = e.encoding ?? DEFAULT_ENCODING;
-        await helper.startWatch(settingStore.watchFile);
 
         if (e.filePath) {
             updateHistory(e.filePath);
@@ -458,7 +593,7 @@
         dispatch({ type: "init", value: { filePath: e.filePath ?? "", content: e.content ?? "", mode: e.mode, startLine: e.startLine } });
         await helper.changeTheme(settings.theme);
 
-        await setTitle();
+        await updateTitle();
         await tick();
 
         ready = true;
@@ -473,7 +608,12 @@
         if (e.restorePosition) {
             await webview.setPosition(util.toPhysicalPosition(settings.bounds));
         }
-        await webview.show();
+
+        if (settings.tabMode) {
+            await ipc.sendTo("Main", "addTab", webview.label);
+        } else {
+            await webview.show();
+        }
     };
 
     onMount(() => {
@@ -482,8 +622,16 @@
         ipc.receiveTauri("tauri://resize", onWindowSizeChanged);
         ipc.receive("contextmenu_event", handleContextMenuEvent);
         ipc.receiveTauri<Mp.FileDropEvent>("tauri://drag-drop", onFileDrop);
+        ipc.receive("bring_to_frong", bringToFront);
+        ipc.receive("tabWindowSizeChange", onTabWindowSizeChangeEvent);
         ipc.receive("settingChanged", onSettingsChange);
-        ipc.receive("watch_event", onWatchEvent);
+        ipc.receive("reloadSettings", onReloadSettings);
+        ipc.receive("enterTabMode", onEnterTabMode);
+        ipc.receive("exitTabMode", onExitTabMode);
+        ipc.receive("updateTitle", onUpdateTitle);
+        ipc.receive("scrollTab", scrollTab);
+        ipc.receive("closed", onAnotherWindowClose);
+        ipc.receive("destory", destroy);
 
         return () => {
             ipc.release();
@@ -496,7 +644,7 @@
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
     {#if ready}
-        <Bar {openNewWindow} {close} {toggleMaximize} {minimize} />
+        <Bar {openNewWindow} close={tryClose} {toggleMaximize} {minimize} />
         {#if $appState.showWatchDialog}
             <WatchDialog />
         {/if}
@@ -509,16 +657,27 @@
         {#if $appState.showPreference}
             <Preference />
         {/if}
-
-        <Editor
-            startLine={$appState.startLine}
-            getClipboardUrls={() => helper.getUrlsFromClipboard()}
-            getClipboardText={() => helper.getTextFromClipboard()}
-            {save}
-            {openNewWindow}
-            {unwatch}
-            {startGrep}
-        />
+        {#if settings.tabMode}
+            <TabControl currentLabel={getCurrentWebviewWindow().label} {switchTab} {closeTab} {onTabScroll} />
+        {/if}
+        <div class="editor">
+            <Editor
+                startLine={$appState.startLine}
+                getClipboardUrls={() => helper.getUrlsFromClipboard()}
+                getClipboardText={() => helper.getTextFromClipboard()}
+                {save}
+                {openNewWindow}
+                {unwatch}
+                {startGrep}
+            />
+        </div>
         <Statusbar />
     {/if}
 </div>
+
+<style>
+    .editor {
+        flex: 1 1 auto;
+        overflow: auto;
+    }
+</style>

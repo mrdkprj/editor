@@ -5,7 +5,6 @@ import { dark_colors, lihgt_colors } from "./theme";
 
 const ipc = new IPCBase();
 const SETTING_FILE_NAME = "editor.settings.json";
-const WATCH_FILE_NAME = ".watch";
 
 export const defaultSettings: Mp.Settings = {
     bounds: { width: 1200, height: 800, x: 0, y: 0 },
@@ -13,6 +12,7 @@ export const defaultSettings: Mp.Settings = {
     history: [],
     theme: "dark",
     grepHistory: DEFAULT_GREP_REQUEST,
+    tabMode: false,
     preference: {
         plain: {
             indentSize: 4,
@@ -46,7 +46,6 @@ export const defaultSettings: Mp.Settings = {
 
 export default class Settings {
     data = defaultSettings;
-    watchFile = "";
 
     private file = "";
     private dataDir = "";
@@ -56,7 +55,6 @@ export default class Settings {
         this.dataDir = appDataDir;
         this.settingPath = path.join(this.dataDir, "temp");
         this.file = path.join(this.settingPath, SETTING_FILE_NAME);
-        this.watchFile = path.join(this.settingPath, WATCH_FILE_NAME);
         await this.createFile();
 
         return this.data;
@@ -79,11 +77,6 @@ export default class Settings {
             await ipc.invoke("mkdir_all", this.settingPath);
             await ipc.invoke("create", this.file);
             await ipc.invoke("write_text_file", { fullPath: this.file, data: JSON.stringify(this.data, null, 2) });
-        }
-
-        const fileExists = await ipc.invoke("exists", this.watchFile);
-        if (!fileExists) {
-            await ipc.invoke("create", this.watchFile);
         }
     }
 
@@ -112,9 +105,5 @@ export default class Settings {
 
     async save() {
         await ipc.invoke("write_text_file", { fullPath: this.file, data: JSON.stringify(this.data) });
-    }
-
-    async emit() {
-        await ipc.invoke("write_text_file", { fullPath: this.watchFile, data: new Date().getTime().toString() });
     }
 }

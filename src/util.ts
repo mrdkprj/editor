@@ -10,7 +10,7 @@ class Util {
     }
 
     toCommandLineArgs(filePath?: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position): string {
-        const args = [filePath];
+        const args = this.isWin() ? [`"${filePath}"`] : [filePath];
         if (grepRequest) {
             args.push("-g");
             args.push(grepRequest.condition);
@@ -119,7 +119,7 @@ class Util {
         ];
     }
 
-    getViewMenubarItems(theme: Mp.Theme, preference: Mp.Preference): Mp.MenuItem[] {
+    getViewMenubarItems(theme: Mp.Theme, tabMode: boolean, preference: Mp.Preference): Mp.MenuItem[] {
         return [
             {
                 id: "ShowLineNumber",
@@ -210,6 +210,15 @@ class Util {
                         submenuId: "Theme",
                     },
                 ],
+            },
+            {
+                type: "separator",
+            },
+            {
+                id: "tab",
+                type: "check",
+                checked: tabMode,
+                label: "Tab Mode",
             },
             {
                 type: "separator",

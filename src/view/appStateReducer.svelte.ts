@@ -9,9 +9,7 @@ type CusorPosition = {
 
 type AppState = {
     mode: Mp.Mode;
-    fullPath: string;
     content: string;
-    isDirty: boolean;
     isMaximized: boolean;
     isFullScreen: boolean;
     openingMenu: boolean;
@@ -34,11 +32,9 @@ type AppState = {
 
 export const initialAppState: AppState = {
     mode: "none",
-    fullPath: "",
     content: "",
     isMaximized: false,
     isFullScreen: false,
-    isDirty: false,
     openingMenu: false,
     visibleMenubarItem: "",
     showWatchDialog: false,
@@ -58,6 +54,11 @@ export const initialAppState: AppState = {
 };
 
 export const textState: Mp.TextState = $state({ textType: "plain", encoding: DEFAULT_ENCODING });
+export const contentState: Mp.ContentState = $state({
+    isDirty: false,
+    fullPath: "",
+});
+
 export const settings: Mp.Settings = $state(defaultSettings);
 export const initSettings = (data: Mp.Settings) => {
     settings.bounds = data.bounds;
@@ -67,6 +68,7 @@ export const initSettings = (data: Mp.Settings) => {
     settings.preference = data.preference;
     settings.theme = data.theme;
     settings.color = data.color;
+    settings.tabMode = data.tabMode;
     temporal.code = data.preference["code"];
     temporal.plain = data.preference["plain"];
 };
@@ -85,6 +87,11 @@ type SelectedPreferenceTab = {
     tab: Mp.PreferenceTab;
 };
 export const selectedPreference: SelectedPreferenceTab = $state({ tab: "view" });
+type Tabs = {
+    webviews: Mp.Tabs;
+    scrollLeft: number;
+};
+export const tabs: Tabs = $state({ webviews: {}, scrollLeft: 0 });
 
 type AppAction =
     | { type: "mode"; value: Mp.Mode }
@@ -108,6 +115,7 @@ type AppAction =
     | { type: "language"; value: string }
     | { type: "hoverMenuItemGroup"; value: string }
     | { type: "showPreference"; value: boolean }
+    | { type: "toggleTabMode"; value: boolean }
     | { type: "isFullScreen"; value: boolean };
 
 const updater = (state: AppState, action: AppAction): AppState => {
@@ -116,13 +124,16 @@ const updater = (state: AppState, action: AppAction): AppState => {
             return { ...state, mode: action.value };
 
         case "init":
-            return { ...state, fullPath: action.value.filePath, content: action.value.content, mode: action.value.mode, startLine: action.value.startLine };
+            contentState.fullPath = action.value.filePath;
+            return { ...state, content: action.value.content, mode: action.value.mode, startLine: action.value.startLine };
 
         case "fullPath":
             if (action.value) {
-                return { ...state, fullPath: action.value, mode: "editor" };
+                contentState.fullPath = action.value;
+                return { ...state, mode: "editor" };
             } else {
-                return { ...state, fullPath: action.value };
+                contentState.fullPath = action.value;
+                return state;
             }
 
         case "content":
@@ -135,7 +146,8 @@ const updater = (state: AppState, action: AppAction): AppState => {
             return { ...state, visibleMenubarItem: action.value };
 
         case "isDirty":
-            return { ...state, isDirty: action.value };
+            contentState.isDirty = action.value;
+            return state;
 
         case "showWatchDialog":
             return { ...state, showWatchDialog: action.value };
@@ -181,6 +193,10 @@ const updater = (state: AppState, action: AppAction): AppState => {
 
         case "isFullScreen":
             return { ...state, isFullScreen: action.value };
+
+        case "toggleTabMode":
+            settings.tabMode = action.value;
+            return state;
 
         default:
             return state;

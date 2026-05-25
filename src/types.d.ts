@@ -7,16 +7,32 @@ declare global {
 
     type RendererChannelEventMap = {
         load: boolean;
-        "after-toggle-maximize": Mp.SettingsChangeEvent;
+        minimize: Mp.AnyEvent;
+        toggleMaximize: Mp.AnyEvent;
+        tabWindowSizeChange: boolean;
         contextmenu_event: Mp.ContextMenuEvent;
         watch_event: Mp.WatchEvent;
         watch_confirm_event: Mp.WatchConfirmEvent;
+        bring_to_frong: Mp.AnyEvent;
         grep_progress: Mp.GrepProgress;
         grep_end: Mp.AnyEvent;
         dialog: boolean;
         encoding_changed: Mp.AnyEvent;
         refelect_settings: Mp.AnyEvent;
         settingChanged: Mp.SettingChangeType;
+        reloadSettings: Mp.AnyEvent;
+        startTabMode: string;
+        endTabMode: Mp.AnyEvent;
+        enterTabMode: Mp.Tabs;
+        exitTabMode: boolean;
+        switchTab: string;
+        updateTitle: Mp.UpdateTitleRequest;
+        addTab: string;
+        closeTab: string;
+        scrollTab: number;
+        closed: string;
+        destory: Mp.TabbedWebview;
+        closeAll: Mp.AnyEvent;
     };
 
     namespace Mp {
@@ -43,9 +59,20 @@ declare global {
             | "searchHighlightBackground"
             | "link";
 
+        type WebviewTitle = {
+            title: string;
+            path: string;
+        };
+        type Tabs = { [key: string]: WebviewTitle };
+
         type TextState = {
             textType: Mp.TextType;
             encoding: string;
+        };
+
+        type ContentState = {
+            isDirty: boolean;
+            fullPath: string;
         };
 
         type ContextMenuEvent = {
@@ -89,6 +116,7 @@ declare global {
             renderWhitespace: null;
             lineHighlight: null;
             preference: null;
+            tab: null;
         };
 
         type Bounds = {
@@ -110,6 +138,17 @@ declare global {
             bottom: number;
         };
 
+        type UpdateTitleRequest = {
+            label: string;
+            webviewTitle: Mp.WebviewTitle;
+        };
+
+        type TabbedWebview = {
+            label: string;
+            bounds: Mp.Bounds;
+            isMaximized: boolean;
+        };
+
         type TypedPreference = { [key in TextType]: Preference };
         type Settings = {
             bounds: Bounds;
@@ -119,6 +158,7 @@ declare global {
             grepHistory: Mp.GrepRequest;
             preference: TypedPreference;
             color: { [key in Mp.Theme]: IColors };
+            tabMode: boolean;
         };
 
         type Preference = {

@@ -5,7 +5,7 @@
     import Menu from "./Menu.svelte";
 
     let fileMenuItems = $derived(util.getFileMenubarItems(settings.history, textState.encoding));
-    let viewMenuItems = $derived(util.getViewMenubarItems(settings.theme, temporal[textState.textType]));
+    let viewMenuItems = $derived(util.getViewMenubarItems(settings.theme, settings.tabMode, temporal[textState.textType]));
 
     const onMenuBarItemMousedown = (e: MouseEvent) => {
         if (!e.target || !(e.target instanceof HTMLElement)) return;

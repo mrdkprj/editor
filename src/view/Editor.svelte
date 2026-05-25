@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState, dispatch, textState, settings, temporal } from "./appStateReducer.svelte";
+    import { appState, contentState, dispatch, textState, settings, temporal } from "./appStateReducer.svelte";
     import type monaco from "monaco-editor";
     import { onMount } from "svelte";
     import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
@@ -109,14 +109,14 @@
         dispatch({ type: "suspendWatch", value: true });
 
         await editor.getAction("editor.action.formatDocument")?.run();
-        const currentPath = $appState.fullPath;
+        const currentPath = contentState.fullPath;
         const saved = await save(saveAs);
 
         if (!saved) {
             dispatch({ type: "suspendWatch", value: false });
         }
 
-        if (saved && currentPath != $appState.fullPath) {
+        if (saved && currentPath != contentState.fullPath) {
             const state = editor.saveViewState();
             updateModel();
             editor.restoreViewState(state);
@@ -129,7 +129,7 @@
             return;
         }
 
-        if ($appState.fullPath == e.file_path) {
+        if (contentState.fullPath == e.file_path) {
             dispatch({ type: "showWatchDialog", value: true });
 
             watchDialogPromise = new Deferred();
@@ -373,7 +373,7 @@
         supressChangeDetection = true;
         const state = editor.saveViewState();
 
-        if ($appState.fullPath) {
+        if (contentState.fullPath) {
             editor.setValue($appState.content);
         } else {
             editor.pushUndoStop();
@@ -442,7 +442,7 @@
 
         const content = $appState.content;
 
-        model = Monaco.editor.createModel(content, undefined, Monaco.Uri.file(path.basename($appState.fullPath)));
+        model = Monaco.editor.createModel(content, undefined, Monaco.Uri.file(path.basename(contentState.fullPath)));
         const language = model.getLanguageId();
         const isPlainText = $appState.mode == "grep" || language == "plaintext";
         textState.textType = isPlainText ? "plain" : "code";
@@ -506,6 +506,9 @@
         const languageName = language in LANGUAGES ? LANGUAGES[language] : language.charAt(0).toUpperCase() + language.slice(1);
         dispatch({ type: "language", value: languageName });
 
+        /* Prevent losing focus */
+        editor.onDidBlurEditorText((_) => editor.focus());
+
         editor.onDidChangeCursorPosition((e) => {
             dispatch({ type: "cusorPosition", value: { line: e.position.lineNumber, column: e.position.column } });
         });
@@ -527,10 +530,10 @@
                 });
             }
 
-            if ($appState.isDirty && !model.canUndo()) {
+            if (contentState.isDirty && !model.canUndo()) {
                 dispatch({ type: "isDirty", value: false });
             }
-            if (!$appState.isDirty && model.canUndo()) {
+            if (!contentState.isDirty && model.canUndo()) {
                 dispatch({ type: "isDirty", value: true });
             }
 

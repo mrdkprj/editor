@@ -1,63 +1,27 @@
 use crate::{
     fgrep::{self, GrepRequest},
-    session::Session,
     watcher::{self, WatchTx},
     WriteFileInfo,
 };
 use encoding_rs::Encoding;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicU16, Mutex, OnceLock},
+};
+use tauri::{AppHandle, Emitter, Manager};
 
-pub fn setup(app: &mut tauri::App, args: Vec<String>) {
-    let id = &app.config().identifier;
-    if let Ok(session) = crate::session::start(id) {
-        app.manage(session);
-    }
+static UUID: AtomicU16 = AtomicU16::new(0);
+static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
 
-    let (tx_cmd, rx_cmd) = smol::channel::bounded(1);
-    app.manage(WatchTx(tx_cmd));
-    watcher::spwan_watcher(app.app_handle(), rx_cmd).unwrap();
-
-    if args.len() == 1 {
-        app.manage(FileArg::default());
-        return;
-    }
-
-    if args[1].is_empty() {
-        app.manage(FileArg::default());
-    } else if args[1] == "-g" {
-        let req = fgrep::GrepRequest {
-            condition: args[2].to_string(),
-            start_directory: args[3].to_string(),
-            file_type: args[4].to_string(),
-            match_by_word: args.contains(&"-m".to_string()),
-            case_sensitive: args.contains(&"-c".to_string()),
-            regexp: args.contains(&"-r".to_string()),
-            recursive: args.contains(&"-s".to_string()),
-        };
-        app.manage(req);
-    } else {
-        let file = FileArg {
-            file_path: Some(args[1].to_string()),
-            content: None,
-            encoding: None,
-            start_line: if args.len() > 2 {
-                Some(Selection {
-                    column: args[2].parse().unwrap(),
-                    row: args[3].parse().unwrap(),
-                })
-            } else {
-                None
-            },
-        };
-        app.manage(file);
-    }
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct OpenedWebview {
+    webviews: HashMap<String, WebviewTitle>,
 }
-
-pub fn exit(app: &tauri::AppHandle) {
-    if let Some(session) = app.try_state::<Session>() {
-        crate::session::end(session.inner());
-    }
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WebviewTitle {
+    title: String,
+    path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -82,9 +46,81 @@ pub struct InitArgs {
     restore_position: bool,
 }
 
+pub fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>) {
+    let opening_file_path = setup(app, argv);
+    create_new_window(app, opening_file_path);
+}
+
+pub fn start(app: &tauri::AppHandle) {
+    let (tx_cmd, rx_cmd) = smol::channel::unbounded();
+    app.manage(WatchTx(tx_cmd));
+    watcher::spwan_watcher(app.app_handle(), rx_cmd).unwrap();
+
+    app.manage(Mutex::new(FileArg::default()));
+    app.manage(Mutex::new(fgrep::GrepRequest::default()));
+    app.manage(Mutex::new(OpenedWebview::default()));
+}
+
+fn update_file_arg(app: &tauri::AppHandle, file_arg: FileArg) {
+    let state = app.state::<Mutex<FileArg>>();
+    let mut state = state.lock().unwrap();
+    *state = file_arg;
+}
+
+fn update_grep_request(app: &tauri::AppHandle, grep_request: fgrep::GrepRequest) {
+    let state = app.state::<Mutex<fgrep::GrepRequest>>();
+    let mut state = state.lock().unwrap();
+    *state = grep_request;
+}
+
+pub fn setup(app: &tauri::AppHandle, args: Vec<String>) -> Option<String> {
+    let mut opening_file = None;
+    if args.len() == 1 {
+        update_file_arg(app, FileArg::default());
+        return opening_file;
+    }
+
+    if args[1].is_empty() {
+        update_file_arg(app, FileArg::default());
+    } else if args[1] == "-g" {
+        let grep_request = fgrep::GrepRequest {
+            condition: args[2].to_string(),
+            start_directory: args[3].to_string(),
+            file_type: args[4].to_string(),
+            match_by_word: args.contains(&"-m".to_string()),
+            case_sensitive: args.contains(&"-c".to_string()),
+            regexp: args.contains(&"-r".to_string()),
+            recursive: args.contains(&"-s".to_string()),
+        };
+        update_grep_request(app, grep_request);
+    } else {
+        let file_arg = FileArg {
+            file_path: Some(args[1].to_string()),
+            content: None,
+            encoding: None,
+            start_line: if args.len() > 2 {
+                Some(Selection {
+                    column: args[2].parse().unwrap(),
+                    row: args[3].parse().unwrap(),
+                })
+            } else {
+                None
+            },
+        };
+        opening_file = Some(args[1].to_string());
+        update_file_arg(app, file_arg);
+    }
+
+    opening_file
+}
+
 pub fn get_init_args(app: AppHandle) -> Result<InitArgs, String> {
     let locale = zouni::shell::get_locale();
-    let restore_position = app.try_state::<Session>().is_some();
+    let restore_position = if RESTORE_POSITION.get().is_none() {
+        *RESTORE_POSITION.get_or_init(|| true)
+    } else {
+        false
+    };
     let mut args = InitArgs {
         locales: vec![locale],
         restore_position,
@@ -92,8 +128,8 @@ pub fn get_init_args(app: AppHandle) -> Result<InitArgs, String> {
         ..Default::default()
     };
 
-    if let Some(file_args) = app.try_state::<FileArg>() {
-        let mut file = file_args.inner().clone();
+    if let Some(file_args_state) = app.try_state::<Mutex<FileArg>>() {
+        let mut file_args = file_args_state.lock().unwrap();
         let (content, encoding) = if let Some(file_path) = &file_args.file_path {
             let bytes = std::fs::read(file_path).map_err(|e| e.to_string())?;
             if bytes.is_empty() {
@@ -110,14 +146,14 @@ pub fn get_init_args(app: AppHandle) -> Result<InitArgs, String> {
         } else {
             (None, None)
         };
-        file.content = content;
-        file.encoding = encoding;
-        args.file = Some(file);
+        file_args.content = content;
+        file_args.encoding = encoding;
+        args.file = Some(file_args.clone());
         return Ok(args);
     }
 
-    if let Some(reg) = app.try_state::<GrepRequest>() {
-        args.grep = Some(reg.inner().clone());
+    if let Some(grep_request_state) = app.try_state::<Mutex<GrepRequest>>() {
+        args.grep = Some(grep_request_state.lock().unwrap().clone());
         return Ok(args);
     }
 
@@ -184,4 +220,64 @@ pub fn write_to_file(info: WriteFileInfo) -> Result<(), String> {
 
 fn write_raw(info: WriteFileInfo) -> Result<(), String> {
     std::fs::write(info.fullPath, info.data.as_bytes()).map_err(|e| e.to_string())
+}
+
+// Check if the file is already opened. If any, returns the window label
+pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> Option<String> {
+    let opening_file_path = opening_file_path.unwrap_or_default();
+    let state = app.state::<Mutex<OpenedWebview>>();
+    let state = state.lock().unwrap();
+    let already_opened = state.webviews.iter().filter(|webview| !webview.1.path.is_empty() && webview.1.path == opening_file_path).map(|webview| webview.0).collect::<Vec<&String>>();
+    if already_opened.is_empty() {
+        None
+    } else {
+        Some(already_opened[0].to_string())
+    }
+}
+
+pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<String>) {
+    if let Some(label) = is_file_opened(app, opening_file_path) {
+        app.emit_to(
+            tauri::EventTarget::WebviewWindow {
+                label,
+            },
+            "bring_to_frong",
+            (),
+        )
+        .unwrap();
+        return;
+    }
+    let id = UUID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let config = &app.config().app.windows[1];
+    let mut config = config.clone();
+    config.label = format!("{}-{:?}", config.label, id);
+    tauri::WebviewWindowBuilder::from_config(app, &config).unwrap().build().unwrap();
+}
+
+pub fn get_webview_labels(app: tauri::AppHandle) -> HashMap<String, WebviewTitle> {
+    let state = app.state::<Mutex<OpenedWebview>>();
+    let state = state.lock().unwrap();
+    state.webviews.clone()
+}
+
+pub fn update_webview_label(app: &tauri::AppHandle, label: &str, webview_title: WebviewTitle) {
+    let state = app.state::<Mutex<OpenedWebview>>();
+    let mut state = state.lock().unwrap();
+    let _ = state.webviews.insert(label.to_string(), webview_title);
+}
+
+pub fn remove_from_webview_label(app: &tauri::AppHandle, label: &str) {
+    let state = app.state::<Mutex<OpenedWebview>>();
+    let mut state = state.lock().unwrap();
+
+    if state.webviews.is_empty() {
+        return;
+    }
+
+    let _ = state.webviews.remove(label);
+    if state.webviews.is_empty() {
+        if let Some(main) = app.get_webview_window("Main") {
+            let _ = main.destroy();
+        }
+    }
 }

@@ -1,7 +1,7 @@
 use crate::watcher::{WatchTx, WatcherCommand};
 use dialog::DialogOptions;
 use serde::{Deserialize, Serialize};
-use std::{env, path::PathBuf};
+use std::{collections::HashMap, env, path::PathBuf};
 #[cfg(target_os = "windows")]
 use tauri::Emitter;
 use tauri::{AppHandle, Manager, WebviewWindow};
@@ -10,7 +10,8 @@ mod dialog;
 mod fgrep;
 mod helper;
 mod menu;
-mod session;
+#[cfg(target_os = "windows")]
+mod tab;
 mod watcher;
 
 #[cfg(target_os = "linux")]
@@ -105,6 +106,9 @@ fn change_theme(window: WebviewWindow, payload: String) {
         "light" => (tauri::Theme::Light, wcpopup::config::Theme::Light),
         _ => (tauri::Theme::Light, wcpopup::config::Theme::System),
     };
+    if let Some(main) = window.get_webview_window("Main") {
+        let _ = main.set_theme(Some(tauri_them));
+    }
     let _ = window.set_theme(Some(tauri_them));
     menu::change_menu_theme(window.app_handle(), menu_theme);
 }
@@ -216,7 +220,14 @@ fn listen_file_drop(window: WebviewWindow, app: AppHandle, payload: Option<Strin
         let label = window.label().to_string();
         window.with_webview(move |webview| {
             zouni::webview2::register_file_drop(unsafe { &webview.controller().CoreWebView2().unwrap() }, payload, move |event| {
-                app.get_webview_window(&label).unwrap().emit("tauri://drag-drop", event).unwrap();
+                app.emit_to(
+                    tauri::EventTarget::WebviewWindow {
+                        label: label.clone(),
+                    },
+                    "tauri://drag-drop",
+                    event,
+                )
+                .unwrap();
             })
             .unwrap();
         })
@@ -248,22 +259,51 @@ fn change_encoding(payload: helper::EncodeArg) -> Result<String, String> {
     helper::encode(payload)
 }
 
+#[tauri::command]
+fn to_child_window(app: tauri::AppHandle, payload: Vec<String>) {
+    #[cfg(target_os = "windows")]
+    tab::to_child_window(app, payload);
+}
+
+#[tauri::command]
+fn restore_webview(app: tauri::AppHandle, payload: String) {
+    tab::restore_webview(app, payload);
+}
+
+#[tauri::command]
+fn get_webview_labels(app: tauri::AppHandle) -> HashMap<String, helper::WebviewTitle> {
+    helper::get_webview_labels(app)
+}
+
+#[tauri::command]
+fn update_webview_label(window: WebviewWindow, payload: helper::WebviewTitle) {
+    helper::update_webview_label(window.app_handle(), window.label(), payload);
+}
+
+#[tauri::command]
+fn is_file_opened(app: tauri::AppHandle, payload: String) -> Option<String> {
+    helper::is_file_opened(&app, Some(payload))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app_handel, args, _| helper::handle_second_instance(app_handel, args)))
         .setup(|app| {
             let args: Vec<String> = env::args().collect();
-            helper::setup(app, args);
+            helper::start(app.app_handle());
+            helper::setup(app.app_handle(), args);
             Ok(())
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                helper::exit(window.app_handle());
+                helper::remove_from_webview_label(window.app_handle(), window.label())
             }
         })
         .invoke_handler(tauri::generate_handler![
             prepare_menu,
             open_list_context_menu,
+            is_file_opened,
             exists,
             is_file,
             is_uris_available,
@@ -289,6 +329,10 @@ pub fn run() {
             run_grep,
             abort_grep,
             change_encoding,
+            restore_webview,
+            to_child_window,
+            get_webview_labels,
+            update_webview_label,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

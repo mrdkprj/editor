@@ -4,6 +4,7 @@
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
     import { appState, dispatch } from "./appStateReducer.svelte";
+    import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
     let { items, submenu, id }: { items: Mp.MenuItem[]; submenu: boolean; id?: string } = $props();
 
@@ -19,13 +20,12 @@
     };
 
     const ignore = (e: MouseEvent) => {
-        console.log(111);
         e.preventDefault();
         e.stopPropagation();
         dispatch({ type: "openingMenu", value: true });
     };
 
-    const emit = (e: MouseEvent) => {
+    const emit = async (e: MouseEvent) => {
         if (!e.target || !(e.target instanceof HTMLElement)) return;
         e.preventDefault();
         e.stopPropagation();
@@ -41,7 +41,7 @@
             toggleCheck(e.target);
         }
 
-        ipc.sendTo("View", "contextmenu_event", { id: e.target.id as keyof Mp.MainContextMenuSubTypeMap, value: e.target.getAttribute("data-value") ?? undefined });
+        ipc.sendTo(getCurrentWebviewWindow().label, "contextmenu_event", { id: e.target.id as keyof Mp.MainContextMenuSubTypeMap, value: e.target.getAttribute("data-value") ?? undefined });
     };
 
     const toggleCheck = (target: HTMLElement) => {
@@ -109,6 +109,7 @@
     class:menu-container={!submenu}
     class:submenu
     class:has-checkmark={hasCheckmark}
+    class:opened={visible}
     style="min-width: {width}px; visibility:{visible ? 'visible' : 'hidden'}; "
     onmousedown={ignore}
     onmouseup={ignore}
@@ -201,12 +202,16 @@
         outline: 1px solid var(--bar-border-color);
         border-radius: 4px;
         font-size: 13px;
-        z-index: 9999;
+        z-index: 1000;
         top: 30px;
         left: 5px;
         box-shadow: 3px 3px 3px 3px var(--menu-shadow);
         padding: 5px 0;
         max-height: 100vh;
+    }
+
+    .opened {
+        z-index: 1500;
     }
 
     .menu-item {

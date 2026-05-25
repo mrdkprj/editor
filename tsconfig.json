@@ -6,10 +6,9 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "allowJs": true,
-    "baseUrl": ".",
     "outDir": "dist",
     "paths": {
-      "*": ["node_modules/*"],
+      "*": ["./node_modules/*"],
     },
     "types": ["vite/client"],
 

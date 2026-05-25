@@ -1,4 +1,5 @@
 import { listen, emit, UnlistenFn, once, emitTo, EventName } from "@tauri-apps/api/event";
+import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { invoke } from "@tauri-apps/api/core";
 
 type TauriCommand<Req, Res> = {
@@ -43,6 +44,11 @@ type ReadResult = {
     encoding: string;
 };
 
+type WebviewTitle = {
+    title: string;
+    path: string;
+};
+
 type TauriCommandMap = {
     prepare_menu: TauriCommand<undefined, undefined>;
     open_list_context_menu: TauriCommand<Mp.Position, undefined>;
@@ -71,6 +77,11 @@ type TauriCommandMap = {
     abort_grep: TauriCommand<undefined, undefined>;
     is_file: TauriCommand<string, boolean>;
     change_encoding: TauriCommand<Mp.EncodeArg, string>;
+    to_child_window: TauriCommand<string[], undefined>;
+    restore_webview: TauriCommand<string, undefined>;
+    get_webview_labels: TauriCommand<undefined, Mp.Tabs>;
+    update_webview_label: TauriCommand<WebviewTitle, undefined>;
+    is_file_opened: TauriCommand<string, string | null>;
 };
 
 export class IPCBase {
@@ -85,7 +96,7 @@ export class IPC extends IPCBase {
     private label: string;
     private funcs: UnlistenFn[] = [];
 
-    constructor(label: RendererName) {
+    constructor(label: string) {
         super();
         this.label = label;
     }
@@ -116,7 +127,15 @@ export class IPC extends IPCBase {
         await emit(channel, data);
     };
 
-    sendTo = async <K extends keyof RendererChannelEventMap>(rendererName: RendererName, channel: K, data: RendererChannelEventMap[K]) => {
+    sendOthers = async <K extends keyof RendererChannelEventMap>(channel: K, data: RendererChannelEventMap[K]) => {
+        const allWindows = await getAllWebviewWindows();
+        const others = allWindows.filter((win) => win.label != this.label).map((win) => win.label);
+        for (const other of others) {
+            await emitTo({ kind: "WebviewWindow", label: other }, channel, data);
+        }
+    };
+
+    sendTo = async <K extends keyof RendererChannelEventMap>(rendererName: string, channel: K, data: RendererChannelEventMap[K]) => {
         await emitTo({ kind: "WebviewWindow", label: rendererName }, channel, data);
     };
 

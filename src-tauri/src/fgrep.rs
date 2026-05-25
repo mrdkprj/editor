@@ -19,7 +19,7 @@ struct GrepProgress {
     total: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GrepRequest {
     pub condition: String,
     pub start_directory: String,

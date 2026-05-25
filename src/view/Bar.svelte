@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState } from "./appStateReducer.svelte";
+    import { appState, contentState } from "./appStateReducer.svelte";
     import { GREP, handleKeyEvent, OS, UNTITLED } from "../constants";
     import path from "../path";
     import Menubar from "./Menubar.svelte";
@@ -27,8 +27,8 @@
     <div class="menu-bar-area" {onmousedown} role="button" tabindex="-1">
         <Menubar />
     </div>
-    <div class="title" title={$appState.fullPath} data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null} {onmousedown} role="button" tabindex="-1">
-        {$appState.fullPath ? path.basename($appState.fullPath) : $appState.mode == "grep" ? GREP : UNTITLED}{$appState.isDirty ? "*" : ""}
+    <div class="title" title={contentState.fullPath} data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null} {onmousedown} role="button" tabindex="-1">
+        {contentState.fullPath ? path.basename(contentState.fullPath) : $appState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
     </div>
     <div class="window-area">
         <div class="minimize" onclick={minimize} onkeydown={handleKeyEvent} role="button" tabindex="-1">&minus;</div>

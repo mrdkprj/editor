@@ -3,7 +3,7 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "context": "local",
-  "windows": ["View"],
+  "windows": ["*"],
   "permissions": [
     "core:default",
     "core:window:allow-destroy",
@@ -29,7 +29,15 @@
     "core:window:allow-set-size",
     "core:webview:allow-internal-toggle-devtools",
     "core:webview:allow-webview-position",
-    "core:webview:allow-webview-size"
+    "core:webview:allow-set-webview-position",
+    "core:webview:allow-set-webview-size",
+    "core:webview:allow-webview-size",
+    "core:webview:allow-reparent",
+    "core:webview:allow-webview-show",
+    "core:webview:allow-webview-hide",
+    "core:webview:allow-webview-close",
+    "core:webview:allow-set-webview-focus",
+    "core:window:allow-request-user-attention"
   ],
   "platforms": [
     "linux",
