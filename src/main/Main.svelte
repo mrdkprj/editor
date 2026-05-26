@@ -15,6 +15,7 @@
     let webviews: Mp.TabbedWebview[] = [];
     let closingLabelSequence: string[] = [];
     let allTabClosing = false;
+    const isLinux = navigator.userAgent.includes(OS.linux);
 
     const toggleMaximize = async () => {
         const view = getCurrentWebviewWindow();
@@ -142,10 +143,18 @@
     const switchTab = async (activeTabLabel: string) => {
         if (activeTabLabel == currentWebview.label) return;
 
-        const size = await getCurrentWebviewWindow().size();
-        const toActive = await WebviewWindow.getByLabel(activeTabLabel);
-        await toActive?.setPosition(new PhysicalPosition(-8, 0));
-        await toActive?.setSize(new PhysicalSize(size.width, size.height));
+        if (isLinux) {
+            const size = currentWebview.label ? await (await WebviewWindow.getByLabel(currentWebview.label))!.size() : await getCurrentWebviewWindow().size();
+            const position = currentWebview.label ? await (await WebviewWindow.getByLabel(currentWebview.label))!.position() : await getCurrentWebviewWindow().position();
+            const toActive = await WebviewWindow.getByLabel(activeTabLabel);
+            await toActive?.setPosition(position);
+            await toActive?.setSize(size);
+        } else {
+            const size = await getCurrentWebviewWindow().size();
+            const toActive = await WebviewWindow.getByLabel(activeTabLabel);
+            await toActive?.setPosition(new PhysicalPosition(-8, 0));
+            await toActive?.setSize(new PhysicalSize(size.width, size.height));
+        }
 
         if (currentWebview.label) {
             const toInactive = await WebviewWindow.getByLabel(currentWebview.label);
@@ -186,9 +195,11 @@
         await switchTab(initial);
 
         active = true;
-        await thisWindow.show();
-        if (currentWebview.isMaximized) {
-            await thisWindow.maximize();
+        if (!isLinux) {
+            await thisWindow.show();
+            if (currentWebview.isMaximized) {
+                await thisWindow.maximize();
+            }
         }
     };
 

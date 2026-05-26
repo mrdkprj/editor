@@ -10,7 +10,6 @@ mod dialog;
 mod fgrep;
 mod helper;
 mod menu;
-#[cfg(target_os = "windows")]
 mod tab;
 mod watcher;
 
@@ -182,16 +181,10 @@ async fn show_save_dialog(payload: DialogOptions) -> Option<String> {
 }
 
 #[tauri::command]
-fn new_window(app: AppHandle, payload: Option<String>) -> Result<(), String> {
-    let app_path = tauri::process::current_binary(&app.env()).map_err(|e| e.to_string())?;
-    if cfg!(windows) {
-        zouni::shell::open_path_with(payload.unwrap_or_default(), app_path)
-    } else {
-        let payload = payload.unwrap_or_default();
-        let args: Vec<&str> = payload.split(" ").collect();
-        std::process::Command::new(app_path).args(args).spawn().map_err(|e| e.to_string())?;
-        Ok(())
-    }
+fn new_window(app: AppHandle, payload: Option<String>) {
+    let payload = payload.unwrap_or_default();
+    let args: Vec<&str> = payload.split(" ").collect();
+    helper::handle_second_instance(&app, args.iter().map(|a| a.to_string()).collect());
 }
 
 #[tauri::command]
@@ -261,7 +254,6 @@ fn change_encoding(payload: helper::EncodeArg) -> Result<String, String> {
 
 #[tauri::command]
 fn to_child_window(app: tauri::AppHandle, payload: Vec<String>) {
-    #[cfg(target_os = "windows")]
     tab::to_child_window(app, payload);
 }
 
@@ -290,6 +282,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app_handel, args, _| helper::handle_second_instance(app_handel, args)))
         .setup(|app| {
+            println!("{:?}", std::env::current_exe());
             let args: Vec<String> = env::args().collect();
             helper::start(app.app_handle());
             helper::setup(app.app_handle(), args);

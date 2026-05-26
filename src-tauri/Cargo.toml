@@ -24,6 +24,9 @@ tauri-plugin-single-instance = "=2.3.0"
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = ["Win32_Foundation"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = { version = "0.18.2" }
+
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!

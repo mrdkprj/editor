@@ -1,34 +1,63 @@
 use tauri::Manager;
+#[cfg(target_os = "windows")]
 use windows::Win32::{
     Foundation::HWND,
     UI::WindowsAndMessaging::{GetWindowLongPtrW, SetParent, SetWindowLongPtrW, GWL_STYLE, WS_CHILD, WS_POPUP},
 };
 
 pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
-    let host = app.get_webview_window("Main").unwrap();
-    let hwnd = host.hwnd().unwrap();
-    let host_hwnd_ptr = hwnd.0 as isize;
+    #[cfg(target_os = "windows")]
+    {
+        let host = app.get_webview_window("Main").unwrap();
+        let hwnd = host.hwnd().unwrap();
+        let host_hwnd_ptr = hwnd.0 as isize;
 
-    for child_label in labels {
-        let child = app.get_webview_window(&child_label).unwrap();
-        let child_hwnd = child.hwnd().unwrap();
+        for child_label in labels {
+            let child = app.get_webview_window(&child_label).unwrap();
+            let child_hwnd = child.hwnd().unwrap();
 
-        let mut style = unsafe { GetWindowLongPtrW(child_hwnd, GWL_STYLE) } as u32;
-        style &= !(WS_POPUP.0);
-        style |= WS_CHILD.0;
-        unsafe { SetWindowLongPtrW(child_hwnd, GWL_STYLE, style as isize) };
+            let mut style = unsafe { GetWindowLongPtrW(child_hwnd, GWL_STYLE) } as u32;
+            style &= !(WS_POPUP.0);
+            style |= WS_CHILD.0;
+            unsafe { SetWindowLongPtrW(child_hwnd, GWL_STYLE, style as isize) };
 
-        unsafe { SetParent(child_hwnd, Some(HWND(host_hwnd_ptr as *mut std::ffi::c_void))).unwrap() };
+            unsafe { SetParent(child_hwnd, Some(HWND(host_hwnd_ptr as *mut std::ffi::c_void))).unwrap() };
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let host = app.get_webview_window("Main").unwrap();
+        let host_window = host.gtk_window().unwrap();
+        for child_label in labels {
+            use gtk::traits::GtkWindowExt;
+
+            let child = app.get_webview_window(&child_label).unwrap();
+            // child.with_webview(|w| w.inner().set)
+            let child_window = child.gtk_window().unwrap();
+            child_window.set_transient_for(Some(&host_window));
+            child_window.set_window_position(gtk::WindowPosition::CenterOnParent);
+        }
     }
 }
 
 pub fn restore_webview(app: tauri::AppHandle, label: String) {
     if let Some(window) = app.get_webview_window(&label) {
-        let hwnd = window.hwnd().unwrap();
+        #[cfg(target_os = "windows")]
+        {
+            let hwnd = window.hwnd().unwrap();
 
-        let style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) };
-        unsafe { SetWindowLongPtrW(hwnd, GWL_STYLE, (style & !WS_CHILD.0 as isize) | WS_POPUP.0 as isize) };
+            let style = unsafe { GetWindowLongPtrW(hwnd, GWL_STYLE) };
+            unsafe { SetWindowLongPtrW(hwnd, GWL_STYLE, (style & !WS_CHILD.0 as isize) | WS_POPUP.0 as isize) };
 
-        unsafe { SetParent(hwnd, None).unwrap() };
+            unsafe { SetParent(hwnd, None).unwrap() };
+        }
+        #[cfg(target_os = "linux")]
+        {
+            use gtk::traits::GtkWindowExt;
+            use gtk::Window;
+
+            let child_window = window.gtk_window().unwrap();
+            child_window.set_transient_for(None::<&Window>);
+        }
     }
 }
