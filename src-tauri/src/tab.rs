@@ -26,16 +26,17 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
     }
     #[cfg(target_os = "linux")]
     {
-        let host = app.get_webview_window("Main").unwrap();
-        let host_window = host.gtk_window().unwrap();
         for child_label in labels {
-            use gtk::traits::GtkWindowExt;
+            use gtk::traits::{GtkWindowExt, WidgetExt};
 
+            let host = app.get_webview_window("Main").unwrap();
+            let host_window = host.gtk_window().unwrap();
             let child = app.get_webview_window(&child_label).unwrap();
-            // child.with_webview(|w| w.inner().set)
             let child_window = child.gtk_window().unwrap();
+
+            child_window.set_opacity(0.0);
+
             child_window.set_transient_for(Some(&host_window));
-            child_window.set_window_position(gtk::WindowPosition::CenterOnParent);
         }
     }
 }
@@ -53,11 +54,23 @@ pub fn restore_webview(app: tauri::AppHandle, label: String) {
         }
         #[cfg(target_os = "linux")]
         {
-            use gtk::traits::GtkWindowExt;
-            use gtk::Window;
+            use gtk::traits::{GtkWindowExt, WidgetExt};
 
             let child_window = window.gtk_window().unwrap();
-            child_window.set_transient_for(None::<&Window>);
+            child_window.set_opacity(1.0);
+            child_window.set_transient_for(gtk::Window::NONE);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn make_opaque(app: tauri::AppHandle, label: String) {
+    if let Some(window) = app.get_webview_window(&label) {
+        {
+            use gtk::traits::WidgetExt;
+
+            let child_window = window.gtk_window().unwrap();
+            child_window.set_opacity(1.0);
         }
     }
 }

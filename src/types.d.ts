@@ -33,6 +33,7 @@ declare global {
         closed: string;
         destory: Mp.TabbedWebview;
         closeAll: Mp.AnyEvent;
+        moved: Mp.WindowMoveEvent;
     };
 
     namespace Mp {
@@ -136,6 +137,12 @@ declare global {
             left: number;
             right: number;
             bottom: number;
+        };
+
+        type WindowMoveEvent = {
+            label: string;
+            x: number;
+            y: number;
         };
 
         type UpdateTitleRequest = {

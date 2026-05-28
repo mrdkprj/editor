@@ -9,7 +9,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2.9.0", features = [ "devtools", "protocol-asset"] }
+tauri = { version = "2", features = [ "devtools", "protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
 smol = "2.0.2"
 notify-debouncer-full = "0.6.0"

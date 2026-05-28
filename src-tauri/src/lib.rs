@@ -277,12 +277,19 @@ fn is_file_opened(app: tauri::AppHandle, payload: String) -> Option<String> {
     helper::is_file_opened(&app, Some(payload))
 }
 
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn make_opaque(app: tauri::AppHandle, payload: String) {
+    tab::make_opaque(app, payload);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app_handel, args, _| helper::handle_second_instance(app_handel, args)))
         .setup(|app| {
-            println!("{:?}", std::env::current_exe());
+            let host = app.get_webview_window("Main").unwrap();
+            host.open_devtools();
             let args: Vec<String> = env::args().collect();
             helper::start(app.app_handle());
             helper::setup(app.app_handle(), args);
@@ -326,6 +333,8 @@ pub fn run() {
             to_child_window,
             get_webview_labels,
             update_webview_label,
+            #[cfg(target_os = "linux")]
+            make_opaque
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
