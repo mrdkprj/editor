@@ -161,15 +161,19 @@
         if (activeTabLabel == currentWebview.label) return;
 
         if (isLinux) {
-            // const currentWindow = currentWebview.label ? await WebviewWindow.getByLabel(currentWebview.label) : await WebviewWindow.getByLabel(activeTabLabel);
-            // const size = currentWebview.bounds.height;
-            // const position = await currentWindow!.outerPosition();
-            // console.log(currentWebview.label);
-            // console.log(position);
-            console.log(currentWebview.bounds);
             const toActive = await WebviewWindow.getByLabel(activeTabLabel);
-            await toActive?.setPosition(new PhysicalPosition(currentWebview.bounds.x, currentWebview.bounds.y));
-            await toActive?.setSize(new PhysicalSize(currentWebview.bounds.width, currentWebview.bounds.height));
+
+            const currentWindow = currentWebview.label ? await WebviewWindow.getByLabel(currentWebview.label) : await WebviewWindow.getByLabel(activeTabLabel);
+            const size = await currentWindow!.innerSize();
+            const position = await currentWindow!.innerPosition();
+            console.log(currentWebview.label);
+            console.log(position);
+            await toActive?.setPosition(position);
+            await toActive?.setSize(size);
+            console.log(currentWebview.bounds);
+
+            // await toActive?.setPosition(new PhysicalPosition(currentWebview.bounds.x, currentWebview.bounds.y));
+            // await toActive?.setSize(new PhysicalSize(currentWebview.bounds.width, currentWebview.bounds.height));
             // Make window fully opaque
             await ipc.invoke("make_opaque", activeTabLabel);
             await toActive?.setIgnoreCursorEvents(false);

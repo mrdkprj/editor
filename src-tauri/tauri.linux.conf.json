@@ -13,7 +13,7 @@
         "closable":true,
         "focus":true,
         "visible":true,
-        "decorations":false,
+        "decorations":true,
         "skipTaskbar":true,
         "transparent":true,
         "dragDropEnabled":false,
