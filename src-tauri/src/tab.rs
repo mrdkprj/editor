@@ -27,51 +27,40 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
     #[cfg(target_os = "linux")]
     {
         use gtk::traits::{BoxExt, ContainerExt};
+        use gtk::traits::{OverlayExt, WidgetExt};
 
         let host = app.get_webview_window("Main").unwrap();
-        let size = host.inner_size().unwrap();
+        let vbox = host.default_vbox().unwrap();
+        let host_chil = vbox.children();
+        let overlay: gtk::Overlay = if host_chil.len() == 1 {
+            let host_webview = host_chil.first().unwrap();
+            host_webview.set_size_request(-1, 30);
+            host_webview.set_vexpand(false);
+            vbox.set_child_packing(host_webview, false, false, 0, gtk::PackType::Start);
+            let overlay = gtk::Overlay::new();
+            overlay.set_hexpand(true);
+            overlay.set_vexpand(true);
+            vbox.pack_start(&overlay, true, true, 0);
+            overlay
+        } else {
+            use gtk::glib::Cast;
+
+            let ov = host_chil.get(1).unwrap();
+            ov.clone().downcast().unwrap()
+        };
 
         for child_label in labels {
-            use gtk::traits::{OverlayExt, WidgetExt};
-
-            let host = app.get_webview_window("Main").unwrap();
-            let vbox = host.default_vbox().unwrap();
-            // let host_chil = vbox.children();
-            // let init_web = host_chil.first().unwrap();
-            // init_web.set_size_request(size.width as _, size.height as _);
-            // init_web.set_vexpand(true);
-            // init_web.set_hexpand(true);
-
             let child = app.get_webview_window(&child_label).unwrap();
-
             let cbvos = child.default_vbox().unwrap();
             let chil = cbvos.children();
-            let web = chil.first().unwrap();
-            cbvos.remove(web);
-            let overlay = gtk::Overlay::new();
-            overlay.add_overlay(web);
-            vbox.pack_start(&overlay, true, true, 0);
-            vbox.reorder_child(&overlay, 1);
-            // web.hexpands();
-            // web.vexpands();
-            // web.set_vexpand(true);
-            // web.set_hexpand(true);
-            // web.set_margin_start(5);
-            // web.set_margin_end(5);
-            // web.set_margin_top(30);
-            // web.set_size_request(size.width as i32, size.height as i32 - 30);
-            child.set_decorations(true).unwrap();
+            let tab_webview = chil.first().unwrap();
+            tab_webview.set_widget_name(&child_label);
+            cbvos.remove(tab_webview);
+            overlay.add_overlay(tab_webview);
+
+            tab_webview.set_hexpand(true);
+            tab_webview.set_vexpand(true);
             let _ = child.hide();
-            // use gtk::traits::{GtkWindowExt, WidgetExt};
-
-            // let host = app.get_webview_window("Main").unwrap();
-            // let host_window = host.gtk_window().unwrap();
-            // let child = app.get_webview_window(&child_label).unwrap();
-            // let child_window = child.gtk_window().unwrap();
-
-            // child_window.set_opacity(0.0);
-
-            // child_window.set_transient_for(Some(&host_window));
         }
     }
 }
@@ -89,11 +78,30 @@ pub fn restore_webview(app: tauri::AppHandle, label: String) {
         }
         #[cfg(target_os = "linux")]
         {
-            use gtk::traits::{GtkWindowExt, WidgetExt};
+            use gtk::traits::ContainerExt;
 
-            let child_window = window.gtk_window().unwrap();
-            child_window.set_opacity(1.0);
-            child_window.set_transient_for(gtk::Window::NONE);
+            let host = app.get_webview_window("Main").unwrap();
+            let vbox = host.default_vbox().unwrap();
+            let host_chil = vbox.children();
+            if host_chil.len() > 1 {
+                use gtk::glib::Cast;
+
+                let ov = host_chil.get(1).unwrap();
+                let overlay: gtk::Overlay = ov.clone().downcast().unwrap();
+                for widget in overlay.children() {
+                    use gtk::traits::WidgetExt;
+
+                    if widget.widget_name() == label {
+                        use gtk::traits::BoxExt;
+
+                        overlay.remove(&widget);
+
+                        let cbvos = window.default_vbox().unwrap();
+                        cbvos.pack_start(&widget, true, true, 0);
+                        window.show().unwrap();
+                    }
+                }
+            }
         }
     }
 }

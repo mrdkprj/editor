@@ -5,6 +5,7 @@
     import { IPC } from "../ipc";
     import util from "../util";
     import { OS } from "../constants";
+    import { Webview } from "@tauri-apps/api/webview";
 
     const ipc = new IPC("Main");
 
@@ -134,13 +135,13 @@
         } else {
             // First place window off-screen
             await webview.setPosition(new PhysicalPosition(OFF_SCREEN, OFF_SCREEN));
+            // Then show window with animation if not visible
+            const visible = await webview.isVisible();
+            if (!visible) {
+                await webview.show();
+            }
         }
 
-        // Then show window with animation if not visible
-        const visible = await webview.isVisible();
-        if (!visible) {
-            await webview.show();
-        }
         ipc.sendTo(label, "tabWindowSizeChange", currentWebview.isMaximized);
     };
 
@@ -161,22 +162,8 @@
         if (activeTabLabel == currentWebview.label) return;
 
         if (isLinux) {
-            const toActive = await WebviewWindow.getByLabel(activeTabLabel);
-
-            const currentWindow = currentWebview.label ? await WebviewWindow.getByLabel(currentWebview.label) : await WebviewWindow.getByLabel(activeTabLabel);
-            const size = await currentWindow!.innerSize();
-            const position = await currentWindow!.innerPosition();
-            console.log(currentWebview.label);
-            console.log(position);
-            await toActive?.setPosition(position);
-            await toActive?.setSize(size);
-            console.log(currentWebview.bounds);
-
-            // await toActive?.setPosition(new PhysicalPosition(currentWebview.bounds.x, currentWebview.bounds.y));
-            // await toActive?.setSize(new PhysicalSize(currentWebview.bounds.width, currentWebview.bounds.height));
-            // Make window fully opaque
-            await ipc.invoke("make_opaque", activeTabLabel);
-            await toActive?.setIgnoreCursorEvents(false);
+            const toActive = await Webview.getByLabel(activeTabLabel);
+            await toActive?.show();
         } else {
             const size = await getCurrentWebviewWindow().size();
             const toActive = await WebviewWindow.getByLabel(activeTabLabel);
@@ -185,13 +172,11 @@
         }
 
         if (currentWebview.label) {
-            const toInactive = await WebviewWindow.getByLabel(currentWebview.label);
-
             if (isLinux) {
-                // Make window transparent
-                await ipc.invoke("to_child_window", [currentWebview.label]);
-                await toInactive?.setIgnoreCursorEvents(true);
+                const toInactive = await Webview.getByLabel(currentWebview.label);
+                await toInactive?.hide();
             } else {
+                const toInactive = await WebviewWindow.getByLabel(currentWebview.label);
                 toInactive?.setPosition(new PhysicalPosition(OFF_SCREEN, OFF_SCREEN));
             }
         }

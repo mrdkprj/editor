@@ -414,7 +414,7 @@
     magic-string "^0.30.17"
     vitefu "^1.0.6"
 
-"@tauri-apps/api@^2.5.0":
+"@tauri-apps/api@^2.11.0":
   version "2.11.0"
   resolved "https://registry.yarnpkg.com/@tauri-apps/api/-/api-2.11.0.tgz#00fb69996010178a5153798d4a84f6fe3a1e1182"
   integrity sha512-7CinYODhky9lmO23xHnUFv0Xt43fbtWMyxZcLcRBlFkcgXKuEirBvHpmtJ89YMhyeGcq20Wuc47Fa4XjyniywA==
@@ -474,7 +474,7 @@
   resolved "https://registry.yarnpkg.com/@tauri-apps/cli-win32-x64-msvc/-/cli-win32-x64-msvc-2.11.2.tgz#32d04f651981b0da298c9c137834cb078615ca9c"
   integrity sha512-d2JchlFIpZevZVReyqhQOekJmb1UH3rhZ5VX6sH3ty9ETE0TKQavpihvoScUXfKKpW6HZC0MrFGRU0ZtD+w3gA==
 
-"@tauri-apps/cli@^2.5.0":
+"@tauri-apps/cli@^2.11.0":
   version "2.11.2"
   resolved "https://registry.yarnpkg.com/@tauri-apps/cli/-/cli-2.11.2.tgz#1e1a112263c8a004a2aecba4874f4217573e74ef"
   integrity sha512-bk3HemqvGRoy+5D/dVMUQHKMYLglD0jVnMm/0iGMH6ufZ+p8r14m6BpIixwij3PBvZdvORUp1YifTD8QxVZ1Nw==
