@@ -26,14 +26,15 @@ declare global {
         enterTabMode: Mp.Tabs;
         exitTabMode: boolean;
         switchTab: string;
-        updateTitle: Mp.UpdateTitleRequest;
         addTab: string;
+        updateTitle: Mp.UpdateTitleRequest;
         closeTab: string;
         scrollTab: number;
         closed: string;
         destory: Mp.TabbedWebview;
         closeAll: Mp.AnyEvent;
-        moved: Mp.WindowMoveEvent;
+        activateTab: Mp.AnyEvent;
+        tabActivated: Mp.TabActivated;
     };
 
     namespace Mp {
@@ -139,12 +140,6 @@ declare global {
             bottom: number;
         };
 
-        type WindowMoveEvent = {
-            label: string;
-            x: number;
-            y: number;
-        };
-
         type UpdateTitleRequest = {
             label: string;
             webviewTitle: Mp.WebviewTitle;
@@ -154,6 +149,11 @@ declare global {
             label: string;
             bounds: Mp.Bounds;
             isMaximized: boolean;
+        };
+
+        type TabActivated = {
+            settings: Mp.Settings;
+            temporal: Mp.TypedPreference;
         };
 
         type TypedPreference = { [key in TextType]: Preference };

@@ -17,7 +17,6 @@
     import Settings from "../settings";
     import Preference from "./Preference.svelte";
     import TabControl from "./TabControl.svelte";
-    import { PhysicalPosition } from "@tauri-apps/api/dpi";
 
     const ipc = new IPC(getCurrentWebviewWindow().label);
     let settingStore = new Settings();
@@ -73,12 +72,6 @@
         const size = await view.innerSize();
         settings.bounds = util.toBounds(position, size);
         await view.minimize();
-    };
-
-    const onWindowMove = (e: PhysicalPosition) => {
-        if (!util.isWin()) {
-            ipc.sendTo("Main", "moved", { label: getCurrentWebviewWindow().label, x: e.x, y: e.y });
-        }
     };
 
     $effect(() => {
@@ -627,7 +620,6 @@
         prepare();
         ipc.receiveTauri("tauri://close-requested", beforeClose);
         ipc.receiveTauri("tauri://resize", onWindowSizeChanged);
-        ipc.receiveTauri("tauri://move", onWindowMove);
         ipc.receive("contextmenu_event", handleContextMenuEvent);
         ipc.receiveTauri<Mp.FileDropEvent>("tauri://drag-drop", onFileDrop);
         ipc.receive("bring_to_frong", bringToFront);

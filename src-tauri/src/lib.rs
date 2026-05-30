@@ -288,8 +288,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app_handel, args, _| helper::handle_second_instance(app_handel, args)))
         .setup(|app| {
-            let host = app.get_webview_window("Main").unwrap();
-            host.open_devtools();
+            // app.get_webview_window("Main").unwrap().open_devtools();
             let args: Vec<String> = env::args().collect();
             helper::start(app.app_handle());
             helper::setup(app.app_handle(), args);

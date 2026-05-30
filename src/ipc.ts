@@ -82,7 +82,6 @@ type TauriCommandMap = {
     get_webview_labels: TauriCommand<undefined, Mp.Tabs>;
     update_webview_label: TauriCommand<WebviewTitle, undefined>;
     is_file_opened: TauriCommand<string, string | null>;
-    make_opaque: TauriCommand<string, undefined>;
 };
 
 export class IPCBase {

@@ -1,22 +1,25 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
+    import { Webview } from "@tauri-apps/api/webview";
     import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
     import { IPC } from "../ipc";
     import util from "../util";
     import { OS } from "../constants";
-    import { Webview } from "@tauri-apps/api/webview";
 
     const ipc = new IPC("Main");
 
     const OFF_SCREEN = -30000;
+    const isLinux = navigator.userAgent.includes(OS.linux);
+
+    let settings = $state<Mp.Settings>();
+    let temporal = $state<Mp.TypedPreference>();
+
     let currentWebview: Mp.TabbedWebview = { label: "", bounds: { x: 0, y: 0, width: 0, height: 0 }, isMaximized: false };
     let active = false;
-
     let webviews: Mp.TabbedWebview[] = [];
     let closingLabelSequence: string[] = [];
     let allTabClosing = false;
-    const isLinux = navigator.userAgent.includes(OS.linux);
 
     const toggleMaximize = async () => {
         const view = getCurrentWebviewWindow();
@@ -109,36 +112,26 @@
         }
     };
 
-    const onMoved = (e: Mp.WindowMoveEvent) => {
-        console.log(e.x);
-        console.log(e.label);
-        if (e.label == currentWebview.label) {
-            currentWebview.bounds.x = e.x;
-            currentWebview.bounds.y = e.y;
-        }
-    };
-
     const pushWebiew = async (label: string) => {
-        const webview = await WebviewWindow.getByLabel(label);
-        if (!webview) return;
+        const webviewWindow = await WebviewWindow.getByLabel(label);
+        if (!webviewWindow) return;
 
-        const size = await webview.innerSize();
-        const position = await webview.innerPosition();
-        const isMaximized = await webview.isMaximized();
+        const size = await webviewWindow.innerSize();
+        const position = await webviewWindow.innerPosition();
+        const isMaximized = await webviewWindow.isMaximized();
 
         webviews.push({ label, bounds: util.toBounds(position, size), isMaximized });
 
         if (isLinux) {
-            // Make window transparent
-            // await ipc.invoke("to_child_window", [label]);
-            // await webview.setIgnoreCursorEvents(true);
+            // Hide window
+            await webviewWindow.hide();
         } else {
             // First place window off-screen
-            await webview.setPosition(new PhysicalPosition(OFF_SCREEN, OFF_SCREEN));
+            await webviewWindow.setPosition(new PhysicalPosition(OFF_SCREEN, OFF_SCREEN));
             // Then show window with animation if not visible
-            const visible = await webview.isVisible();
+            const visible = await webviewWindow.isVisible();
             if (!visible) {
-                await webview.show();
+                await webviewWindow.show();
             }
         }
 
@@ -158,8 +151,12 @@
         await switchTab(label);
     };
 
+    const onActivated = (e: Mp.TabActivated) => {};
+
     const switchTab = async (activeTabLabel: string) => {
         if (activeTabLabel == currentWebview.label) return;
+
+        ipc.sendTo(activeTabLabel, "activateTab", {});
 
         if (isLinux) {
             const toActive = await Webview.getByLabel(activeTabLabel);
@@ -201,7 +198,7 @@
         const thisWindow = getCurrentWebviewWindow();
         await thisWindow.setSize(util.toPhysicalSize(currentWebview.bounds));
         await thisWindow.setPosition(util.toPhysicalPosition(currentWebview.bounds));
-
+        // await getCurrentWebview().setAutoResize(false);
         // Prepare tabs
         const labelTitleMap = await ipc.invoke("get_webview_labels", undefined);
         const sortedLabels = Object.keys(labelTitleMap).toSorted();
@@ -215,10 +212,6 @@
         await switchTab(initial);
 
         active = true;
-
-        // if (isLinux) {
-        //     await ipc.invoke("to_child_window", [thisWindow.label]);
-        // }
 
         await thisWindow.show();
         if (currentWebview.isMaximized) {
@@ -239,8 +232,12 @@
             await ipc.invoke("restore_webview", webview.label);
 
             const webiewWindow = await WebviewWindow.getByLabel(webview.label);
-            await webiewWindow?.setPosition(util.toPhysicalPosition(bounds));
-            await webiewWindow?.setSize(util.toPhysicalSize(bounds));
+            if (isLinux) {
+                await webiewWindow?.show();
+            } else {
+                await webiewWindow?.setPosition(util.toPhysicalPosition(bounds));
+                await webiewWindow?.setSize(util.toPhysicalSize(bounds));
+            }
             await ipc.sendTo(webview.label, "exitTabMode", isMaximized);
         }
 
@@ -262,7 +259,6 @@
     onMount(() => {
         ipc.receiveTauri("tauri://close-requested", beforeClose);
         ipc.receiveTauri("tauri://resize", onResize);
-        ipc.receive("moved", onMoved);
         ipc.receive("toggleMaximize", toggleMaximize);
         ipc.receive("minimize", minimize);
         ipc.receive("startTabMode", startTabMode);
@@ -270,6 +266,7 @@
         ipc.receive("switchTab", switchTab);
         ipc.receive("updateTitle", updateTitle);
         ipc.receive("addTab", addTab);
+        ipc.receive("tabActivated", onActivated);
         ipc.receive("closeTab", closeTab);
         ipc.receive("closeAll", closeAll);
         ipc.receive("closed", onAnotherWindowClosed);
