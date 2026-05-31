@@ -1,3 +1,4 @@
+import "../view.css";
 import "../common.css";
 import { mount } from "svelte";
 import Main from "./Main.svelte";

@@ -33,8 +33,6 @@ declare global {
         closed: string;
         destory: Mp.TabbedWebview;
         closeAll: Mp.AnyEvent;
-        activateTab: Mp.AnyEvent;
-        tabActivated: Mp.TabActivated;
     };
 
     namespace Mp {
@@ -43,6 +41,7 @@ declare global {
         type TextType = "plain" | "code";
         type WhiteSpaceRenderMode = "none" | "all" | "boundary" | "selection" | "trailing" | undefined;
         type PreferenceTab = "view" | "color";
+        type DialogType = "grep" | "progress" | "preference" | "watch";
         type ColorKey =
             | "color"
             | "background"
@@ -149,11 +148,6 @@ declare global {
             label: string;
             bounds: Mp.Bounds;
             isMaximized: boolean;
-        };
-
-        type TabActivated = {
-            settings: Mp.Settings;
-            temporal: Mp.TypedPreference;
         };
 
         type TypedPreference = { [key in TextType]: Preference };

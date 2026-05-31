@@ -235,11 +235,11 @@
 
     const showPreference = () => {
         if ($appState.mode == "grep") return;
-        dispatch({ type: "showPreference", value: true });
+        dispatch({ type: "toggleDialog", value: { type: "preference", open: true } });
     };
 
     const startGrep = () => {
-        dispatch({ type: "showGrepDialog", value: true });
+        dispatch({ type: "toggleDialog", value: { type: "grep", open: true } });
     };
 
     const executeGrep = async (request: Mp.GrepRequest) => {
@@ -251,10 +251,10 @@
         }
 
         dispatch({ type: "mode", value: "grep" });
-        dispatch({ type: "showGrepProgress", value: true });
+        dispatch({ type: "toggleDialog", value: { type: "progress", open: true } });
         const results = await helper.grep(request);
         dispatch({ type: "grepResult", value: results });
-        dispatch({ type: "showGrepProgress", value: false });
+        dispatch({ type: "toggleDialog", value: { type: "progress", open: true } });
         await ipc.sendTo("View", "grep_end", {});
     };
 
@@ -644,7 +644,7 @@
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
     {#if ready}
-        <Bar {openNewWindow} close={tryClose} {toggleMaximize} {minimize} />
+        <Bar label={getCurrentWebviewWindow().label} {openNewWindow} close={tryClose} {toggleMaximize} {minimize} />
         {#if $appState.showWatchDialog}
             <WatchDialog />
         {/if}

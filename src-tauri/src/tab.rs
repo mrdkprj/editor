@@ -27,32 +27,17 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
     #[cfg(target_os = "linux")]
     {
         use gtk::glib::Cast;
-        use gtk::traits::{BoxExt, ContainerExt};
+        use gtk::traits::ContainerExt;
         use gtk::traits::{OverlayExt, WidgetExt};
 
         let host = app.get_webview_window("Main").unwrap();
-        let size = host.inner_size().unwrap();
         let vbox = host.default_vbox().unwrap();
         let host_children = vbox.children();
-        let overlay: gtk::Overlay = if host_children.len() == 1 {
-            let host_webview = host_children.first().unwrap();
-            host_webview.set_size_request(-1, 35);
-            host_webview.set_vexpand(false);
-            vbox.set_child_packing(host_webview, false, false, 0, gtk::PackType::Start);
-
-            let overlay = gtk::Overlay::new();
-            overlay.set_size_request(size.width as i32, size.height as i32 - 35);
-            overlay.set_hexpand(true);
-            overlay.set_vexpand(true);
-            vbox.pack_start(&overlay, true, true, 0);
-
-            overlay
-        } else {
-            let widget = host_children.get(1).unwrap();
-            widget.clone().downcast().unwrap()
-        };
+        let widget = host_children.get(1).unwrap();
+        let overlay: gtk::Overlay = widget.clone().downcast().unwrap();
 
         for child_label in labels {
+            println!("add:{:?}", child_label);
             let child = app.get_webview_window(&child_label).unwrap();
             let child_vbox = child.default_vbox().unwrap();
             let children = child_vbox.children();
@@ -97,6 +82,7 @@ pub fn restore_webview(app: tauri::AppHandle, label: String) {
                         overlay.remove(&child);
                         let child_vbox = window.default_vbox().unwrap();
                         child_vbox.pack_start(&child, true, true, 0);
+                        println!("close:{:?}", label);
                     }
                 }
             }

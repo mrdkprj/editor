@@ -44,7 +44,7 @@
     };
 
     const close = () => {
-        dispatch({ type: "showGrepDialog", value: false });
+        dispatch({ type: "toggleDialog", value: { type: "grep", open: false } });
         ipc.sendTo("View", "dialog", false);
     };
 

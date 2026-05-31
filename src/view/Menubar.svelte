@@ -4,6 +4,8 @@
     import util from "../util";
     import Menu from "./Menu.svelte";
 
+    let { label }: { label: string } = $props();
+
     let fileMenuItems = $derived(util.getFileMenubarItems(settings.history, textState.encoding));
     let viewMenuItems = $derived(util.getViewMenubarItems(settings.theme, settings.tabMode, temporal[textState.textType]));
 
@@ -41,7 +43,7 @@
             File
         </div>
         {#if $appState.visibleMenubarItem == "file"}
-            <Menu items={fileMenuItems} submenu={false} />
+            <Menu {label} items={fileMenuItems} submenu={false} />
         {/if}
     </div>
     <div class="menu-bar-item">
@@ -58,7 +60,7 @@
             Edit
         </div>
         {#if $appState.visibleMenubarItem == "edit"}
-            <Menu items={EDIT_MENU_ITEMS} submenu={false} />
+            <Menu {label} items={EDIT_MENU_ITEMS} submenu={false} />
         {/if}
     </div>
     <div class="menu-bar-item">
@@ -75,7 +77,7 @@
             View
         </div>
         {#if $appState.visibleMenubarItem == "view"}
-            <Menu items={viewMenuItems} submenu={false} />
+            <Menu {label} items={viewMenuItems} submenu={false} />
         {/if}
     </div>
 </div>

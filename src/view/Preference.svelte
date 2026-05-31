@@ -49,7 +49,7 @@
     };
 
     const close = () => {
-        dispatch({ type: "showPreference", value: false });
+        dispatch({ type: "toggleDialog", value: { type: "preference", open: false } });
         ipc.sendTo("View", "dialog", false);
     };
 

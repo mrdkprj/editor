@@ -19,7 +19,7 @@
 
     const close = (applyChange: boolean) => {
         ipc.sendTo("View", "watch_confirm_event", { applyChange, doNotNotify });
-        dispatch({ type: "showWatchDialog", value: false });
+        dispatch({ type: "toggleDialog", value: { type: "watch", open: false } });
         ipc.sendTo("View", "dialog", false);
     };
 

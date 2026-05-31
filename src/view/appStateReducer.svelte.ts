@@ -28,6 +28,7 @@ type AppState = {
     language: string;
     hoverMenuItemGroup: string;
     showPreference: boolean;
+    anyDialogOpened: boolean;
 };
 
 export const initialAppState: AppState = {
@@ -51,6 +52,7 @@ export const initialAppState: AppState = {
     language: "",
     hoverMenuItemGroup: "",
     showPreference: false,
+    anyDialogOpened: false,
 };
 
 export const textState: Mp.TextState = $state({ textType: "plain", encoding: DEFAULT_ENCODING });
@@ -102,20 +104,17 @@ type AppAction =
     | { type: "isDirty"; value: boolean }
     | { type: "openingMenu"; value: boolean }
     | { type: "visibleMenubarItem"; value: string }
-    | { type: "showWatchDialog"; value: boolean }
     | { type: "watchThisFile"; value: boolean }
     | { type: "suspendWatch"; value: boolean }
-    | { type: "showGrepDialog"; value: boolean }
     | { type: "grepRequest"; value: Mp.GrepRequest }
     | { type: "grepResult"; value: Mp.GrepResult[] }
-    | { type: "showGrepProgress"; value: boolean }
     | { type: "columnSelection"; value: boolean }
     | { type: "cusorPosition"; value: CusorPosition }
     | { type: "lineEnding"; value: string }
     | { type: "language"; value: string }
     | { type: "hoverMenuItemGroup"; value: string }
-    | { type: "showPreference"; value: boolean }
     | { type: "toggleTabMode"; value: boolean }
+    | { type: "toggleDialog"; value: { type: Mp.DialogType; open: boolean } }
     | { type: "isFullScreen"; value: boolean };
 
 const updater = (state: AppState, action: AppAction): AppState => {
@@ -149,26 +148,17 @@ const updater = (state: AppState, action: AppAction): AppState => {
             contentState.isDirty = action.value;
             return state;
 
-        case "showWatchDialog":
-            return { ...state, showWatchDialog: action.value };
-
         case "watchThisFile":
             return { ...state, watchThisFile: action.value };
 
         case "suspendWatch":
             return { ...state, suspendWatch: action.value };
 
-        case "showGrepDialog":
-            return { ...state, showGrepDialog: action.value };
-
         case "grepRequest":
             return { ...state, grepRequest: action.value };
 
         case "grepResult":
             return { ...state, grepResults: action.value };
-
-        case "showGrepProgress":
-            return { ...state, showGrepProgress: action.value };
 
         case "columnSelection":
             return { ...state, columnSelection: action.value };
@@ -185,9 +175,6 @@ const updater = (state: AppState, action: AppAction): AppState => {
         case "hoverMenuItemGroup":
             return { ...state, hoverMenuItemGroup: action.value };
 
-        case "showPreference":
-            return { ...state, showPreference: action.value };
-
         case "isMaximized":
             return { ...state, isMaximized: action.value };
 
@@ -197,6 +184,18 @@ const updater = (state: AppState, action: AppAction): AppState => {
         case "toggleTabMode":
             settings.tabMode = action.value;
             return state;
+
+        case "toggleDialog":
+            switch (action.value.type) {
+                case "grep":
+                    return { ...state, showGrepDialog: action.value.open, anyDialogOpened: action.value.open };
+                case "progress":
+                    return { ...state, showGrepProgress: action.value.open, anyDialogOpened: action.value.open };
+                case "preference":
+                    return { ...state, showPreference: action.value.open, anyDialogOpened: action.value.open };
+                case "watch":
+                    return { ...state, showWatchDialog: action.value.open, anyDialogOpened: action.value.open };
+            }
 
         default:
             return state;

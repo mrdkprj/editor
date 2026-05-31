@@ -12,9 +12,6 @@
     const OFF_SCREEN = -30000;
     const isLinux = navigator.userAgent.includes(OS.linux);
 
-    let settings = $state<Mp.Settings>();
-    let temporal = $state<Mp.TypedPreference>();
-
     let currentWebview: Mp.TabbedWebview = { label: "", bounds: { x: 0, y: 0, width: 0, height: 0 }, isMaximized: false };
     let active = false;
     let webviews: Mp.TabbedWebview[] = [];
@@ -26,7 +23,9 @@
         const isMaximized = await view.isMaximized();
         if (isMaximized) {
             view.unmaximize();
-            view.setPosition(util.toPhysicalPosition(currentWebview.bounds));
+            if (!isLinux) {
+                view.setPosition(util.toPhysicalPosition(currentWebview.bounds));
+            }
         } else {
             const position = await view.innerPosition();
             const size = await view.innerSize();
@@ -151,12 +150,8 @@
         await switchTab(label);
     };
 
-    const onActivated = (e: Mp.TabActivated) => {};
-
     const switchTab = async (activeTabLabel: string) => {
         if (activeTabLabel == currentWebview.label) return;
-
-        ipc.sendTo(activeTabLabel, "activateTab", {});
 
         if (isLinux) {
             const toActive = await Webview.getByLabel(activeTabLabel);
@@ -266,7 +261,6 @@
         ipc.receive("switchTab", switchTab);
         ipc.receive("updateTitle", updateTitle);
         ipc.receive("addTab", addTab);
-        ipc.receive("tabActivated", onActivated);
         ipc.receive("closeTab", closeTab);
         ipc.receive("closeAll", closeAll);
         ipc.receive("closed", onAnotherWindowClosed);

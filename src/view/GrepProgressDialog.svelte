@@ -26,7 +26,7 @@
 
     const close = async () => {
         await abortGrep();
-        dispatch({ type: "showGrepProgress", value: false });
+        dispatch({ type: "toggleDialog", value: { type: "progress", open: false } });
     };
 
     const onProgress = (e: Mp.GrepProgress) => {

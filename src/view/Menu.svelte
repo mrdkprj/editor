@@ -4,11 +4,11 @@
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
     import { appState, dispatch } from "./appStateReducer.svelte";
-    import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
-    let { items, submenu, id }: { items: Mp.MenuItem[]; submenu: boolean; id?: string } = $props();
+    let { label, items, submenu, id }: { label: string; items: Mp.MenuItem[]; submenu: boolean; id?: string } = $props();
 
-    const ipc = new IPC("View");
+    // svelte-ignore state_referenced_locally
+    const ipc = new IPC(label);
 
     let canvas: HTMLCanvasElement;
     let width = $state(0);
@@ -41,7 +41,7 @@
             toggleCheck(e.target);
         }
 
-        ipc.sendTo(getCurrentWebviewWindow().label, "contextmenu_event", { id: e.target.id as keyof Mp.MainContextMenuSubTypeMap, value: e.target.getAttribute("data-value") ?? undefined });
+        ipc.sendTo(label, "contextmenu_event", { id: e.target.id as keyof Mp.MainContextMenuSubTypeMap, value: e.target.getAttribute("data-value") ?? undefined });
     };
 
     const toggleCheck = (target: HTMLElement) => {
@@ -132,7 +132,7 @@
                 onkeydown={handleKeyEvent}
             >
                 <div class="menu-item-label">{item.label}</div>
-                <Menu items={item.items ?? []} id={item.submenuId} submenu={true} />
+                <Menu {label} items={item.items ?? []} id={item.submenuId} submenu={true} />
             </div>
         {:else if item.type == "text"}
             <div
