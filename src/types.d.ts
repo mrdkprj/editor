@@ -76,6 +76,12 @@ declare global {
             fullPath: string;
         };
 
+        type OpenContextMenuRequest = {
+            opener: string;
+            receiver: string;
+            position: Mp.Position;
+        };
+
         type ContextMenuEvent = {
             id: keyof MainContextMenuSubTypeMap;
             value?: string;

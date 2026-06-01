@@ -1,5 +1,6 @@
 use crate::{
     fgrep::{self, GrepRequest},
+    menu::AppMenu,
     watcher::{self, WatchTx},
     WriteFileInfo,
 };
@@ -59,6 +60,7 @@ pub fn start(app: &tauri::AppHandle) {
     app.manage(Mutex::new(FileArg::default()));
     app.manage(Mutex::new(fgrep::GrepRequest::default()));
     app.manage(Mutex::new(OpenedWebview::default()));
+    app.manage(smol::lock::Mutex::new(AppMenu::default()));
 
     #[cfg(target_os = "linux")]
     {

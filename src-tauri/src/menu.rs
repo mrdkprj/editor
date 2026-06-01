@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use smol::lock::Mutex;
+use std::collections::HashMap;
 use tauri::{Emitter, Manager};
 use wcpopup::{
     config::{ColorScheme, Config, MenuSize, Theme, ThemeColor, DEFAULT_DARK_COLOR_SCHEME},
@@ -6,6 +8,16 @@ use wcpopup::{
 };
 
 const MENU_EVENT_NAME: &str = "contextmenu_event";
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AppMenu(HashMap<String, Menu>);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenContextMenuRequest {
+    opener: String,
+    receiver: String,
+    position: Position,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position {
@@ -19,16 +31,18 @@ struct ContextMenuEvent {
     value: Option<String>,
 }
 
-struct AppMenu(Menu);
-
-pub async fn popup_menu(app_handle: &tauri::AppHandle, position: Position) {
-    let menu = &app_handle.state::<AppMenu>().inner().0;
-
-    let result = menu.popup_at_async(position.x, position.y).await;
+pub async fn popup_menu(app_handle: &tauri::AppHandle, e: OpenContextMenuRequest) {
+    let state = app_handle.state::<Mutex<AppMenu>>();
+    let state = state.lock().await;
+    let menu = state.0.get(&e.opener).unwrap();
+    let result = menu.popup_at_async(e.position.x, e.position.y).await;
 
     if let Some(item) = result {
         app_handle
-            .emit(
+            .emit_to(
+                tauri::EventTarget::WebviewWindow {
+                    label: e.receiver,
+                },
                 MENU_EVENT_NAME,
                 ContextMenuEvent {
                     id: item.id,
@@ -58,14 +72,20 @@ fn get_menu_config(theme: Theme) -> Config {
     }
 }
 
-pub fn create(app_handle: &tauri::AppHandle, window_handle: isize) {
+pub fn create(app_handle: &tauri::AppHandle, label: String, window_handle: isize) {
     let menu = create_list_menu(window_handle);
-    app_handle.manage(AppMenu(menu));
+    let state = app_handle.state::<Mutex<AppMenu>>();
+    let mut state = state.try_lock().unwrap();
+    let _ = state.0.insert(label, menu);
 }
 
 pub fn change_menu_theme(app_handle: &tauri::AppHandle, theme: Theme) {
-    let menu = &app_handle.state::<AppMenu>().inner().0;
-    menu.set_theme(theme);
+    let state = app_handle.state::<Mutex<AppMenu>>();
+    let state = state.try_lock().unwrap();
+    for key in state.0.keys() {
+        let menu = state.0.get(key).unwrap();
+        menu.set_theme(theme);
+    }
 }
 
 fn create_list_menu(window_handle: isize) -> Menu {

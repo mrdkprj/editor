@@ -51,7 +51,7 @@ type WebviewTitle = {
 
 type TauriCommandMap = {
     prepare_menu: TauriCommand<undefined, undefined>;
-    open_list_context_menu: TauriCommand<Mp.Position, undefined>;
+    open_list_context_menu: TauriCommand<Mp.OpenContextMenuRequest, undefined>;
     new_window: TauriCommand<string, undefined>;
     exists: TauriCommand<string, boolean>;
     is_uris_available: TauriCommand<undefined, boolean>;

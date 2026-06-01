@@ -1,8 +1,8 @@
 <script lang="ts">
     import { onMount, tick, untrack } from "svelte";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-    import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences } from "./appStateReducer.svelte";
-    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, OS, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
+    import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
+    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
     import util from "../util";
@@ -28,11 +28,18 @@
         e.preventDefault();
         e.stopPropagation();
         closeMenu();
-        if (navigator.userAgent.includes(OS.windows)) {
-            await helper.openContextMenu({ x: e.screenX, y: e.screenY });
+        if (util.isWin()) {
+            const label = getCurrentWebviewWindow().label;
+            await helper.openContextMenu(label, label, { x: e.screenX, y: e.screenY });
         } else {
-            await helper.openContextMenu({ x: e.clientX, y: e.clientY });
+            await awaitContextMenu();
+            const opener = settings.tabMode ? "Main" : getCurrentWebviewWindow().label;
+            await helper.openContextMenu(opener, getCurrentWebviewWindow().label, { x: e.clientX, y: e.clientY });
         }
+    };
+
+    const onmouseup = () => {
+        resolveContextMenu();
     };
 
     const toggleMaximize = async () => {
@@ -179,7 +186,7 @@
     };
 
     const onkeyup = async (e: KeyboardEvent) => {
-        if (navigator.userAgent.includes(OS.windows)) return;
+        if (util.isWin()) return;
 
         if (!handleKeyUp) return;
 
@@ -456,8 +463,7 @@
     const tryDestory = async () => {
         if (settings.tabMode) {
             // Switch tab before "destroy" to prevent flickering
-            const currentWindow = getCurrentWebviewWindow();
-            await ipc.sendOthers("closed", currentWindow.label);
+            await ipc.sendOthers("closed", getCurrentWebviewWindow().label);
         } else {
             destroy();
         }
@@ -640,7 +646,7 @@
 </script>
 
 <svelte:window oncontextmenu={openContextMenu} />
-<svelte:document {onkeydown} {onkeyup} {onclick} ondragover={(e) => e.preventDefault()} />
+<svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} />
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
     {#if ready}

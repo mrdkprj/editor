@@ -37,7 +37,6 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
         let overlay: gtk::Overlay = widget.clone().downcast().unwrap();
 
         for child_label in labels {
-            println!("add:{:?}", child_label);
             let child = app.get_webview_window(&child_label).unwrap();
             let child_vbox = child.default_vbox().unwrap();
             let children = child_vbox.children();
@@ -82,23 +81,9 @@ pub fn restore_webview(app: tauri::AppHandle, label: String) {
                         overlay.remove(&child);
                         let child_vbox = window.default_vbox().unwrap();
                         child_vbox.pack_start(&child, true, true, 0);
-                        println!("close:{:?}", label);
                     }
                 }
             }
-        }
-    }
-}
-
-#[cfg(target_os = "linux")]
-pub fn make_opaque(app: tauri::AppHandle, label: String) {
-    if let Some(window) = app.get_webview_window(&label) {
-        {
-            use gtk::traits::{GtkWindowExt, WidgetExt};
-
-            let child_window = window.gtk_window().unwrap();
-            println!("{:?}", child_window.position());
-            child_window.set_opacity(1.0);
         }
     }
 }

@@ -130,7 +130,7 @@
         }
 
         if (contentState.fullPath == e.file_path) {
-            dispatch({ type: "showWatchDialog", value: true });
+            dispatch({ type: "toggleDialog", value: { type: "watch", open: true } });
 
             watchDialogPromise = new Deferred();
             const result = await watchDialogPromise.promise;

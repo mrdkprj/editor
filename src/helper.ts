@@ -44,8 +44,8 @@ class Helper {
         }
     };
 
-    openContextMenu = async (position: Mp.Position) => {
-        await ipc.invoke("open_list_context_menu", position);
+    openContextMenu = async (opener: string, receiver: string, position: Mp.Position) => {
+        await ipc.invoke("open_list_context_menu", { opener, receiver, position });
     };
 
     confirm = async (message: string, buttons?: string[]): Promise<Mp.MessageResult> => {

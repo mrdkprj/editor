@@ -1,7 +1,6 @@
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
-import { AVAILABLE_ENCODING, GREP, OS, UNTITLED } from "./constants";
+import { AVAILABLE_ENCODING, OS } from "./constants";
 import { IPCBase } from "./ipc";
-import path from "./path";
 
 const ipc = new IPCBase();
 
@@ -36,12 +35,6 @@ class Util {
 
         return args.join(" ");
     }
-
-    formatTitle = (contentState: Mp.ContentState, mode: Mp.Mode) => {
-        const mark = contentState.isDirty ? "*" : "";
-        const title = contentState.fullPath ? `${path.basename(contentState.fullPath)}${mark}` : mode == "grep" ? `${GREP}${mark}` : `${UNTITLED}${mark}`;
-        return title;
-    };
 
     getFileMenubarItems(history: string[], encoding: string): Mp.MenuItem[] {
         return [

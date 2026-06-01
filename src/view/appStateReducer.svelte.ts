@@ -1,6 +1,23 @@
 import { DEFAULT_ENCODING, DEFAULT_GREP_REQUEST, DEFAULT_PREFERENCE } from "../constants";
+import Deferred from "../deferred";
 import { defaultSettings } from "../settings";
 import { writable } from "svelte/store";
+
+// Linux only
+type ContextMenuState = {
+    deferred: Deferred<number> | null;
+};
+const contextMenuState: ContextMenuState = $state({ deferred: null });
+export const awaitContextMenu = async () => {
+    contextMenuState.deferred = new Deferred();
+    await contextMenuState.deferred.promise;
+};
+export const resolveContextMenu = () => {
+    if (contextMenuState.deferred) {
+        contextMenuState.deferred.resolve(0);
+        contextMenuState.deferred = null;
+    }
+};
 
 type CusorPosition = {
     line: number;
