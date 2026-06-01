@@ -135,6 +135,38 @@ pub fn setup(app: &tauri::AppHandle, args: Vec<String>) -> Option<String> {
     opening_file
 }
 
+// Check if the file is already opened. If any, returns the window label
+pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> Option<String> {
+    let opening_file_path = opening_file_path.unwrap_or_default();
+    let state = app.state::<Mutex<OpenedWebview>>();
+    let state = state.lock().unwrap();
+    let already_opened = state.webviews.iter().filter(|webview| !webview.1.path.is_empty() && webview.1.path == opening_file_path).map(|webview| webview.0).collect::<Vec<&String>>();
+    if already_opened.is_empty() {
+        None
+    } else {
+        Some(already_opened[0].to_string())
+    }
+}
+
+pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<String>) {
+    if let Some(label) = is_file_opened(app, opening_file_path) {
+        app.emit_to(
+            tauri::EventTarget::WebviewWindow {
+                label,
+            },
+            "bring_to_frong",
+            (),
+        )
+        .unwrap();
+        return;
+    }
+    let id = UUID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let config = &app.config().app.windows[1];
+    let mut config = config.clone();
+    config.label = format!("{}-{:?}", config.label, id);
+    tauri::WebviewWindowBuilder::from_config(app, &config).unwrap().build().unwrap();
+}
+
 pub fn get_init_args(app: AppHandle) -> Result<InitArgs, String> {
     let locale = zouni::shell::get_locale();
     let restore_position = if RESTORE_POSITION.get().is_none() {
@@ -241,38 +273,6 @@ pub fn write_to_file(info: WriteFileInfo) -> Result<(), String> {
 
 fn write_raw(info: WriteFileInfo) -> Result<(), String> {
     std::fs::write(info.fullPath, info.data.as_bytes()).map_err(|e| e.to_string())
-}
-
-// Check if the file is already opened. If any, returns the window label
-pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> Option<String> {
-    let opening_file_path = opening_file_path.unwrap_or_default();
-    let state = app.state::<Mutex<OpenedWebview>>();
-    let state = state.lock().unwrap();
-    let already_opened = state.webviews.iter().filter(|webview| !webview.1.path.is_empty() && webview.1.path == opening_file_path).map(|webview| webview.0).collect::<Vec<&String>>();
-    if already_opened.is_empty() {
-        None
-    } else {
-        Some(already_opened[0].to_string())
-    }
-}
-
-pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<String>) {
-    if let Some(label) = is_file_opened(app, opening_file_path) {
-        app.emit_to(
-            tauri::EventTarget::WebviewWindow {
-                label,
-            },
-            "bring_to_frong",
-            (),
-        )
-        .unwrap();
-        return;
-    }
-    let id = UUID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let config = &app.config().app.windows[1];
-    let mut config = config.clone();
-    config.label = format!("{}-{:?}", config.label, id);
-    tauri::WebviewWindowBuilder::from_config(app, &config).unwrap().build().unwrap();
 }
 
 pub fn get_webview_labels(app: tauri::AppHandle) -> HashMap<String, WebviewTitle> {

@@ -182,10 +182,18 @@ async fn show_save_dialog(payload: DialogOptions) -> Option<String> {
 }
 
 #[tauri::command]
-fn new_window(app: AppHandle, payload: Option<String>) {
-    let payload = payload.unwrap_or_default();
-    let args: Vec<&str> = payload.split(" ").collect();
-    helper::handle_second_instance(&app, args.iter().map(|a| a.to_string()).collect());
+fn new_window(app: AppHandle, payload: Option<String>) -> Result<(), String> {
+    if cfg!(windows) {
+        let app_path = tauri::process::current_binary(&app.env()).map_err(|e| e.to_string())?;
+        zouni::shell::open_path_with(payload.unwrap_or_default(), app_path)
+    } else {
+        let payload = payload.unwrap_or_default();
+        let mut args = vec!["thisapp"];
+        let argv: Vec<&str> = payload.split(" ").collect();
+        args.extend(argv);
+        helper::handle_second_instance(&app, args.iter().map(|a| a.to_string()).collect());
+        Ok(())
+    }
 }
 
 #[tauri::command]
@@ -287,10 +295,13 @@ pub fn run() {
             helper::start(app.app_handle());
             helper::setup(app.app_handle(), args);
 
-            let window = app.get_webview_window("Main").unwrap();
-            let label = window.label().to_string();
-            let window_handle = get_window_handel(&window);
-            menu::create(app.app_handle(), label, window_handle);
+            #[cfg(target_os = "linux")]
+            {
+                let window = app.get_webview_window("Main").unwrap();
+                let label = window.label().to_string();
+                let window_handle = get_window_handel(&window);
+                menu::create(app.app_handle(), label, window_handle);
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

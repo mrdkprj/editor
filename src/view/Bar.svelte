@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { appState, contentState, settings } from "./appStateReducer.svelte";
-    import { GREP, handleKeyEvent, OS, UNTITLED } from "../constants";
+    import { appState, contentState } from "./appStateReducer.svelte";
+    import { GREP, handleKeyEvent, UNTITLED } from "../constants";
     import path from "../path";
     import util from "../util";
     import Menubar from "./Menubar.svelte";
@@ -41,15 +41,15 @@
     };
 </script>
 
-{#if util.isWin() || !settings.tabMode}
-    <div class="title-bar no-print" data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null} class:bar-disabled={disabled}>
+{#if util.isWin()}
+    <div class="title-bar no-print" class:bar-disabled={disabled}>
         <div class="icon-area" {onmousedown} onclick={() => openNewWindow("")} onkeydown={handleKeyEvent} role="button" tabindex="-1">
             <img src={icon} alt="" width="20" height="20" />
         </div>
         <div class="menu-bar-area" {onmousedown} role="button" tabindex="-1">
             <Menubar {label} />
         </div>
-        <div class="title" title={contentState.fullPath} data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null} {onmousedown} role="button" tabindex="-1">
+        <div class="title" title={contentState.fullPath} {onmousedown} role="button" tabindex="-1">
             {contentState.fullPath ? path.basename(contentState.fullPath) : $appState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
         </div>
         <div class="window-area">

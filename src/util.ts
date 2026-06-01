@@ -10,7 +10,7 @@ class Util {
     }
 
     toCommandLineArgs(filePath?: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position): string {
-        const args = this.isWin() ? [`"${filePath}"`] : [filePath];
+        const args = [filePath]; //this.isWin() ? [`"${filePath}"`] : [filePath];
         if (grepRequest) {
             args.push("-g");
             args.push(grepRequest.condition);

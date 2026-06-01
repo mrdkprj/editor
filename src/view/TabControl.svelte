@@ -46,7 +46,6 @@
         display: flex;
         border-bottom: 1px solid #ccc;
         z-index: 1300;
-        cursor: pointer;
         width: 100%;
         overflow: hidden;
     }
@@ -73,6 +72,7 @@
         position: relative;
         display: flex;
         justify-content: center;
+        cursor: pointer;
     }
 
     .tab-title {
