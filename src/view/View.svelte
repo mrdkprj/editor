@@ -89,10 +89,16 @@
     const updateTitle = async (_isDirty = false) => {
         const label = getCurrentWebviewWindow().label;
         const title = getTitle();
-        const webviewTitle = { title, path: contentState.fullPath };
-        tabs.webviews[label] = webviewTitle;
+        const path = contentState.fullPath;
+        tabs.webviews.forEach((tab) => {
+            if (tab.label == label) {
+                tab.title = title;
+                tab.path = path;
+            }
+        });
+        const webviewTitle = { label, title, path };
         ipc.invoke("update_webview_label", webviewTitle);
-        ipc.sendOthers("updateTitle", { label, webviewTitle });
+        ipc.sendOthers("updateTitle", webviewTitle);
         await getCurrentWebviewWindow().setTitle(title);
     };
 
@@ -430,7 +436,10 @@
     };
 
     const onAnotherWindowClose = (label: string) => {
-        delete tabs.webviews[label];
+        const index = tabs.webviews.findIndex((tab) => tab.label == label);
+        if (index >= 0) {
+            tabs.webviews.splice(index, 1);
+        }
     };
 
     const beforeClose = async () => {
@@ -469,7 +478,7 @@
         }
     };
 
-    const destroy = async (host?: Mp.TabbedWebview) => {
+    const destroy = async (host?: Mp.WebviewTab) => {
         const currentWindow = getCurrentWebviewWindow();
         await ipc.invoke("restore_webview", currentWindow.label);
 
@@ -525,18 +534,8 @@
         }
     };
 
-    // Keep labelMap order
-    const sortLabelMap = (unordered: Mp.Tabs) => {
-        return Object.keys(unordered)
-            .sort()
-            .reduce((obj: Mp.Tabs, key) => {
-                obj[key] = unordered[key];
-                return obj;
-            }, {});
-    };
-
-    const onEnterTabMode = async (labelMap: Mp.Tabs) => {
-        tabs.webviews = sortLabelMap(labelMap);
+    const onEnterTabMode = async (webviewTabs: Mp.WebviewTab[]) => {
+        tabs.webviews = webviewTabs;
         dispatch({ type: "toggleTabMode", value: true });
     };
 
@@ -545,7 +544,7 @@
         dispatch({ type: "isMaximized", value: isMaximized });
 
         // Clean up tabs
-        tabs.webviews = {};
+        tabs.webviews = [];
     };
 
     const switchTab = (label: string) => {
@@ -564,8 +563,12 @@
         tabs.scrollLeft = scrollLeft;
     };
 
-    const onUpdateTitle = (e: Mp.UpdateTitleRequest) => {
-        tabs.webviews[e.label] = e.webviewTitle;
+    const onUpdateTitle = (e: Mp.WebviewTitle) => {
+        const index = tabs.webviews.findIndex((tab) => tab.label == e.label);
+        if (index >= 0) {
+            tabs.webviews[index].path = e.path;
+            tabs.webviews[index].title = e.title;
+        }
     };
 
     const onTabWindowSizeChangeEvent = (isMaximized: boolean) => {

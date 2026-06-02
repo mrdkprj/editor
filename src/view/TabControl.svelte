@@ -27,9 +27,9 @@
 </script>
 
 <div class="tab" bind:this={tab} onwheel={onmousewheel}>
-    {#each Object.entries(tabs.webviews) as [label, webviewTitle]}
-        <div class="tablinks" class:tablinks-active={label == currentLabel} onclick={(e) => onTabClick(e, label)} onkeydown={() => {}} role="button" tabindex="-1">
-            <div class="tab-title" title={webviewTitle.title}>{webviewTitle.title}</div>
+    {#each tabs.webviews as tab}
+        <div class="tablinks" class:tablinks-active={tab.label == currentLabel} onclick={(e) => onTabClick(e, tab.label)} onkeydown={() => {}} role="button" tabindex="-1">
+            <div class="tab-title" title={tab.title}>{tab.title}</div>
             <div class="tab-close-btn" onclick={closeTab} onkeydown={() => {}} role="button" tabindex="-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x" viewBox="0 0 16 16">
                     <path

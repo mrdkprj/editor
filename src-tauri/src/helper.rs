@@ -19,8 +19,10 @@ static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
 pub struct OpenedWebview {
     webviews: HashMap<String, WebviewTitle>,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WebviewTitle {
+    label: String,
     title: String,
     path: String,
 }
@@ -275,16 +277,16 @@ fn write_raw(info: WriteFileInfo) -> Result<(), String> {
     std::fs::write(info.fullPath, info.data.as_bytes()).map_err(|e| e.to_string())
 }
 
-pub fn get_webview_labels(app: tauri::AppHandle) -> HashMap<String, WebviewTitle> {
+pub fn get_webview_labels(app: tauri::AppHandle) -> OpenedWebview {
     let state = app.state::<Mutex<OpenedWebview>>();
     let state = state.lock().unwrap();
-    state.webviews.clone()
+    state.clone()
 }
 
-pub fn update_webview_label(app: &tauri::AppHandle, label: &str, webview_title: WebviewTitle) {
+pub fn update_webview_label(app: &tauri::AppHandle, webview_title: WebviewTitle) {
     let state = app.state::<Mutex<OpenedWebview>>();
     let mut state = state.lock().unwrap();
-    let _ = state.webviews.insert(label.to_string(), webview_title);
+    let _ = state.webviews.insert(webview_title.label.clone(), webview_title);
 }
 
 pub fn remove_from_webview_label(app: &tauri::AppHandle, label: &str) {

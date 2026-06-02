@@ -23,11 +23,11 @@ declare global {
         reloadSettings: Mp.AnyEvent;
         startTabMode: string;
         endTabMode: Mp.AnyEvent;
-        enterTabMode: Mp.Tabs;
+        enterTabMode: Mp.WebviewTab[];
         exitTabMode: boolean;
         switchTab: string;
         addTab: string;
-        updateTitle: Mp.UpdateTitleRequest;
+        updateTitle: Mp.WebviewTitle;
         closeTab: string;
         scrollTab: number;
         closed: string;
@@ -61,10 +61,14 @@ declare global {
             | "link";
 
         type WebviewTitle = {
+            label: string;
             title: string;
             path: string;
         };
-        type Tabs = { [key: string]: WebviewTitle };
+
+        type OpenedWebview = {
+            webviews: { [key: string]: WebviewTitle };
+        };
 
         type TextState = {
             textType: Mp.TextType;
@@ -145,13 +149,10 @@ declare global {
             bottom: number;
         };
 
-        type UpdateTitleRequest = {
+        type WebviewTab = {
             label: string;
-            webviewTitle: Mp.WebviewTitle;
-        };
-
-        type TabbedWebview = {
-            label: string;
+            title: string;
+            path: string;
             bounds: Mp.Bounds;
             isMaximized: boolean;
         };

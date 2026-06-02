@@ -1,7 +1,7 @@
 use crate::watcher::{WatchTx, WatcherCommand};
 use dialog::DialogOptions;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env, path::PathBuf};
+use std::{env, path::PathBuf};
 #[cfg(target_os = "windows")]
 use tauri::Emitter;
 use tauri::{AppHandle, Manager, WebviewWindow};
@@ -272,13 +272,13 @@ fn restore_webview(app: tauri::AppHandle, payload: String) {
 }
 
 #[tauri::command]
-fn get_webview_labels(app: tauri::AppHandle) -> HashMap<String, helper::WebviewTitle> {
+fn get_webview_labels(app: tauri::AppHandle) -> helper::OpenedWebview {
     helper::get_webview_labels(app)
 }
 
 #[tauri::command]
 fn update_webview_label(window: WebviewWindow, payload: helper::WebviewTitle) {
-    helper::update_webview_label(window.app_handle(), window.label(), payload);
+    helper::update_webview_label(window.app_handle(), payload);
 }
 
 #[tauri::command]

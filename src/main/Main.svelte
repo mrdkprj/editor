@@ -12,38 +12,38 @@
     const OFF_SCREEN = -30000;
     const isLinux = navigator.userAgent.includes(OS.linux);
 
-    let currentWebview: Mp.TabbedWebview = { label: "", bounds: { x: 0, y: 0, width: 0, height: 0 }, isMaximized: false };
+    let currentWebviewTab: Mp.WebviewTab = { label: "", title: "", path: "", bounds: { x: 0, y: 0, width: 0, height: 0 }, isMaximized: false };
     let active = false;
-    let webviews: Mp.TabbedWebview[] = [];
+    let webviewTabs: Mp.WebviewTab[] = [];
     let closingLabelSequence: string[] = [];
     let allTabClosing = false;
 
     const toggleMaximize = async () => {
-        const view = getCurrentWebviewWindow();
-        const isMaximized = await view.isMaximized();
+        const window = getCurrentWebviewWindow();
+        const isMaximized = await window.isMaximized();
         if (isMaximized) {
-            view.unmaximize();
+            window.unmaximize();
             if (!isLinux) {
-                view.setPosition(util.toPhysicalPosition(currentWebview.bounds));
+                window.setPosition(util.toPhysicalPosition(currentWebviewTab.bounds));
             }
         } else {
-            const position = await view.innerPosition();
-            const size = await view.innerSize();
-            currentWebview.bounds = util.toBounds(position, size);
-            await view.maximize();
+            const position = await window.innerPosition();
+            const size = await window.innerSize();
+            currentWebviewTab.bounds = util.toBounds(position, size);
+            await window.maximize();
         }
 
-        currentWebview.isMaximized = !isMaximized;
+        currentWebviewTab.isMaximized = !isMaximized;
 
         await ipc.sendOthers("tabWindowSizeChange", !isMaximized);
     };
 
     const minimize = async () => {
-        const view = getCurrentWebviewWindow();
-        const position = await view.innerPosition();
-        const size = await view.innerSize();
-        currentWebview.bounds = util.toBounds(position, size);
-        await view.minimize();
+        const window = getCurrentWebviewWindow();
+        const position = await window.innerPosition();
+        const size = await window.innerSize();
+        currentWebviewTab.bounds = util.toBounds(position, size);
+        await window.minimize();
     };
 
     const beforeClose = async () => {
@@ -64,7 +64,7 @@
         if (!active) return;
 
         allTabClosing = true;
-        closingLabelSequence = webviews.map((webview) => webview.label);
+        closingLabelSequence = webviewTabs.map((tab) => tab.label);
         await tryCloseNext();
     };
 
@@ -79,10 +79,10 @@
 
     const onAnotherWindowClosed = async (closedLabel: string) => {
         if (!allTabClosing) {
-            const removed = webviews.findIndex((view) => view.label == closedLabel);
+            const removed = webviewTabs.findIndex((tab) => tab.label == closedLabel);
             if (removed > 0) {
-                await switchTab(webviews[removed - 1].label);
-                webviews.splice(removed, 1);
+                await switchTab(webviewTabs[removed - 1].label);
+                webviewTabs.splice(removed, 1);
             }
         } else {
             // If no window to close, hide this before destroy
@@ -91,12 +91,12 @@
             }
             await tryCloseNext();
         }
-        ipc.sendTo(closedLabel, "destory", currentWebview);
+        ipc.sendTo(closedLabel, "destory", currentWebviewTab);
     };
 
-    const updateTitle = async (e: Mp.UpdateTitleRequest) => {
-        if (e.label == currentWebview.label) {
-            await getCurrentWebviewWindow().setTitle(e.webviewTitle.title);
+    const updateTitle = async (e: Mp.WebviewTitle) => {
+        if (e.label == currentWebviewTab.label) {
+            await getCurrentWebviewWindow().setTitle(e.title);
         }
     };
 
@@ -106,20 +106,20 @@
     };
     const onResize = async (e: ResizeEvent) => {
         if (active) {
-            const toActive = await WebviewWindow.getByLabel(currentWebview.label);
+            const toActive = await WebviewWindow.getByLabel(currentWebviewTab.label);
             await toActive?.setSize(new PhysicalSize(e.width, e.height));
         }
     };
 
-    const pushWebiew = async (label: string) => {
-        const webviewWindow = await WebviewWindow.getByLabel(label);
+    const pushWebiew = async (title: Mp.WebviewTitle) => {
+        const webviewWindow = await WebviewWindow.getByLabel(title.label);
         if (!webviewWindow) return;
 
         const size = await webviewWindow.innerSize();
         const position = await webviewWindow.innerPosition();
         const isMaximized = await webviewWindow.isMaximized();
 
-        webviews.push({ label, bounds: util.toBounds(position, size), isMaximized });
+        webviewTabs.push({ label: title.label, title: title.title, path: title.path, bounds: util.toBounds(position, size), isMaximized });
 
         if (isLinux) {
             // Hide window
@@ -134,7 +134,7 @@
             }
         }
 
-        ipc.sendTo(label, "tabWindowSizeChange", currentWebview.isMaximized);
+        ipc.sendTo(title.label, "tabWindowSizeChange", currentWebviewTab.isMaximized);
     };
 
     const addTab = async (label: string) => {
@@ -143,15 +143,20 @@
             return;
         }
 
-        await pushWebiew(label);
+        const openedWebviews = await ipc.invoke("get_webview_labels", undefined);
+        webviewTabs.forEach((tab) => {
+            tab.title = openedWebviews.webviews[tab.label].title;
+            tab.path = openedWebviews.webviews[tab.label].path;
+        });
+        await pushWebiew(openedWebviews.webviews[label]);
         await ipc.invoke("to_child_window", [label]);
-        const labelTitleMap = await ipc.invoke("get_webview_labels", undefined);
-        await ipc.sendOthers("enterTabMode", labelTitleMap);
+
+        await ipc.sendOthers("enterTabMode", webviewTabs);
         await switchTab(label);
     };
 
     const switchTab = async (activeTabLabel: string) => {
-        if (activeTabLabel == currentWebview.label) return;
+        if (activeTabLabel == currentWebviewTab.label) return;
 
         if (isLinux) {
             const toActive = await Webview.getByLabel(activeTabLabel);
@@ -163,22 +168,22 @@
             await toActive?.setSize(new PhysicalSize(size.width, size.height));
         }
 
-        if (currentWebview.label) {
+        if (currentWebviewTab.label) {
             if (isLinux) {
-                const toInactive = await Webview.getByLabel(currentWebview.label);
+                const toInactive = await Webview.getByLabel(currentWebviewTab.label);
                 await toInactive?.hide();
             } else {
-                const toInactive = await WebviewWindow.getByLabel(currentWebview.label);
+                const toInactive = await WebviewWindow.getByLabel(currentWebviewTab.label);
                 toInactive?.setPosition(new PhysicalPosition(OFF_SCREEN, OFF_SCREEN));
             }
         }
 
-        currentWebview.label = activeTabLabel;
+        currentWebviewTab.label = activeTabLabel;
     };
 
     const startTabMode = async (initial: string) => {
-        webviews = [];
-        currentWebview.label = "";
+        webviewTabs = [];
+        currentWebviewTab.label = "";
 
         // Get bounds
         const initiatedWindow = await WebviewWindow.getByLabel(initial);
@@ -186,30 +191,30 @@
         const isMaximized = await initiatedWindow.isMaximized();
         const position = await initiatedWindow.innerPosition();
         const size = await initiatedWindow.innerSize();
-        currentWebview.bounds = util.toBounds(position, size);
-        currentWebview.isMaximized = isMaximized;
+        currentWebviewTab.bounds = util.toBounds(position, size);
+        currentWebviewTab.isMaximized = isMaximized;
 
         // Set bound
         const thisWindow = getCurrentWebviewWindow();
-        await thisWindow.setSize(util.toPhysicalSize(currentWebview.bounds));
-        await thisWindow.setPosition(util.toPhysicalPosition(currentWebview.bounds));
-        // await getCurrentWebview().setAutoResize(false);
+        await thisWindow.setSize(util.toPhysicalSize(currentWebviewTab.bounds));
+        await thisWindow.setPosition(util.toPhysicalPosition(currentWebviewTab.bounds));
+
         // Prepare tabs
-        const labelTitleMap = await ipc.invoke("get_webview_labels", undefined);
-        const sortedLabels = Object.keys(labelTitleMap).toSorted();
+        const openedWebviews = await ipc.invoke("get_webview_labels", undefined);
+        const sortedLabels = Object.keys(openedWebviews.webviews).toSorted();
         for (const label of sortedLabels) {
-            await pushWebiew(label);
+            await pushWebiew(openedWebviews.webviews[label]);
         }
 
-        await ipc.invoke("to_child_window", Object.keys(labelTitleMap));
-        await ipc.sendOthers("enterTabMode", labelTitleMap);
+        await ipc.invoke("to_child_window", sortedLabels);
+        await ipc.sendOthers("enterTabMode", webviewTabs);
 
         await switchTab(initial);
 
         active = true;
 
         await thisWindow.show();
-        if (currentWebview.isMaximized) {
+        if (currentWebviewTab.isMaximized) {
             await thisWindow.maximize();
         }
     };
@@ -220,9 +225,9 @@
         const position = await thisWindow.outerPosition();
         const size = await thisWindow.innerSize();
 
-        for (const webview of webviews) {
-            const bounds = webview.label == currentWebview.label ? util.toBounds(position, size) : webview.bounds;
-            const isMaximized = webview.label == currentWebview.label ? currentWebview.isMaximized : webview.isMaximized;
+        for (const webview of webviewTabs) {
+            const bounds = webview.label == currentWebviewTab.label ? util.toBounds(position, size) : webview.bounds;
+            const isMaximized = webview.label == currentWebviewTab.label ? currentWebviewTab.isMaximized : webview.isMaximized;
 
             await ipc.invoke("restore_webview", webview.label);
 
@@ -240,8 +245,8 @@
 
         // Clean up tabs
         active = false;
-        currentWebview.label = "";
-        webviews = [];
+        currentWebviewTab.label = "";
+        webviewTabs = [];
     };
 
     const hideThis = async () => {

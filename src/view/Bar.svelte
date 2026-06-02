@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { appState, contentState } from "./appStateReducer.svelte";
+    import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
+    import { appState, contentState, settings } from "./appStateReducer.svelte";
     import { GREP, handleKeyEvent, UNTITLED } from "../constants";
     import path from "../path";
     import util from "../util";
     import Menubar from "./Menubar.svelte";
     import icon from "../asset/icon.png";
-    import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
     let {
         label,
@@ -28,15 +28,19 @@
         }
     };
 
-    /* On Linux, webviews are attached to Main Window on tab mode */
     const dragGtkWindow = async (e: MouseEvent) => {
         if ($appState.visibleMenubarItem) return;
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
 
         if (e.target.classList.contains("title-bar") || e.target.classList.contains("title")) {
-            const mainWindow = await WebviewWindow.getByLabel("Main");
-            mainWindow?.startDragging();
+            if (settings.tabMode) {
+                /* On Linux, webviews are attached to Main Window on tab mode */
+                const mainWindow = await WebviewWindow.getByLabel("Main");
+                mainWindow?.startDragging();
+            } else {
+                getCurrentWebviewWindow().startDragging();
+            }
         }
     };
 </script>

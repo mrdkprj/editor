@@ -44,11 +44,6 @@ type ReadResult = {
     encoding: string;
 };
 
-type WebviewTitle = {
-    title: string;
-    path: string;
-};
-
 type TauriCommandMap = {
     prepare_menu: TauriCommand<undefined, undefined>;
     open_list_context_menu: TauriCommand<Mp.OpenContextMenuRequest, undefined>;
@@ -79,8 +74,8 @@ type TauriCommandMap = {
     change_encoding: TauriCommand<Mp.EncodeArg, string>;
     to_child_window: TauriCommand<string[], undefined>;
     restore_webview: TauriCommand<string, undefined>;
-    get_webview_labels: TauriCommand<undefined, Mp.Tabs>;
-    update_webview_label: TauriCommand<WebviewTitle, undefined>;
+    get_webview_labels: TauriCommand<undefined, Mp.OpenedWebview>;
+    update_webview_label: TauriCommand<Mp.WebviewTitle, undefined>;
     is_file_opened: TauriCommand<string, string | null>;
 };
 

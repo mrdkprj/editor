@@ -107,10 +107,10 @@ type SelectedPreferenceTab = {
 };
 export const selectedPreference: SelectedPreferenceTab = $state({ tab: "view" });
 type Tabs = {
-    webviews: Mp.Tabs;
+    webviews: Mp.WebviewTab[];
     scrollLeft: number;
 };
-export const tabs: Tabs = $state({ webviews: {}, scrollLeft: 0 });
+export const tabs: Tabs = $state({ webviews: [], scrollLeft: 0 });
 
 type AppAction =
     | { type: "mode"; value: Mp.Mode }
