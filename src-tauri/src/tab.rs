@@ -40,13 +40,14 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
             let child = app.get_webview_window(&child_label).unwrap();
             let child_vbox = child.default_vbox().unwrap();
             let children = child_vbox.children();
-            let tab_webview = children.first().unwrap();
-            child_vbox.remove(tab_webview);
-            tab_webview.set_widget_name(&child_label);
-            tab_webview.set_hexpand(true);
-            tab_webview.set_vexpand(true);
+            if let Some(tab_webview) = children.first() {
+                child_vbox.remove(tab_webview);
+                tab_webview.set_widget_name(&child_label);
+                tab_webview.set_hexpand(true);
+                tab_webview.set_vexpand(true);
 
-            overlay.add_overlay(tab_webview);
+                overlay.add_overlay(tab_webview);
+            }
         }
     }
 }

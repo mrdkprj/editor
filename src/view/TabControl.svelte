@@ -1,6 +1,7 @@
 <script lang="ts">
     import { flip } from "svelte/animate";
     import { tabs } from "./appStateReducer.svelte";
+    import util from "../util";
 
     let {
         currentLabel,
@@ -39,6 +40,10 @@
     };
 
     const startDrag = async (e: DragEvent) => {
+        if (!util.isWin()) {
+            e.preventDefault();
+        }
+
         if (!e.target || !(e.target instanceof HTMLElement)) return;
         dragstate.dragging = true;
         dragstate.startLabel = e.target.id;
@@ -47,6 +52,44 @@
 
     const onDragOver = (e: DragEvent) => {
         e.preventDefault();
+        if (!util.isWin()) return;
+
+        if (!dragstate.dragging) return;
+
+        if (e.pageX == dragstate.lastX) return;
+        const dargToRight = e.pageX > dragstate.lastX;
+        dragstate.lastX = e.pageX;
+
+        if (!e.target || !(e.target instanceof HTMLElement)) return;
+
+        const id = e.target.getAttribute("data-drag-id") ?? "";
+
+        if (!id) return;
+
+        if (id == dragstate.startLabel) return;
+
+        if (!dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 < e.pageX) {
+            replace(dragstate.startLabel, id);
+        }
+
+        if (dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 > e.pageX) {
+            replace(dragstate.startLabel, id);
+        }
+
+        if (tab.scrollWidth > tab.clientWidth) {
+            if (e.target.offsetLeft + e.target.clientWidth > tab.clientWidth) {
+                tab.scroll(e.target.offsetLeft + e.target.clientWidth - tab.clientWidth, 0);
+            }
+
+            if (tab.scrollLeft > e.target.offsetLeft) {
+                tab.scroll(-20, 0);
+            }
+        }
+    };
+
+    /* On Linux, dragover never fires */
+    const onMouseMove = (e: MouseEvent) => {
+        if (util.isWin()) return;
 
         if (!dragstate.dragging) return;
 
@@ -82,6 +125,15 @@
     };
 
     const onDrop = () => {
+        if (!util.isWin()) return;
+        if (!dragstate.dragging) return;
+        dragstate.dragging = false;
+        onTabMoved();
+    };
+
+    /* On Linux, drop never fires, because dragstart is prevented */
+    const onMouseUp = () => {
+        if (util.isWin()) return;
         if (!dragstate.dragging) return;
         dragstate.dragging = false;
         onTabMoved();
@@ -109,6 +161,8 @@
             onkeydown={() => {}}
             ondragstart={startDrag}
             ondragover={onDragOver}
+            onmousemove={onMouseMove}
+            onmouseup={onMouseUp}
             ondrop={onDrop}
             role="button"
             tabindex="-1"
