@@ -163,11 +163,9 @@
             return;
         }
 
+        await ipc.invoke("to_child_window", [label]);
         const openedWebviews = await ipc.invoke("get_webview_labels", undefined);
         await pushWebiew(openedWebviews.webviews[label]);
-        webviewTabs.forEach((a) => console.log(a));
-        await ipc.invoke("to_child_window", [label]);
-
         await ipc.sendOthers("updateTab", { tabs: webviewTabs });
         await switchTab(label);
     };
