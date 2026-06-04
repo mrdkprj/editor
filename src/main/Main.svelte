@@ -80,9 +80,13 @@
     const onAnotherWindowClosed = async (closedLabel: string) => {
         if (!allTabClosing) {
             const removed = webviewTabs.findIndex((tab) => tab.label == closedLabel);
-            if (removed > 0) {
-                await switchTab(webviewTabs[removed - 1].label);
-                webviewTabs.splice(removed, 1);
+            webviewTabs.splice(removed, 1);
+            if (webviewTabs.length) {
+                if (removed == 0) {
+                    await switchTab(webviewTabs[0].label);
+                } else {
+                    await switchTab(webviewTabs[removed - 1].label);
+                }
             }
         } else {
             // If no window to close, hide this before destroy
@@ -94,9 +98,25 @@
         ipc.sendTo(closedLabel, "destory", currentWebviewTab);
     };
 
-    const updateTitle = async (e: Mp.WebviewTitle) => {
-        if (e.label == currentWebviewTab.label) {
-            await getCurrentWebviewWindow().setTitle(e.title);
+    const updateTabTitle = (e: Mp.WebviewTitle) => {
+        webviewTabs
+            .filter((tab) => tab.label == e.label)
+            .forEach((tab) => {
+                tab.title = e.title;
+                tab.path = e.path;
+            });
+    };
+
+    const updateTab = async (e: Mp.UpdateTabsEvent) => {
+        if (e.webviewTitle) {
+            updateTabTitle(e.webviewTitle);
+            if (e.webviewTitle.label == currentWebviewTab.label) {
+                await getCurrentWebviewWindow().setTitle(e.webviewTitle.title);
+            }
+        }
+
+        if (e.tabs) {
+            webviewTabs = e.tabs;
         }
     };
 
@@ -144,14 +164,11 @@
         }
 
         const openedWebviews = await ipc.invoke("get_webview_labels", undefined);
-        webviewTabs.forEach((tab) => {
-            tab.title = openedWebviews.webviews[tab.label].title;
-            tab.path = openedWebviews.webviews[tab.label].path;
-        });
         await pushWebiew(openedWebviews.webviews[label]);
+        webviewTabs.forEach((a) => console.log(a));
         await ipc.invoke("to_child_window", [label]);
 
-        await ipc.sendOthers("enterTabMode", webviewTabs);
+        await ipc.sendOthers("updateTab", { tabs: webviewTabs });
         await switchTab(label);
     };
 
@@ -264,7 +281,7 @@
         ipc.receive("startTabMode", startTabMode);
         ipc.receive("endTabMode", endTabMode);
         ipc.receive("switchTab", switchTab);
-        ipc.receive("updateTitle", updateTitle);
+        ipc.receive("updateTab", updateTab);
         ipc.receive("addTab", addTab);
         ipc.receive("closeTab", closeTab);
         ipc.receive("closeAll", closeAll);

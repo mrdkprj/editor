@@ -27,7 +27,7 @@ declare global {
         exitTabMode: boolean;
         switchTab: string;
         addTab: string;
-        updateTitle: Mp.WebviewTitle;
+        updateTab: Mp.UpdateTabsEvent;
         closeTab: string;
         scrollTab: number;
         closed: string;
@@ -155,6 +155,11 @@ declare global {
             path: string;
             bounds: Mp.Bounds;
             isMaximized: boolean;
+        };
+
+        type UpdateTabsEvent = {
+            webviewTitle?: Mp.WebviewTitle;
+            tabs?: Mp.WebviewTab[];
         };
 
         type TypedPreference = { [key in TextType]: Preference };

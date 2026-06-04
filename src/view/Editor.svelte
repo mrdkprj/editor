@@ -507,7 +507,7 @@
         dispatch({ type: "language", value: languageName });
 
         /* Prevent losing focus */
-        editor.onDidBlurEditorText((_) => editor.focus());
+        // editor.onDidBlurEditorText((_) => editor.focus());
 
         editor.onDidChangeCursorPosition((e) => {
             dispatch({ type: "cusorPosition", value: { line: e.position.lineNumber, column: e.position.column } });

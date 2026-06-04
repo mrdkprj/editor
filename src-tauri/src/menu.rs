@@ -79,6 +79,12 @@ pub fn create(app_handle: &tauri::AppHandle, label: String, window_handle: isize
     let _ = state.0.insert(label, menu);
 }
 
+pub fn remove(app_handle: &tauri::AppHandle, label: &str) {
+    let state = app_handle.state::<Mutex<AppMenu>>();
+    let mut state = state.try_lock().unwrap();
+    let _ = state.0.remove(label);
+}
+
 pub fn change_menu_theme(app_handle: &tauri::AppHandle, theme: Theme) {
     let state = app_handle.state::<Mutex<AppMenu>>();
     let state = state.try_lock().unwrap();

@@ -81,33 +81,6 @@
         await view.minimize();
     };
 
-    $effect(() => {
-        const idDirty = contentState.isDirty;
-        untrack(() => updateTitle(idDirty));
-    });
-
-    const updateTitle = async (_isDirty = false) => {
-        const label = getCurrentWebviewWindow().label;
-        const title = getTitle();
-        const path = contentState.fullPath;
-        tabs.webviews.forEach((tab) => {
-            if (tab.label == label) {
-                tab.title = title;
-                tab.path = path;
-            }
-        });
-        const webviewTitle = { label, title, path };
-        ipc.invoke("update_webview_label", webviewTitle);
-        ipc.sendOthers("updateTitle", webviewTitle);
-        await getCurrentWebviewWindow().setTitle(title);
-    };
-
-    const getTitle = () => {
-        const mark = contentState.isDirty ? "*" : "";
-        const title = contentState.fullPath ? `${path.basename(contentState.fullPath)}${mark}` : $appState.mode == "grep" ? `${GREP}${mark}` : `${UNTITLED}${mark}`;
-        return title;
-    };
-
     const handleContextMenuEvent = async (e: Mp.ContextMenuEvent) => {
         switch (e.id) {
             case "New": {
@@ -319,7 +292,7 @@
         await helper.startWatch(filePath);
         updateHistory(filePath);
         await ipc.sendTo("View", "load", false);
-        await updateTitle();
+        await updateThisTitle();
     };
 
     const onFileDrop = async (e: Mp.FileDropEvent) => {
@@ -551,24 +524,61 @@
         ipc.sendTo("Main", "switchTab", label);
     };
 
-    const closeTab = () => {
-        ipc.sendTo("Main", "closeTab", getCurrentWebviewWindow().label);
+    const closeTab = (label: string) => {
+        ipc.sendTo("Main", "closeTab", label);
     };
 
     const onTabScroll = (scrollLeft: number) => {
         ipc.sendOthers("scrollTab", scrollLeft);
     };
 
+    const onTabMoved = () => {
+        ipc.sendOthers("updateTab", { tabs: $state.snapshot(tabs.webviews) });
+    };
+
     const scrollTab = (scrollLeft: number) => {
         tabs.scrollLeft = scrollLeft;
     };
 
-    const onUpdateTitle = (e: Mp.WebviewTitle) => {
-        const index = tabs.webviews.findIndex((tab) => tab.label == e.label);
-        if (index >= 0) {
-            tabs.webviews[index].path = e.path;
-            tabs.webviews[index].title = e.title;
+    const updateTabTitle = (e: Mp.WebviewTitle) => {
+        tabs.webviews
+            .filter((tab) => tab.label == e.label)
+            .forEach((tab) => {
+                tab.title = e.title;
+                tab.path = e.path;
+            });
+    };
+
+    const onUpdateTab = (e: Mp.UpdateTabsEvent) => {
+        if (e.webviewTitle) {
+            updateTabTitle(e.webviewTitle);
         }
+
+        if (e.tabs) {
+            tabs.webviews = e.tabs;
+        }
+    };
+
+    $effect(() => {
+        const idDirty = contentState.isDirty;
+        untrack(() => updateThisTitle(idDirty));
+    });
+
+    const updateThisTitle = async (_isDirty = false) => {
+        const label = getCurrentWebviewWindow().label;
+        const title = getTitle();
+        const path = contentState.fullPath;
+        const webviewTitle = { label, title, path };
+        updateTabTitle(webviewTitle);
+        ipc.invoke("update_webview_label", webviewTitle);
+        ipc.sendOthers("updateTab", { webviewTitle });
+        await getCurrentWebviewWindow().setTitle(title);
+    };
+
+    const getTitle = () => {
+        const mark = contentState.isDirty ? "*" : "";
+        const title = contentState.fullPath ? `${path.basename(contentState.fullPath)}${mark}` : $appState.mode == "grep" ? `${GREP}${mark}` : `${UNTITLED}${mark}`;
+        return title;
     };
 
     const onTabWindowSizeChangeEvent = (isMaximized: boolean) => {
@@ -602,7 +612,7 @@
         dispatch({ type: "init", value: { filePath: e.filePath ?? "", content: e.content ?? "", mode: e.mode, startLine: e.startLine } });
         await helper.changeTheme(settings.theme);
 
-        await updateTitle();
+        await updateThisTitle();
         await tick();
 
         ready = true;
@@ -637,7 +647,7 @@
         ipc.receive("reloadSettings", onReloadSettings);
         ipc.receive("enterTabMode", onEnterTabMode);
         ipc.receive("exitTabMode", onExitTabMode);
-        ipc.receive("updateTitle", onUpdateTitle);
+        ipc.receive("updateTab", onUpdateTab);
         ipc.receive("scrollTab", scrollTab);
         ipc.receive("closed", onAnotherWindowClose);
         ipc.receive("destory", destroy);
@@ -667,7 +677,7 @@
             <Preference />
         {/if}
         {#if settings.tabMode}
-            <TabControl currentLabel={getCurrentWebviewWindow().label} {switchTab} {closeTab} {onTabScroll} />
+            <TabControl currentLabel={getCurrentWebviewWindow().label} {switchTab} {closeTab} {onTabScroll} {onTabMoved} />
         {/if}
         <div class="editor">
             <Editor

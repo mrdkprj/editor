@@ -1,6 +1,6 @@
 use crate::{
     fgrep::{self, GrepRequest},
-    menu::AppMenu,
+    menu::{self, AppMenu},
     watcher::{self, WatchTx},
     WriteFileInfo,
 };
@@ -298,6 +298,9 @@ pub fn remove_from_webview_label(app: &tauri::AppHandle, label: &str) {
     }
 
     let _ = state.webviews.remove(label);
+    /* Remove from Menu map too */
+    menu::remove(app, label);
+
     if state.webviews.is_empty() {
         if let Some(main) = app.get_webview_window("Main") {
             let _ = main.destroy();
