@@ -167,7 +167,10 @@
         const openedWebviews = await ipc.invoke("get_webview_labels", undefined);
         await pushWebiew(openedWebviews.webviews[label]);
         await ipc.sendOthers("updateTab", { tabs: webviewTabs });
-        await switchTab(label);
+        /* Delay switching for smooth rendering */
+        setTimeout(async () => {
+            await switchTab(label);
+        }, 50);
     };
 
     const switchTab = async (activeTabLabel: string) => {
