@@ -112,6 +112,13 @@ type Tabs = {
 };
 export const tabs: Tabs = $state({ webviews: [], scrollLeft: 0 });
 
+type DragState = {
+    startLabel: string;
+    dragging: boolean;
+    lastX: number;
+};
+export const dragState = $state<DragState>({ startLabel: "", dragging: false, lastX: 0 });
+
 type AppAction =
     | { type: "mode"; value: Mp.Mode }
     | { type: "init"; value: { filePath: string; content: string; mode: Mp.Mode; startLine?: Mp.Position } }

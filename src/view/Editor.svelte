@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState, contentState, dispatch, textState, settings, temporal } from "./appStateReducer.svelte";
+    import { appState, contentState, dispatch, textState, settings, temporal, dragState } from "./appStateReducer.svelte";
     import type monaco from "monaco-editor";
     import { onMount } from "svelte";
     import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
@@ -417,6 +417,18 @@
         updateModel(restoreDecoration);
     };
 
+    const willLoseFocus = () => {
+        state = editor.saveViewState();
+    };
+
+    const canGetFocus = () => {
+        if (state) {
+            editor.restoreViewState(state);
+            editor.focus();
+            state = null;
+        }
+    };
+
     const createEditor = async () => {
         // @ts-ignore
         self.MonacoEnvironment = {
@@ -506,8 +518,12 @@
         const languageName = language in LANGUAGES ? LANGUAGES[language] : language.charAt(0).toUpperCase() + language.slice(1);
         dispatch({ type: "language", value: languageName });
 
-        /* Prevent losing focus */
-        // editor.onDidBlurEditorText((_) => editor.focus());
+        // /* Prevent losing focus */
+        editor.onDidBlurEditorText((_) => {
+            if (!dragState.dragging) {
+                editor.focus();
+            }
+        });
 
         editor.onDidChangeCursorPosition((e) => {
             dispatch({ type: "cusorPosition", value: { line: e.position.lineNumber, column: e.position.column } });
@@ -613,6 +629,8 @@
         ipc.receive("encoding_changed", onEncodingChanged);
         ipc.receive("settingChanged", reflectSettings);
         ipc.receive("refelect_settings", () => updateModel(true));
+        ipc.receive("willLoseFocus", willLoseFocus);
+        ipc.receive("canGetFocus", canGetFocus);
 
         return () => {
             ipc.release();

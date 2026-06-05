@@ -33,6 +33,8 @@ declare global {
         closed: string;
         destory: Mp.TabbedWebview;
         closeAll: Mp.AnyEvent;
+        willLoseFocus: Mp.AnyEvent;
+        canGetFocus: Mp.AnyEvent;
     };
 
     namespace Mp {

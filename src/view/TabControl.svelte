@@ -1,7 +1,8 @@
 <script lang="ts">
     import { flip } from "svelte/animate";
-    import { tabs } from "./appStateReducer.svelte";
+    import { dragState, tabs } from "./appStateReducer.svelte";
     import util from "../util";
+    import { IPC } from "../ipc";
 
     let {
         currentLabel,
@@ -11,12 +12,8 @@
         onTabMoved,
     }: { currentLabel: string; switchTab: (label: string) => void; closeTab: (label: string) => void; onTabScroll: (scrollLeft: number) => void; onTabMoved: () => void } = $props();
 
-    type DragState = {
-        startLabel: string;
-        dragging: boolean;
-        lastX: number;
-    };
-    const dragstate = $state<DragState>({ startLabel: "", dragging: false, lastX: 0 });
+    // svelte-ignore state_referenced_locally
+    const ipc = new IPC(currentLabel);
     let tab: HTMLDivElement;
 
     $effect(() => {
@@ -45,20 +42,20 @@
         }
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
-        dragstate.dragging = true;
-        dragstate.startLabel = e.target.id;
-        dragstate.lastX = e.pageX;
+        dragState.dragging = true;
+        dragState.startLabel = e.target.id;
+        dragState.lastX = e.pageX;
     };
 
     const onDragOver = (e: DragEvent) => {
         e.preventDefault();
         if (util.isLinux()) return;
 
-        if (!dragstate.dragging) return;
+        if (!dragState.dragging) return;
 
-        if (e.pageX == dragstate.lastX) return;
-        const dargToRight = e.pageX > dragstate.lastX;
-        dragstate.lastX = e.pageX;
+        if (e.pageX == dragState.lastX) return;
+        const dargToRight = e.pageX > dragState.lastX;
+        dragState.lastX = e.pageX;
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
 
@@ -66,14 +63,14 @@
 
         if (!id) return;
 
-        if (id == dragstate.startLabel) return;
+        if (id == dragState.startLabel) return;
 
         if (!dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 < e.pageX) {
-            replace(dragstate.startLabel, id);
+            replace(dragState.startLabel, id);
         }
 
         if (dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 > e.pageX) {
-            replace(dragstate.startLabel, id);
+            replace(dragState.startLabel, id);
         }
 
         if (tab.scrollWidth > tab.clientWidth) {
@@ -91,11 +88,11 @@
     const onMouseMove = (e: MouseEvent) => {
         if (util.isWin()) return;
 
-        if (!dragstate.dragging) return;
+        if (!dragState.dragging) return;
 
-        if (e.pageX == dragstate.lastX) return;
-        const dargToRight = e.pageX > dragstate.lastX;
-        dragstate.lastX = e.pageX;
+        if (e.pageX == dragState.lastX) return;
+        const dargToRight = e.pageX > dragState.lastX;
+        dragState.lastX = e.pageX;
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
 
@@ -103,14 +100,14 @@
 
         if (!id) return;
 
-        if (id == dragstate.startLabel) return;
+        if (id == dragState.startLabel) return;
 
         if (!dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 < e.pageX) {
-            replace(dragstate.startLabel, id);
+            replace(dragState.startLabel, id);
         }
 
         if (dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 > e.pageX) {
-            replace(dragstate.startLabel, id);
+            replace(dragState.startLabel, id);
         }
 
         if (tab.scrollWidth > tab.clientWidth) {
@@ -126,16 +123,24 @@
 
     const onDrop = () => {
         if (util.isLinux()) return;
-        if (!dragstate.dragging) return;
-        dragstate.dragging = false;
+        if (!dragState.dragging) return;
+
+        dragState.dragging = false;
         onTabMoved();
+    };
+
+    const onMouseDown = () => {
+        dragState.dragging = true;
+        ipc.sendTo(currentLabel, "willLoseFocus", {});
     };
 
     /* On Linux, drop never fires, because dragstart is prevented */
     const onMouseUp = () => {
+        ipc.sendTo(currentLabel, "canGetFocus", {});
         if (util.isWin()) return;
-        if (!dragstate.dragging) return;
-        dragstate.dragging = false;
+        if (!dragState.dragging) return;
+
+        dragState.dragging = false;
         onTabMoved();
     };
 
@@ -163,10 +168,11 @@
             ondragover={onDragOver}
             onmousemove={onMouseMove}
             onmouseup={onMouseUp}
+            onmousedown={onMouseDown}
             ondrop={onDrop}
             role="button"
             tabindex="-1"
-            animate:flip={{ duration: dragstate.dragging ? 400 : 0 }}
+            animate:flip={{ duration: dragState.dragging ? 400 : 0 }}
         >
             <div class="tab-title" title={tab.title}>{tab.title}</div>
             <div class="tab-close-btn" onclick={() => closeTab(tab.label)} onkeydown={() => {}} role="button" tabindex="-1">
