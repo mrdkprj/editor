@@ -89,8 +89,9 @@ pub fn change_menu_theme(app_handle: &tauri::AppHandle, theme: Theme) {
     let state = app_handle.state::<Mutex<AppMenu>>();
     let state = state.try_lock().unwrap();
     for key in state.0.keys() {
-        let menu = state.0.get(key).unwrap();
-        menu.set_theme(theme);
+        if let Some(menu) = state.0.get(key) {
+            menu.set_theme(theme);
+        }
     }
 }
 

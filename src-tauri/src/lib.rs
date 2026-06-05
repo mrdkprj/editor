@@ -14,7 +14,7 @@ mod tab;
 mod watcher;
 
 #[cfg(target_os = "linux")]
-fn get_window_handel(window: &WebviewWindow) -> isize {
+fn get_window_handle(window: &WebviewWindow) -> isize {
     use gtk::{ffi::GtkApplicationWindow, glib::translate::ToGlibPtr};
 
     let ptr: *mut GtkApplicationWindow = window.gtk_window().unwrap().to_glib_none().0;
@@ -22,7 +22,7 @@ fn get_window_handel(window: &WebviewWindow) -> isize {
 }
 
 #[cfg(target_os = "windows")]
-fn get_window_handel(window: &WebviewWindow) -> isize {
+fn get_window_handle(window: &WebviewWindow) -> isize {
     window.hwnd().unwrap().0 as _
 }
 
@@ -43,17 +43,17 @@ fn is_uris_available() -> bool {
 
 #[tauri::command]
 fn read_uris(window: WebviewWindow) -> Result<ClipboardData, String> {
-    clipboard::read_uris(get_window_handel(&window))
+    clipboard::read_uris(get_window_handle(&window))
 }
 
 #[tauri::command]
 fn read_clipboard_text(window: WebviewWindow) -> Result<String, String> {
-    clipboard::read_text(get_window_handel(&window))
+    clipboard::read_text(get_window_handle(&window))
 }
 
 #[tauri::command]
 fn write_clipboard_text(window: WebviewWindow, payload: String) -> Result<(), String> {
-    clipboard::write_text(get_window_handel(&window), payload)
+    clipboard::write_text(get_window_handle(&window), payload)
 }
 
 #[tauri::command]
@@ -95,21 +95,21 @@ fn write_text_file(payload: WriteFileInfo) -> Result<(), String> {
 #[tauri::command]
 fn prepare_menu(window: WebviewWindow) {
     let label = window.label().to_string();
-    let window_handle = get_window_handel(&window);
+    let window_handle = get_window_handle(&window);
     menu::create(window.app_handle(), label, window_handle);
 }
 
 #[tauri::command]
 fn change_theme(window: WebviewWindow, payload: String) {
-    let (tauri_them, menu_theme) = match payload.as_str() {
+    let (tauri_theme, menu_theme) = match payload.as_str() {
         "dark" => (tauri::Theme::Dark, wcpopup::config::Theme::Dark),
         "light" => (tauri::Theme::Light, wcpopup::config::Theme::Light),
         _ => (tauri::Theme::Light, wcpopup::config::Theme::System),
     };
     if let Some(main) = window.get_webview_window("Main") {
-        let _ = main.set_theme(Some(tauri_them));
+        let _ = main.set_theme(Some(tauri_theme));
     }
-    let _ = window.set_theme(Some(tauri_them));
+    let _ = window.set_theme(Some(tauri_theme));
     menu::change_menu_theme(window.app_handle(), menu_theme);
 }
 
@@ -299,7 +299,7 @@ pub fn run() {
             {
                 let window = app.get_webview_window("Main").unwrap();
                 let label = window.label().to_string();
-                let window_handle = get_window_handel(&window);
+                let window_handle = get_window_handle(&window);
                 menu::create(app.app_handle(), label, window_handle);
             }
             Ok(())

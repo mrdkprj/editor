@@ -45,6 +45,7 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
                 tab_webview.set_widget_name(&child_label);
                 tab_webview.set_hexpand(true);
                 tab_webview.set_vexpand(true);
+                tab_webview.hide();
 
                 overlay.add_overlay(tab_webview);
             }

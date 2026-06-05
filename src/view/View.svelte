@@ -612,7 +612,6 @@
         dispatch({ type: "init", value: { filePath: e.filePath ?? "", content: e.content ?? "", mode: e.mode, startLine: e.startLine } });
         await helper.changeTheme(settings.theme);
 
-        await updateThisTitle();
         await tick();
 
         ready = true;

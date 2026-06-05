@@ -9,6 +9,10 @@ class Util {
         return navigator.userAgent.includes(OS.windows);
     }
 
+    isLinux() {
+        return navigator.userAgent.includes(OS.linux);
+    }
+
     toCommandLineArgs(filePath?: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position): string {
         const args = filePath ? [filePath] : []; //this.isWin() ? [`"${filePath}"`] : [filePath];
         if (grepRequest) {

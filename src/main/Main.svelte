@@ -169,11 +169,11 @@
         await ipc.sendOthers("updateTab", { tabs: webviewTabs });
         /* Delay switching for smooth rendering */
         setTimeout(async () => {
-            await switchTab(label);
+            await switchTab(label, false);
         }, 50);
     };
 
-    const switchTab = async (activeTabLabel: string) => {
+    const switchTab = async (activeTabLabel: string, hideCurrent = true) => {
         if (activeTabLabel == currentWebviewTab.label) return;
 
         if (isLinux) {
@@ -188,8 +188,10 @@
 
         if (currentWebviewTab.label) {
             if (isLinux) {
-                const toInactive = await Webview.getByLabel(currentWebviewTab.label);
-                await toInactive?.hide();
+                if (hideCurrent) {
+                    const toInactive = await Webview.getByLabel(currentWebviewTab.label);
+                    await toInactive?.hide();
+                }
             } else {
                 const toInactive = await WebviewWindow.getByLabel(currentWebviewTab.label);
                 toInactive?.setPosition(new PhysicalPosition(OFF_SCREEN, OFF_SCREEN));

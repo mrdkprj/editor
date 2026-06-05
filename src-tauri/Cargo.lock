@@ -5665,9 +5665,9 @@ dependencies = [
 
 [[package]]
 name = "wcpopup"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6763d68d4e6dedd1887fa742e6988384b548a551dad953f6427dd63f6ee789a7"
+checksum = "5ba35d419c3aa1f9d6ed9afda5066904ed6a5db04b799f6b1b0b4dbfee3e58b4"
 dependencies = [
  "gtk",
  "librsvg",

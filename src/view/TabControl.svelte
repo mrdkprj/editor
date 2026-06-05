@@ -40,7 +40,7 @@
     };
 
     const startDrag = async (e: DragEvent) => {
-        if (!util.isWin()) {
+        if (util.isLinux()) {
             e.preventDefault();
         }
 
@@ -52,7 +52,7 @@
 
     const onDragOver = (e: DragEvent) => {
         e.preventDefault();
-        if (!util.isWin()) return;
+        if (util.isLinux()) return;
 
         if (!dragstate.dragging) return;
 
@@ -125,7 +125,7 @@
     };
 
     const onDrop = () => {
-        if (!util.isWin()) return;
+        if (util.isLinux()) return;
         if (!dragstate.dragging) return;
         dragstate.dragging = false;
         onTabMoved();
