@@ -67,7 +67,7 @@
         </div>
     </div>
 {:else}
-    <div class="title-bar no-print" onmousedown={dragGtkWindow} class:bar-disabled={disabled} role="button" tabindex="-1">
+    <div class="title-bar no-print" data-tauri-drag-region onmousedown={dragGtkWindow} class:bar-disabled={disabled} role="button" tabindex="-1">
         <div class="icon-area" {onmousedown} onclick={() => openNewWindow("")} onkeydown={handleKeyEvent} role="button" tabindex="-1">
             <img src={icon} alt="" width="20" height="20" />
         </div>

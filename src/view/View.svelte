@@ -18,6 +18,7 @@
     import Preference from "./Preference.svelte";
     import TabControl from "./TabControl.svelte";
     import Deferred from "../deferred";
+    import WaylandResize from "./WaylandResize.svelte";
 
     const label = getCurrentWebviewWindow().label;
     const ipc = new IPC(label);
@@ -696,6 +697,9 @@
 <svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} />
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
+    {#if util.isLinux()}
+        <WaylandResize />
+    {/if}
     {#if ready}
         <Bar {label} {openNewWindow} close={tryClose} {toggleMaximize} {minimize} />
         {#if $appState.showWatchDialog}

@@ -37,7 +37,7 @@
     "core:webview:allow-webview-close",
     "core:webview:allow-set-webview-focus",
     "core:window:allow-request-user-attention",
-    "core:window:allow-set-ignore-cursor-events"
+    "core:window:allow-start-resize-dragging"
   ],
   "platforms": [
     "linux",

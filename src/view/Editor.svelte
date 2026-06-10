@@ -35,6 +35,7 @@
         startGrep: () => void;
     } = $props();
 
+    // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
     const DARK = "custom-dark";
     const LIGHT = "custom-light";

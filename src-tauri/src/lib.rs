@@ -185,8 +185,19 @@ async fn show_save_dialog(payload: DialogOptions) -> Option<String> {
    Must be async for tauri::WebviewWindowBuilder::from_config.
    On Windows, this function deadlocks when used in a synchronous command or event handlers, see the Webview2 issue. You should use async commands and separate threads when creating windows.
 */
+#[cfg(target_os = "windows")]
 #[tauri::command]
 async fn new_window(app: AppHandle, payload: Vec<String>) {
+    let mut args = vec!["thisapp".to_string()];
+    if !payload.is_empty() {
+        args.extend(payload);
+    }
+    helper::handle_second_instance(&app, args);
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn new_window(app: AppHandle, payload: Vec<String>) {
     let mut args = vec!["thisapp".to_string()];
     if !payload.is_empty() {
         args.extend(payload);
