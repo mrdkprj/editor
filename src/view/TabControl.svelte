@@ -158,7 +158,7 @@
 <style>
     .tab {
         display: flex;
-        border-bottom: 1px solid #ccc;
+        border-bottom: 1px solid var(--tab-border);
         z-index: 1300;
         width: 100%;
         overflow: hidden;
@@ -173,10 +173,11 @@
         background: #ccc;
         border-top-left-radius: 4px;
         border-top-right-radius: 4px;
-        background-color: var(--menu-bgcolor);
-        color: var(--menu-color);
+        background-color: var(--tab-bg-color);
+        color: var(--tab-color);
         font-size: 14px;
-        border-right: 1px solid transparent;
+        border-right: 1px solid var(--tab-border);
+        border-left: 1px solid var(--tab-border);
         flex-shrink: 0;
         max-width: 300px;
         min-width: 100px;
@@ -212,16 +213,15 @@
     }
 
     .tab-close-btn:hover {
-        background-color: #ccc;
-        color: black;
+        background-color: var(--tab-close-btn-hover-bg-color);
+        color: var(--tab-close-btn-hover-color);
     }
 
     .tablinks:not(.tablinks-active):hover {
-        color: #ccc;
+        background-color: var(--tab-hover-bg-color);
     }
 
     .tablinks-active {
-        background-color: var(--menu-hover-color);
-        border-right: 1px solid var(--tab-border);
+        background-color: var(--tab-active-bg-color);
     }
 </style>

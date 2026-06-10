@@ -36,7 +36,13 @@
         --button-disabled: #9f8e8e;
         --button-hover-color:#8f8ac9;
 
-        --tab-border:#4f4a4a;
+        --tab-bg-color:#181818;
+        --tab-active-bg-color:#3b3a3a;
+        --tab-hover-bg-color:#272424;
+        --tab-color:#eceef3;
+        --tab-border:#3b3a3a;
+        --tab-close-btn-hover-bg-color:#eceef3;
+        --tab-close-btn-hover-color:#212337;
 
         --scrollbar-track:#272626;
         --scrollbar-thumb:#7979791a;
@@ -49,7 +55,7 @@
         --main-bgcolor: #fff;
         --main-color: #0e0e0e;
 
-        --bar-bg-color:#e5dddd;
+        --bar-bg-color:#f9eaea;
         --bar-border-color: #cdc2c2;
 
         --menu-bgcolor: #eceef3;
@@ -77,7 +83,13 @@
         --button-disabled: #9f8e8e;
         --button-hover-color:#f5eeee;
 
-        --tab-border:#876f6f;
+        --tab-bg-color:#fff;
+        --tab-active-bg-color:#e5dddd;
+        --tab-hover-bg-color:#f5f5f5;
+        --tab-color:#0e0e0e;
+        --tab-border:#e5dddd;
+        --tab-close-btn-hover-bg-color:#0e0e0e;
+        --tab-close-btn-hover-color:#d1c1c1;
 
         --scrollbar-track: #fff;
         --scrollbar-thumb: #7979791a;
