@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState, contentState, dispatch, textState, settings, temporal, dragState } from "./appStateReducer.svelte";
+    import { appState, contentState, dispatch, textState, settings, temporal, tabState } from "./appStateReducer.svelte";
     import type monaco from "monaco-editor";
     import { onMount } from "svelte";
     import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
@@ -16,6 +16,7 @@
     import { getThemeData } from "../theme";
 
     let {
+        label,
         startLine,
         save,
         openNewWindow,
@@ -24,6 +25,7 @@
         unwatch,
         startGrep,
     }: {
+        label: string;
         startLine?: Mp.Position;
         getClipboardUrls: () => Promise<Mp.PasteData>;
         getClipboardText: () => Promise<string>;
@@ -33,7 +35,7 @@
         startGrep: () => void;
     } = $props();
 
-    const ipc = new IPC("View");
+    const ipc = new IPC(label);
     const DARK = "custom-dark";
     const LIGHT = "custom-light";
     const headerLineCount = 9;
@@ -48,6 +50,12 @@
     let state: monaco.editor.ICodeEditorViewState | null = null;
     let supressChangeDetection = false;
     let useTemporal = false;
+
+    $effect(() => {
+        if (tabState.willStartDrag) {
+            state = editor.saveViewState();
+        }
+    });
 
     const onDialogEvent = (open: boolean) => {
         if (open) {
@@ -85,7 +93,7 @@
                     editor.getAction("editor.action.startFindReplaceAction")?.run();
                     return;
                 case "/":
-                    if ($appState.mode != "grep") {
+                    if (contentState.mode != "grep") {
                         await editor.getAction("editor.action.commentLine")?.run();
                     }
                     return;
@@ -156,7 +164,7 @@
     };
 
     const onDblClick = async (e: MouseEvent) => {
-        if ($appState.mode != "grep") return;
+        if (contentState.mode != "grep") return;
 
         e.preventDefault();
         const position = editor.getPosition();
@@ -222,40 +230,40 @@
                 break;
 
             case "ToggleLineComment":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.commentLine")?.run();
                 break;
             case "ToggleBlockComment":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.blockComment")?.run();
                 break;
 
             case "transformToLowercase":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.transformToLowercase")?.run();
                 break;
             case "transformToUppercase":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.transformToUppercase")?.run();
                 break;
             case "transformToSnakecase":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.transformToSnakecase")?.run();
                 break;
             case "transformToCamelcase":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.transformToCamelcase")?.run();
                 break;
             case "transformToPascalcase":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.transformToPascalcase")?.run();
                 break;
             case "transformToTitlecase":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.transformToTitlecase")?.run();
                 break;
             case "transformToKebabcase":
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 await editor.getAction("editor.action.transformToKebabcase")?.run();
                 break;
 
@@ -304,7 +312,7 @@
             }
 
             case "Format": {
-                if ($appState.mode == "grep") return;
+                if (contentState.mode == "grep") return;
                 editor.trigger("", "editor.action.formatDocument", {});
                 break;
             }
@@ -354,6 +362,7 @@
     };
 
     const onGrepResults = () => {
+        editor.focus();
         const lineCount = model.getLineCount();
         const content = getContent();
         const range: monaco.IRange = {
@@ -417,16 +426,12 @@
         updateModel(restoreDecoration);
     };
 
-    const willLoseFocus = () => {
-        state = editor.saveViewState();
-    };
-
-    const canGetFocus = () => {
+    const restoreFocus = () => {
         if (state) {
             editor.restoreViewState(state);
-            editor.focus();
             state = null;
         }
+        editor.focus();
     };
 
     const createEditor = async () => {
@@ -456,7 +461,7 @@
 
         model = Monaco.editor.createModel(content, undefined, Monaco.Uri.file(path.basename(contentState.fullPath)));
         const language = model.getLanguageId();
-        const isPlainText = $appState.mode == "grep" || language == "plaintext";
+        const isPlainText = contentState.mode == "grep" || language == "plaintext";
         textState.textType = isPlainText ? "plain" : "code";
 
         const preference = settings.preference[textState.textType];
@@ -518,13 +523,6 @@
         const languageName = language in LANGUAGES ? LANGUAGES[language] : language.charAt(0).toUpperCase() + language.slice(1);
         dispatch({ type: "language", value: languageName });
 
-        // /* Prevent losing focus */
-        editor.onDidBlurEditorText((_) => {
-            if (!dragState.dragging) {
-                editor.focus();
-            }
-        });
-
         editor.onDidChangeCursorPosition((e) => {
             dispatch({ type: "cusorPosition", value: { line: e.position.lineNumber, column: e.position.column } });
         });
@@ -534,7 +532,7 @@
         model.onDidChangeContent((e) => {
             if (supressChangeDetection) return;
 
-            if ($appState.mode == "grep") {
+            if (contentState.mode == "grep") {
                 /* To prevent broken decorations, remove and restore decoration */
                 e.changes.forEach((change) => {
                     model.getDecorationsInRange(change.range).forEach((lineDecoration) => {
@@ -629,8 +627,8 @@
         ipc.receive("encoding_changed", onEncodingChanged);
         ipc.receive("settingChanged", reflectSettings);
         ipc.receive("refelect_settings", () => updateModel(true));
-        ipc.receive("willLoseFocus", willLoseFocus);
-        ipc.receive("canGetFocus", canGetFocus);
+        ipc.receive("tabActivated", restoreFocus);
+        ipc.receive("dragEnd", restoreFocus);
 
         return () => {
             ipc.release();
@@ -642,7 +640,7 @@
 
 <div
     id="root"
-    class:disable-unexpected-closing-bracket={$appState.mode == "grep" || $appState.language == "Plain Text"}
+    class:disable-unexpected-closing-bracket={contentState.mode == "grep" || $appState.language == "Plain Text"}
     bind:this={root}
     onkeydown={onEditorKeydown}
     ondblclick={onDblClick}

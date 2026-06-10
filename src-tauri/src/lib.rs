@@ -186,14 +186,12 @@ async fn show_save_dialog(payload: DialogOptions) -> Option<String> {
    On Windows, this function deadlocks when used in a synchronous command or event handlers, see the Webview2 issue. You should use async commands and separate threads when creating windows.
 */
 #[tauri::command]
-async fn new_window(app: AppHandle, payload: String) {
-    let mut args = vec!["thisapp"];
+async fn new_window(app: AppHandle, payload: Vec<String>) {
+    let mut args = vec!["thisapp".to_string()];
     if !payload.is_empty() {
-        let argv: Vec<&str> = payload.split(" ").collect();
-        args.extend(argv);
+        args.extend(payload);
     }
-
-    helper::handle_second_instance(&app, args.iter().map(|a| a.to_string()).collect());
+    helper::handle_second_instance(&app, args);
 }
 
 #[tauri::command]
@@ -248,12 +246,12 @@ fn unlisten_file_drop() {
 
 #[tauri::command]
 async fn run_grep(window: WebviewWindow, payload: fgrep::GrepRequest) -> Result<Vec<fgrep::GrepResult>, String> {
-    fgrep::run_grep(&window, payload).await
+    fgrep::run_grep(window.app_handle(), window.label(), payload).await
 }
 
 #[tauri::command]
-fn abort_grep() {
-    fgrep::cancel();
+async fn abort_grep() {
+    fgrep::cancel().await;
 }
 
 #[tauri::command]

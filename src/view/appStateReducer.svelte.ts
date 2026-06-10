@@ -25,7 +25,6 @@ type CusorPosition = {
 };
 
 type AppState = {
-    mode: Mp.Mode;
     content: string;
     isMaximized: boolean;
     isFullScreen: boolean;
@@ -49,7 +48,6 @@ type AppState = {
 };
 
 export const initialAppState: AppState = {
-    mode: "none",
     content: "",
     isMaximized: false,
     isFullScreen: false,
@@ -74,10 +72,12 @@ export const initialAppState: AppState = {
 
 export const textState: Mp.TextState = $state({ textType: "plain", encoding: DEFAULT_ENCODING });
 export const contentState: Mp.ContentState = $state({
+    mode: "none",
     isDirty: false,
     fullPath: "",
 });
 
+/* Settings */
 export const settings: Mp.Settings = $state(defaultSettings);
 export const initSettings = (data: Mp.Settings) => {
     settings.bounds = data.bounds;
@@ -102,22 +102,35 @@ export const temporal: Mp.TypedPreference = $state({
     code: DEFAULT_PREFERENCE,
 });
 
+/* Preference */
 type SelectedPreferenceTab = {
     tab: Mp.PreferenceTab;
 };
-export const selectedPreference: SelectedPreferenceTab = $state({ tab: "view" });
+export const selectedPreference: SelectedPreferenceTab = $state({ tab: "appearance" });
+
+/* Webview Tabs */
 type Tabs = {
     webviews: Mp.WebviewTab[];
     scrollLeft: number;
 };
 export const tabs: Tabs = $state({ webviews: [], scrollLeft: 0 });
 
-type DragState = {
+/* Tab Drag State */
+type TabState = {
     startLabel: string;
+    willStartDrag: boolean;
     dragging: boolean;
     lastX: number;
 };
-export const dragState = $state<DragState>({ startLabel: "", dragging: false, lastX: 0 });
+export const tabState = $state<TabState>({ startLabel: "", willStartDrag: false, dragging: false, lastX: 0 });
+
+/* Grep Progress */
+type GrepProgress = {
+    file: string;
+    total: number;
+    current: number;
+};
+export const grepProgress = $state<GrepProgress>({ file: "", total: 0, current: 0 });
 
 type AppAction =
     | { type: "mode"; value: Mp.Mode }
@@ -131,6 +144,7 @@ type AppAction =
     | { type: "watchThisFile"; value: boolean }
     | { type: "suspendWatch"; value: boolean }
     | { type: "grepRequest"; value: Mp.GrepRequest }
+    | { type: "grepProgress"; value: Mp.GrepProgress }
     | { type: "grepResult"; value: Mp.GrepResult[] }
     | { type: "columnSelection"; value: boolean }
     | { type: "cusorPosition"; value: CusorPosition }
@@ -144,16 +158,19 @@ type AppAction =
 const updater = (state: AppState, action: AppAction): AppState => {
     switch (action.type) {
         case "mode":
-            return { ...state, mode: action.value };
+            contentState.mode = action.value;
+            return state;
 
         case "init":
             contentState.fullPath = action.value.filePath;
-            return { ...state, content: action.value.content, mode: action.value.mode, startLine: action.value.startLine };
+            contentState.mode = action.value.mode;
+            return { ...state, content: action.value.content, startLine: action.value.startLine };
 
         case "fullPath":
             if (action.value) {
                 contentState.fullPath = action.value;
-                return { ...state, mode: "editor" };
+                contentState.mode = "editor";
+                return state;
             } else {
                 contentState.fullPath = action.value;
                 return state;
@@ -180,6 +197,12 @@ const updater = (state: AppState, action: AppAction): AppState => {
 
         case "grepRequest":
             return { ...state, grepRequest: action.value };
+
+        case "grepProgress":
+            grepProgress.file = action.value.processing;
+            grepProgress.current = action.value.current;
+            grepProgress.total = action.value.total;
+            return state;
 
         case "grepResult":
             return { ...state, grepResults: action.value };
@@ -214,6 +237,11 @@ const updater = (state: AppState, action: AppAction): AppState => {
                 case "grep":
                     return { ...state, showGrepDialog: action.value.open, anyDialogOpened: action.value.open };
                 case "progress":
+                    if (action.value.open) {
+                        grepProgress.file = "";
+                        grepProgress.current = 0;
+                        grepProgress.total = 0;
+                    }
                     return { ...state, showGrepProgress: action.value.open, anyDialogOpened: action.value.open };
                 case "preference":
                     return { ...state, showPreference: action.value.open, anyDialogOpened: action.value.open };

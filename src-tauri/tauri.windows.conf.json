@@ -11,7 +11,7 @@
         "maximizable":true,
         "minimizable":true,
         "closable":true,
-        "focus":true,
+        "focus":false,
         "visible":false,
         "decorations":false,
         "skipTaskbar":false,

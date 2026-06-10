@@ -5,8 +5,9 @@ use grep::{
     searcher::{sinks::Lossy, MmapChoice, SearcherBuilder},
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Mutex};
-use tauri::{Emitter, EventTarget};
+use smol::lock::Mutex;
+use std::collections::HashMap;
+use tauri::{AppHandle, Emitter, EventTarget};
 use zouni::Dirent;
 
 static CANCEL: Mutex<bool> = Mutex::new(false);
@@ -38,9 +39,9 @@ pub struct GrepResult {
     ranges: Vec<(usize, usize)>,
 }
 
-pub async fn run_grep(window: &tauri::WebviewWindow, e: GrepRequest) -> Result<Vec<GrepResult>, String> {
+pub async fn run_grep(app: &AppHandle, label: &str, e: GrepRequest) -> Result<Vec<GrepResult>, String> {
     {
-        let mut token = CANCEL.lock().unwrap();
+        let mut token = CANCEL.lock().await;
         *token = false;
     }
     let items = zouni::fs::readdir(e.start_directory, e.recursive, false)?;
@@ -69,17 +70,21 @@ pub async fn run_grep(window: &tauri::WebviewWindow, e: GrepRequest) -> Result<V
     let matcher: RegexMatcher = builder.build(&e.condition).unwrap();
     let mut searcher = SearcherBuilder::new().memory_map(unsafe { MmapChoice::auto() }).build();
 
-    let mut results: HashMap<String, GrepResult> = HashMap::new();
-    for (count, file) in files.iter().enumerate() {
-        if let Ok(token) = CANCEL.try_lock() {
-            if *token {
-                break;
+    let app = app.clone();
+    let label = label.to_string();
+    smol::spawn(async move {
+        let mut results: HashMap<String, GrepResult> = HashMap::new();
+
+        for (count, file) in files.iter().enumerate() {
+            if let Some(token) = CANCEL.try_lock() {
+                if *token {
+                    break;
+                }
             }
-        }
-        window
-            .emit_to(
+
+            app.emit_to(
                 EventTarget::WebviewWindow {
-                    label: window.label().to_string(),
+                    label: label.clone(),
                 },
                 GREP_EVENT_NAME,
                 GrepProgress {
@@ -90,43 +95,40 @@ pub async fn run_grep(window: &tauri::WebviewWindow, e: GrepRequest) -> Result<V
             )
             .unwrap();
 
-        searcher
-            .search_path(
-                &matcher,
-                &file.full_path,
-                Lossy(|line_number, line| {
-                    matcher.find_iter(line.as_bytes(), |matched| {
-                        let full_path = file.full_path.clone();
-                        let mut key = full_path.clone();
-                        key.push_str(&line_number.to_string());
-                        if let Some(result) = results.get_mut(&key) {
-                            result.ranges.push((matched.start(), matched.end()));
-                        } else {
-                            let result = GrepResult {
-                                full_path,
-                                line_number,
-                                line: line.to_string(),
-                                ranges: vec![(matched.start(), matched.end())],
-                            };
-                            results.insert(key, result);
-                        }
-                        true
-                    })?;
+            searcher
+                .search_path(
+                    &matcher,
+                    &file.full_path,
+                    Lossy(|line_number, line| {
+                        matcher.find_iter(line.as_bytes(), |matched| {
+                            let full_path = file.full_path.clone();
+                            let mut key = full_path.clone();
+                            key.push_str(&line_number.to_string());
+                            if let Some(result) = results.get_mut(&key) {
+                                result.ranges.push((matched.start(), matched.end()));
+                            } else {
+                                let result = GrepResult {
+                                    full_path,
+                                    line_number,
+                                    line: line.to_string(),
+                                    ranges: vec![(matched.start(), matched.end())],
+                                };
+                                results.insert(key, result);
+                            }
+                            true
+                        })?;
 
-                    Ok(true)
-                }),
-            )
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(results.into_values().collect())
+                        Ok(true)
+                    }),
+                )
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(results.into_values().collect())
+    })
+    .await
 }
 
-pub fn cancel() {
-    loop {
-        if let Ok(mut token) = CANCEL.try_lock() {
-            *token = true;
-            break;
-        }
-    }
+pub async fn cancel() {
+    let mut token = CANCEL.lock().await;
+    *token = true;
 }

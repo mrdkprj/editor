@@ -5,7 +5,7 @@
     import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
     import { IPC } from "../ipc";
     import util from "../util";
-    import { OS } from "../constants";
+    import { BROWSER_SHORTCUT_KEYS, OS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
 
     const ipc = new IPC("Main");
 
@@ -46,6 +46,23 @@
         await window.minimize();
     };
 
+    const onWindowSizeChanged = async () => {
+        const isMaximized = await getCurrentWebviewWindow().isMaximized();
+        currentWebviewTab.isMaximized = isMaximized;
+        await ipc.sendOthers("tabWindowSizeChange", isMaximized);
+    };
+
+    type ResizeEvent = {
+        width: number;
+        height: number;
+    };
+    const onResize = async (e: ResizeEvent) => {
+        if (active) {
+            const toActive = await WebviewWindow.getByLabel(currentWebviewTab.label);
+            await toActive?.setSize(new PhysicalSize(e.width, e.height));
+        }
+    };
+
     const beforeClose = async () => {
         const isMinimized = await getCurrentWebviewWindow().isMinimized();
         if (isMinimized) {
@@ -78,9 +95,10 @@
     };
 
     const onAnotherWindowClosed = async (closedLabel: string) => {
+        const removed = webviewTabs.findIndex((tab) => tab.label == closedLabel);
+        webviewTabs.splice(removed, 1);
+
         if (!allTabClosing) {
-            const removed = webviewTabs.findIndex((tab) => tab.label == closedLabel);
-            webviewTabs.splice(removed, 1);
             if (webviewTabs.length) {
                 if (removed == 0) {
                     await switchTab(webviewTabs[0].label);
@@ -89,7 +107,7 @@
                 }
             }
         } else {
-            // If no window to close, hide this before destroy
+            /* If no window to close, hide this before destroy */
             if (!closingLabelSequence.length) {
                 await hideThis();
             }
@@ -120,17 +138,6 @@
         }
     };
 
-    type ResizeEvent = {
-        width: number;
-        height: number;
-    };
-    const onResize = async (e: ResizeEvent) => {
-        if (active) {
-            const toActive = await WebviewWindow.getByLabel(currentWebviewTab.label);
-            await toActive?.setSize(new PhysicalSize(e.width, e.height));
-        }
-    };
-
     const pushWebiew = async (title: Mp.WebviewTitle) => {
         const webviewWindow = await WebviewWindow.getByLabel(title.label);
         if (!webviewWindow) return;
@@ -142,12 +149,12 @@
         webviewTabs.push({ label: title.label, title: title.title, path: title.path, bounds: util.toBounds(position, size), isMaximized });
 
         if (isLinux) {
-            // Hide window
+            /* Hide window */
             await webviewWindow.hide();
         } else {
-            // First place window off-screen
+            /* First place window off-screen */
             await webviewWindow.setPosition(new PhysicalPosition(OFF_SCREEN, OFF_SCREEN));
-            // Then show window with animation if not visible
+            /* Then show window with animation if not visible */
             const visible = await webviewWindow.isVisible();
             if (!visible) {
                 await webviewWindow.show();
@@ -163,9 +170,10 @@
             return;
         }
 
-        await ipc.invoke("to_child_window", [label]);
         const openedWebviews = await ipc.invoke("get_webview_labels", undefined);
         await pushWebiew(openedWebviews.webviews[label]);
+        /* Making child window comes after WebviewWindow is shown. Otherwise, child window can't get focus */
+        await ipc.invoke("to_child_window", [label]);
         await ipc.sendOthers("updateTab", { tabs: webviewTabs });
         /* Delay switching for smooth rendering */
         setTimeout(async () => {
@@ -199,13 +207,35 @@
         }
 
         currentWebviewTab.label = activeTabLabel;
+
+        await activateWebview(activeTabLabel);
+    };
+
+    const activateWebview = async (label: string) => {
+        /* Make the view restore focus on its editor */
+        await ipc.sendTo(label, "tabActivated", {});
+
+        if (isLinux) return;
+
+        /*
+            On Windows, focus must be set on active child window.
+            But focusing on a child window causes problems and app switching like ALT+Tab does not work.
+            So place focus on the active child window's webview instead.
+         */
+        const activatedWebvivew = await Webview.getByLabel(label);
+        await activatedWebvivew?.setFocus();
+    };
+
+    const onFocus = () => {
+        if (currentWebviewTab.label) {
+            activateWebview(currentWebviewTab.label);
+        }
     };
 
     const startTabMode = async (initial: string) => {
         webviewTabs = [];
         currentWebviewTab.label = "";
 
-        // Get bounds
         const initiatedWindow = await WebviewWindow.getByLabel(initial);
         if (!initiatedWindow) return;
         const isMaximized = await initiatedWindow.isMaximized();
@@ -214,12 +244,9 @@
         currentWebviewTab.bounds = util.toBounds(position, size);
         currentWebviewTab.isMaximized = isMaximized;
 
-        // Set bound
         const thisWindow = getCurrentWebviewWindow();
         await thisWindow.setSize(util.toPhysicalSize(currentWebviewTab.bounds));
         await thisWindow.setPosition(util.toPhysicalPosition(currentWebviewTab.bounds));
-
-        // Prepare tabs
         const openedWebviews = await ipc.invoke("get_webview_labels", undefined);
         const sortedLabels = Object.keys(openedWebviews.webviews).toSorted();
         for (const label of sortedLabels) {
@@ -241,7 +268,7 @@
 
     const endTabMode = async () => {
         const thisWindow = getCurrentWebviewWindow();
-        // Don't know why but outerPosition is correct
+        /* Don't know why but outerPosition is correct */
         const position = await thisWindow.outerPosition();
         const size = await thisWindow.innerSize();
 
@@ -263,7 +290,6 @@
 
         await hideThis();
 
-        // Clean up tabs
         active = false;
         currentWebviewTab.label = "";
         webviewTabs = [];
@@ -276,9 +302,18 @@
         await thisWindow.hide();
     };
 
+    const onKeyDown = (e: KeyboardEvent) => {
+        if ((e.ctrlKey && BROWSER_SHORTCUT_KEYS.includes(e.key)) || SINGLE_BROWSER_SHORTCUT_KEYS.includes(e.key)) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+
     onMount(() => {
         ipc.receiveTauri("tauri://close-requested", beforeClose);
+        ipc.receiveTauri("tauri://resize", onWindowSizeChanged);
         ipc.receiveTauri("tauri://resize", onResize);
+        ipc.receiveTauri("tauri://focus", onFocus);
         ipc.receive("toggleMaximize", toggleMaximize);
         ipc.receive("minimize", minimize);
         ipc.receive("startTabMode", startTabMode);
@@ -296,32 +331,6 @@
     });
 </script>
 
-<svelte:document ondragover={(e) => e.preventDefault()} />
+<svelte:document ondragover={(e) => e.preventDefault()} onkeydown={onKeyDown} />
 
-<div class="viewport"><div class="title-bar no-print" data-tauri-drag-region={navigator.userAgent.includes(OS.linux) ? true : null}></div></div>
-
-<style>
-    .viewport {
-        background-color: var(--main-bgcolor);
-        color: var(--menu-color);
-        height: 100%;
-        width: 100%;
-        cursor: default;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .title-bar {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        height: 35px;
-        min-height: 35px;
-        width: 100%;
-        color: var(--main-color);
-        background-color: var(--bar-bg-color);
-        -webkit-app-region: drag;
-        user-select: none;
-        -webkit-user-select: none;
-    }
-</style>
+<div class="viewport"><div class="title-bar no-print"></div></div>

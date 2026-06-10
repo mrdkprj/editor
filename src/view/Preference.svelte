@@ -5,7 +5,9 @@
     import { onMount } from "svelte";
     import { Colors, ColorTokens, dark_colors, lihgt_colors } from "../theme";
 
-    const ipc = new IPC("View");
+    let { label }: { label: string } = $props();
+
+    const ipc = new IPC(label);
     const fontSizes = [10, 11, 12, 13, 14, 16, 18, 20];
     const indentSizes = [1, 2, 3, 4, 5, 6, 7, 8];
     let themeColors = $state(settings.theme == "dark" ? $state.snapshot(settings.color["dark"]) : $state.snapshot(settings.color["light"]));
@@ -38,7 +40,7 @@
         }
 
         if (colorChanged || preferenceChanged) {
-            ipc.sendTo("View", "settingChanged", colorChanged && preferenceChanged ? "both" : colorChanged ? "color" : "preference");
+            ipc.sendTo(label, "settingChanged", colorChanged && preferenceChanged ? "both" : colorChanged ? "color" : "preference");
         }
 
         close();
@@ -50,11 +52,11 @@
 
     const close = () => {
         dispatch({ type: "toggleDialog", value: { type: "preference", open: false } });
-        ipc.sendTo("View", "dialog", false);
+        ipc.sendTo(label, "dialog", false);
     };
 
     onMount(() => {
-        ipc.sendTo("View", "dialog", true);
+        ipc.sendTo(label, "dialog", true);
     });
 </script>
 
@@ -65,7 +67,14 @@
         </div>
         <div class="mp-dialog preference">
             <div class="tab">
-                <div class="tablinks" class:tablinks-active={selectedPreference.tab == "view"} onclick={() => (selectedPreference.tab = "view")} onkeydown={handleKeyEvent} role="button" tabindex="-1">
+                <div
+                    class="tablinks"
+                    class:tablinks-active={selectedPreference.tab == "appearance"}
+                    onclick={() => (selectedPreference.tab = "appearance")}
+                    onkeydown={handleKeyEvent}
+                    role="button"
+                    tabindex="-1"
+                >
                     View
                 </div>
                 <div
@@ -79,7 +88,7 @@
                     Color
                 </div>
             </div>
-            {#if selectedPreference.tab == "view"}
+            {#if selectedPreference.tab == "appearance"}
                 <div class="mp-dialog-column">
                     <div class="mp-dialog-item-block">
                         <div class="mp-dialog-item"><label for="fontfamily">Font Family</label></div>

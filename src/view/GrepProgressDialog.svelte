@@ -1,16 +1,12 @@
 <script lang="ts">
     import { handleKeyEvent } from "../constants";
-    import { dispatch } from "./appStateReducer.svelte";
+    import { dispatch, grepProgress } from "./appStateReducer.svelte";
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
 
-    let { abortGrep }: { abortGrep: () => Promise<void> } = $props();
+    let { label, abortGrep }: { label: string; abortGrep: () => Promise<void> } = $props();
 
-    const ipc = new IPC("View");
-
-    let file = $state("");
-    let total = $state(0);
-    let current = $state(0);
+    const ipc = new IPC(label);
 
     const onkeydown = (e: KeyboardEvent) => {
         e.preventDefault();
@@ -27,20 +23,11 @@
     const close = async () => {
         await abortGrep();
         dispatch({ type: "toggleDialog", value: { type: "progress", open: false } });
-    };
-
-    const onProgress = (e: Mp.GrepProgress) => {
-        file = e.processing;
-        current = e.current;
-        total = e.total;
+        ipc.sendTo(label, "dialog", false);
     };
 
     onMount(() => {
-        ipc.receive("grep_progress", onProgress);
-
-        return () => {
-            ipc.release();
-        };
+        ipc.sendTo(label, "dialog", true);
     });
 </script>
 
@@ -52,8 +39,8 @@
         <div class="mp-dialog">
             <div class="mp-dialog-item-block">
                 <div class="mp-dialog-title-block">Processing...</div>
-                <div class="mp-dialog-item"><div class="mp-dialog-text">File: {file}</div></div>
-                <div class="mp-dialog-item">{`${current}/${total}`}</div>
+                <div class="mp-dialog-item"><div class="mp-dialog-text">File: {grepProgress.file}</div></div>
+                <div class="mp-dialog-item">{`${grepProgress.current}/${grepProgress.total}`}</div>
             </div>
             <div class="mp-dialog-separator"></div>
             <div class="mp-dialog-action">

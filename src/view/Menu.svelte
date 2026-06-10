@@ -7,7 +7,6 @@
 
     let { label, items, submenu, id }: { label: string; items: Mp.MenuItem[]; submenu: boolean; id?: string } = $props();
 
-    // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
 
     let canvas: HTMLCanvasElement;

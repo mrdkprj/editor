@@ -1,19 +1,18 @@
 <script lang="ts">
     import { flip } from "svelte/animate";
-    import { dragState, tabs } from "./appStateReducer.svelte";
+    import { tabState, tabs } from "./appStateReducer.svelte";
     import util from "../util";
     import { IPC } from "../ipc";
 
     let {
-        currentLabel,
+        label,
         switchTab,
         closeTab,
         onTabScroll,
         onTabMoved,
-    }: { currentLabel: string; switchTab: (label: string) => void; closeTab: (label: string) => void; onTabScroll: (scrollLeft: number) => void; onTabMoved: () => void } = $props();
+    }: { label: string; switchTab: (label: string) => void; closeTab: (label: string) => void; onTabScroll: (scrollLeft: number) => void; onTabMoved: () => void } = $props();
 
-    // svelte-ignore state_referenced_locally
-    const ipc = new IPC(currentLabel);
+    const ipc = new IPC(label);
     let tab: HTMLDivElement;
 
     $effect(() => {
@@ -22,7 +21,7 @@
 
     const onTabClick = (e: MouseEvent, selected: string) => {
         e.preventDefault();
-        if (selected != currentLabel) {
+        if (selected != label) {
             switchTab(selected);
         }
     };
@@ -42,57 +41,29 @@
         }
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
-        dragState.dragging = true;
-        dragState.startLabel = e.target.id;
-        dragState.lastX = e.pageX;
+        tabState.dragging = true;
+        tabState.startLabel = e.target.id;
+        tabState.lastX = e.pageX;
     };
 
     const onDragOver = (e: DragEvent) => {
         e.preventDefault();
         if (util.isLinux()) return;
-
-        if (!dragState.dragging) return;
-
-        if (e.pageX == dragState.lastX) return;
-        const dargToRight = e.pageX > dragState.lastX;
-        dragState.lastX = e.pageX;
-
-        if (!e.target || !(e.target instanceof HTMLElement)) return;
-
-        const id = e.target.getAttribute("data-drag-id") ?? "";
-
-        if (!id) return;
-
-        if (id == dragState.startLabel) return;
-
-        if (!dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 < e.pageX) {
-            replace(dragState.startLabel, id);
-        }
-
-        if (dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 > e.pageX) {
-            replace(dragState.startLabel, id);
-        }
-
-        if (tab.scrollWidth > tab.clientWidth) {
-            if (e.target.offsetLeft + e.target.clientWidth > tab.clientWidth) {
-                tab.scroll(e.target.offsetLeft + e.target.clientWidth - tab.clientWidth, 0);
-            }
-
-            if (tab.scrollLeft > e.target.offsetLeft) {
-                tab.scroll(-20, 0);
-            }
-        }
+        drag(e);
     };
 
     /* On Linux, dragover never fires */
     const onMouseMove = (e: MouseEvent) => {
         if (util.isWin()) return;
+        drag(e);
+    };
 
-        if (!dragState.dragging) return;
+    const drag = (e: MouseEvent | DragEvent) => {
+        if (!tabState.dragging) return;
 
-        if (e.pageX == dragState.lastX) return;
-        const dargToRight = e.pageX > dragState.lastX;
-        dragState.lastX = e.pageX;
+        if (e.pageX == tabState.lastX) return;
+        const dargToRight = e.pageX > tabState.lastX;
+        tabState.lastX = e.pageX;
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
 
@@ -100,14 +71,14 @@
 
         if (!id) return;
 
-        if (id == dragState.startLabel) return;
+        if (id == tabState.startLabel) return;
 
         if (!dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 < e.pageX) {
-            replace(dragState.startLabel, id);
+            replace(tabState.startLabel, id);
         }
 
         if (dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 > e.pageX) {
-            replace(dragState.startLabel, id);
+            replace(tabState.startLabel, id);
         }
 
         if (tab.scrollWidth > tab.clientWidth) {
@@ -122,26 +93,24 @@
     };
 
     const onDrop = () => {
-        if (util.isLinux()) return;
-        if (!dragState.dragging) return;
+        tabState.willStartDrag = false;
+        endDrag();
+    };
 
-        dragState.dragging = false;
+    const onMouseUp = () => {
+        tabState.willStartDrag = false;
+        endDrag();
+    };
+
+    const endDrag = () => {
+        if (!tabState.dragging) return;
+        ipc.sendTo(label, "dragEnd", {});
+        tabState.dragging = false;
         onTabMoved();
     };
 
     const onMouseDown = () => {
-        dragState.dragging = true;
-        ipc.sendTo(currentLabel, "willLoseFocus", {});
-    };
-
-    /* On Linux, drop never fires, because dragstart is prevented */
-    const onMouseUp = () => {
-        ipc.sendTo(currentLabel, "canGetFocus", {});
-        if (util.isWin()) return;
-        if (!dragState.dragging) return;
-
-        dragState.dragging = false;
-        onTabMoved();
+        tabState.willStartDrag = true;
     };
 
     const replace = (sourceId: string, targetId: string) => {
@@ -161,7 +130,7 @@
             draggable="true"
             class="tablinks"
             data-drag-id={tab.label}
-            class:tablinks-active={tab.label == currentLabel}
+            class:tablinks-active={tab.label == label}
             onclick={(e) => onTabClick(e, tab.label)}
             onkeydown={() => {}}
             ondragstart={startDrag}
@@ -172,7 +141,7 @@
             ondrop={onDrop}
             role="button"
             tabindex="-1"
-            animate:flip={{ duration: dragState.dragging ? 400 : 0 }}
+            animate:flip={{ duration: tabState.dragging ? 400 : 0 }}
         >
             <div class="tab-title" title={tab.title}>{tab.title}</div>
             <div class="tab-close-btn" onclick={() => closeTab(tab.label)} onkeydown={() => {}} role="button" tabindex="-1">

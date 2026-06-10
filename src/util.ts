@@ -12,9 +12,9 @@ class Util {
     isLinux() {
         return navigator.userAgent.includes(OS.linux);
     }
-
-    toCommandLineArgs(filePath?: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position): string {
-        const args = filePath ? [filePath] : []; //this.isWin() ? [`"${filePath}"`] : [filePath];
+    //[`"${filePath}"`]
+    toCommandLineArgs(filePath?: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position): string[] {
+        const args = filePath ? [filePath] : [];
         if (grepRequest) {
             args.push("-g");
             args.push(grepRequest.condition);
@@ -37,7 +37,7 @@ class Util {
             args.push(position.y.toString());
         }
 
-        return args.join(" ");
+        return args;
     }
 
     getFileMenubarItems(history: string[], encoding: string): Mp.MenuItem[] {

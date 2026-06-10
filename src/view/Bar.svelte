@@ -41,12 +41,14 @@
             } else {
                 getCurrentWebviewWindow().startDragging();
             }
+        } else {
+            e.preventDefault();
         }
     };
 </script>
 
 {#if util.isWin()}
-    <div class="title-bar no-print" class:bar-disabled={disabled}>
+    <div class="title-bar no-print" class:bar-disabled={disabled} onmousedown={(e) => e.preventDefault()} onkeydown={handleKeyEvent} role="button" tabindex="-1">
         <div class="icon-area" {onmousedown} onclick={() => openNewWindow("")} onkeydown={handleKeyEvent} role="button" tabindex="-1">
             <img src={icon} alt="" width="20" height="20" />
         </div>
@@ -54,7 +56,7 @@
             <Menubar {label} />
         </div>
         <div class="title" title={contentState.fullPath} {onmousedown} role="button" tabindex="-1">
-            {contentState.fullPath ? path.basename(contentState.fullPath) : $appState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
+            {contentState.fullPath ? path.basename(contentState.fullPath) : contentState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
         </div>
         <div class="window-area">
             <div class="minimize" onclick={minimize} onkeydown={handleKeyEvent} role="button" tabindex="-1">&minus;</div>
@@ -73,7 +75,7 @@
             <Menubar {label} />
         </div>
         <div class="title" title={contentState.fullPath} onmousedown={dragGtkWindow} role="button" tabindex="-1">
-            {contentState.fullPath ? path.basename(contentState.fullPath) : $appState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
+            {contentState.fullPath ? path.basename(contentState.fullPath) : contentState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
         </div>
         <div class="window-area">
             <div class="minimize" onclick={minimize} onkeydown={handleKeyEvent} role="button" tabindex="-1">&minus;</div>

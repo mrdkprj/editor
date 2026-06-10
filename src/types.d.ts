@@ -28,13 +28,13 @@ declare global {
         switchTab: string;
         addTab: string;
         updateTab: Mp.UpdateTabsEvent;
+        tabActivated: Mp.AnyEvent;
         closeTab: string;
         scrollTab: number;
         closed: string;
         destory: Mp.TabbedWebview;
         closeAll: Mp.AnyEvent;
-        willLoseFocus: Mp.AnyEvent;
-        canGetFocus: Mp.AnyEvent;
+        dragEnd: Mp.AnyEvent;
     };
 
     namespace Mp {
@@ -42,7 +42,7 @@ declare global {
         type Mode = "editor" | "grep" | "none";
         type TextType = "plain" | "code";
         type WhiteSpaceRenderMode = "none" | "all" | "boundary" | "selection" | "trailing" | undefined;
-        type PreferenceTab = "view" | "color";
+        type PreferenceTab = "appearance" | "color";
         type DialogType = "grep" | "progress" | "preference" | "watch";
         type ColorKey =
             | "color"
@@ -78,6 +78,7 @@ declare global {
         };
 
         type ContentState = {
+            mode: Mp.Mode;
             isDirty: boolean;
             fullPath: string;
         };

@@ -4,8 +4,10 @@
     import { IPC } from "../ipc";
     import { dispatch } from "./appStateReducer.svelte";
 
-    const ipc = new IPC("View");
-    let doNotNotify = false;
+    let { label }: { label: string } = $props();
+
+    const ipc = new IPC(label);
+    let doNotNotify = $state(false);
 
     const onkeydown = (e: KeyboardEvent) => {
         if (e.key == "Escape") {
@@ -18,13 +20,13 @@
     };
 
     const close = (applyChange: boolean) => {
-        ipc.sendTo("View", "watch_confirm_event", { applyChange, doNotNotify });
+        ipc.sendTo(label, "watch_confirm_event", { applyChange, doNotNotify });
         dispatch({ type: "toggleDialog", value: { type: "watch", open: false } });
-        ipc.sendTo("View", "dialog", false);
+        ipc.sendTo(label, "dialog", false);
     };
 
     onMount(() => {
-        ipc.sendTo("View", "dialog", true);
+        ipc.sendTo(label, "dialog", true);
     });
 </script>
 

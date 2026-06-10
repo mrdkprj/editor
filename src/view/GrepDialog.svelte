@@ -4,8 +4,9 @@
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
 
-    let { showErrorMessage, executeGrep }: { executeGrep: (reqeust: Mp.GrepRequest) => void; showErrorMessage: (message: string) => Promise<void> } = $props();
-    const ipc = new IPC("View");
+    let { label, showErrorMessage, executeGrep }: { label: string; executeGrep: (reqeust: Mp.GrepRequest) => void; showErrorMessage: (message: string) => Promise<void> } = $props();
+
+    const ipc = new IPC(label);
     let request: Mp.GrepRequest = $state({
         condition: $appState.grepRequest?.condition,
         start_directory: $appState.grepRequest?.start_directory,
@@ -45,11 +46,11 @@
 
     const close = () => {
         dispatch({ type: "toggleDialog", value: { type: "grep", open: false } });
-        ipc.sendTo("View", "dialog", false);
+        ipc.sendTo(label, "dialog", false);
     };
 
     onMount(() => {
-        ipc.sendTo("View", "dialog", true);
+        ipc.sendTo(label, "dialog", true);
     });
 </script>
 
