@@ -1,6 +1,7 @@
 <script lang="ts">
     import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { settings } from "./appStateReducer.svelte";
+    import { MAIN_LABEL } from "../constants";
 
     type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
     const dragResize = async (e: MouseEvent) => {
@@ -8,7 +9,7 @@
         const direction = e.target.getAttribute("data-direction");
         if (direction) {
             if (settings.tabMode) {
-                const main = await WebviewWindow.getByLabel("Main");
+                const main = await WebviewWindow.getByLabel(MAIN_LABEL);
                 main?.startResizeDragging(direction as ResizeDirection);
             } else {
                 getCurrentWebviewWindow().startResizeDragging(direction as ResizeDirection);

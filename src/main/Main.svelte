@@ -5,14 +5,14 @@
     import { PhysicalPosition } from "@tauri-apps/api/dpi";
     import { IPC } from "../ipc";
     import util from "../util";
-    import { BROWSER_SHORTCUT_KEYS, OS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
+    import { BROWSER_SHORTCUT_KEYS, MAIN_LABEL, OS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
 
     type ResizeEvent = {
         width: number;
         height: number;
     };
 
-    const ipc = new IPC("Main");
+    const ipc = new IPC(MAIN_LABEL);
 
     const OFF_SCREEN = -30000;
     const isLinux = navigator.userAgent.includes(OS.linux);

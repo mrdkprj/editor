@@ -1,7 +1,7 @@
 <script lang="ts">
     import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { appState, contentState, settings } from "./appStateReducer.svelte";
-    import { GREP, handleKeyEvent, UNTITLED } from "../constants";
+    import { GREP, handleKeyEvent, MAIN_LABEL, UNTITLED } from "../constants";
     import path from "../path";
     import util from "../util";
     import Menubar from "./Menubar.svelte";
@@ -35,8 +35,7 @@
 
         if (e.target.classList.contains("title-bar") || e.target.classList.contains("title")) {
             if (settings.tabMode) {
-                /* On Linux, webviews are attached to Main Window on tab mode */
-                const mainWindow = await WebviewWindow.getByLabel("Main");
+                const mainWindow = await WebviewWindow.getByLabel(MAIN_LABEL);
                 mainWindow?.startDragging();
             } else {
                 getCurrentWebviewWindow().startDragging();

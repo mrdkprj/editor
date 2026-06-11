@@ -2,7 +2,7 @@
     import { onMount, tick, untrack } from "svelte";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
-    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
+    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, MAIN_LABEL, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
     import util from "../util";
@@ -44,7 +44,7 @@
             await helper.openContextMenu(label, label, { x: e.screenX, y: e.screenY });
         } else {
             await awaitContextMenu();
-            const opener = settings.tabMode ? "Main" : label;
+            const opener = settings.tabMode ? MAIN_LABEL : label;
             await helper.openContextMenu(opener, label, { x: e.clientX, y: e.clientY });
         }
     };
@@ -55,7 +55,7 @@
 
     const toggleMaximize = async () => {
         if (settings.tabMode) {
-            return ipc.sendTo("Main", "toggleMaximize", {});
+            return ipc.sendTo(MAIN_LABEL, "toggleMaximize", {});
         }
 
         const view = getCurrentWebviewWindow();
@@ -83,7 +83,7 @@
 
     const minimize = async () => {
         if (settings.tabMode) {
-            return ipc.sendTo("Main", "minimize", {});
+            return ipc.sendTo(MAIN_LABEL, "minimize", {});
         }
 
         const view = getCurrentWebviewWindow();
@@ -470,7 +470,7 @@
 
     const tryClose = async () => {
         if (settings.tabMode) {
-            await ipc.sendTo("Main", "closeAll", {});
+            await ipc.sendTo(MAIN_LABEL, "closeAll", {});
         } else {
             await getCurrentWebviewWindow().close();
         }
@@ -538,10 +538,10 @@
     const toggleTabMode = async () => {
         if (settings.tabMode) {
             saveTabMode();
-            await ipc.sendTo("Main", "endTabMode", {});
+            await ipc.sendTo(MAIN_LABEL, "endTabMode", {});
         } else {
             saveTabMode();
-            await ipc.sendTo("Main", "startTabMode", label);
+            await ipc.sendTo(MAIN_LABEL, "startTabMode", label);
         }
     };
 
@@ -558,11 +558,11 @@
     };
 
     const switchTab = (label: string) => {
-        ipc.sendTo("Main", "switchTab", label);
+        ipc.sendTo(MAIN_LABEL, "switchTab", label);
     };
 
     const closeTab = (label: string) => {
-        ipc.sendTo("Main", "closeTab", label);
+        ipc.sendTo(MAIN_LABEL, "closeTab", label);
     };
 
     const onTabScroll = (scrollLeft: number) => {
@@ -667,7 +667,7 @@
         }
 
         if (settings.tabMode) {
-            await ipc.sendTo("Main", "addTab", label);
+            await ipc.sendTo(MAIN_LABEL, "addTab", label);
         } else {
             await thisWindow.show();
         }
