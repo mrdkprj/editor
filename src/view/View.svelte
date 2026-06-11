@@ -487,11 +487,11 @@
 
     const destroy = async (host?: Mp.WebviewTab) => {
         const thisWindow = getCurrentWebviewWindow();
-        /* In tab mode, hide before destroy */
-        if (settings.tabMode) {
-            await thisWindow.hide();
+
+        /* On Linux, must move webview back to its original parent window */
+        if (settings.tabMode && util.isLinux()) {
+            await ipc.invoke("restore_webview", label);
         }
-        await ipc.invoke("restore_webview", thisWindow.label);
 
         settingStore.data = $state.snapshot(settings);
 

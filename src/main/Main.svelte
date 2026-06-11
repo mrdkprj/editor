@@ -2,10 +2,15 @@
     import { onMount } from "svelte";
     import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { Webview } from "@tauri-apps/api/webview";
-    import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
+    import { PhysicalPosition } from "@tauri-apps/api/dpi";
     import { IPC } from "../ipc";
     import util from "../util";
     import { BROWSER_SHORTCUT_KEYS, OS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
+
+    type ResizeEvent = {
+        width: number;
+        height: number;
+    };
 
     const ipc = new IPC("Main");
 
@@ -47,21 +52,35 @@
         await thisWindow.minimize();
     };
 
-    const onWindowSizeChanged = async () => {
-        const isMaximized = await getCurrentWebviewWindow().isMaximized();
-        windowState.isMaximized = isMaximized;
-        await ipc.sendOthers("tabWindowSizeChange", isMaximized);
+    const onWindowSizeChanged = async (e: ResizeEvent) => {
+        await updateWindowState(e);
+        await ipc.sendOthers("tabWindowSizeChange", windowState.isMaximized);
+
+        if (isLinux) return;
+
+        /* On Windows, windows other than the current Windowresize are not autimatically resized */
+        for (const tab of webviewTabs) {
+            if (tab.label != currentTabLabel) {
+                const webviewWindow = await WebviewWindow.getByLabel(tab.label);
+                await webviewWindow?.setSize(util.toPhysicalSize(windowState.bounds));
+            }
+        }
     };
 
-    type ResizeEvent = {
-        width: number;
-        height: number;
-    };
     const onResize = async (e: ResizeEvent) => {
+        /* On Windows, resize is not autimatic */
         if (!isLinux && active) {
+            await updateWindowState(e);
             const toActive = await WebviewWindow.getByLabel(currentTabLabel);
-            await toActive?.setSize(new PhysicalSize(e.width, e.height));
+            await toActive?.setSize(util.toPhysicalSize(windowState.bounds));
         }
+    };
+
+    const updateWindowState = async (e: ResizeEvent) => {
+        const isMaximized = await getCurrentWebviewWindow().isMaximized();
+        windowState.isMaximized = isMaximized;
+        windowState.bounds.width = e.width;
+        windowState.bounds.height = e.height;
     };
 
     const beforeClose = async () => {
@@ -154,8 +173,9 @@
             /* Hide window */
             await webviewWindow.hide();
         } else {
-            /* First place window off-screen */
+            /* First place window off-screen and change size*/
             await webviewWindow.setPosition(new PhysicalPosition(OFF_SCREEN, OFF_SCREEN));
+            await webviewWindow.setSize(util.toPhysicalSize(windowState.bounds));
             /* Then show window with animation if not visible */
             const visible = await webviewWindow.isVisible();
             if (!visible) {
@@ -192,10 +212,10 @@
             /* Keep webview visible and only change z-index */
             await ipc.invoke("bring_to_front", activeTabLabel);
         } else {
-            const size = await getCurrentWebviewWindow().size();
+            // const size = await getCurrentWebviewWindow().size();
             const toActive = await WebviewWindow.getByLabel(activeTabLabel);
+            await toActive?.setSize(util.toPhysicalSize(windowState.bounds));
             await toActive?.setPosition(new PhysicalPosition(-8, 0));
-            await toActive?.setSize(new PhysicalSize(size.width, size.height));
         }
 
         if (currentTabLabel) {
