@@ -24,6 +24,7 @@
     const ipc = new IPC(label);
     let grepPromise: Deferred<number> | null;
     let settingStore = new Settings();
+    let isWayland = $state(false);
     let ready = $state(false);
     // Linux only
     let handleKeyUp = false;
@@ -62,6 +63,7 @@
         if (maximized) {
             view.unmaximize();
             view.setPosition(util.toPhysicalPosition(settings.bounds));
+            view.setSize(util.toPhysicalSize(settings.bounds));
         } else {
             const position = await view.innerPosition();
             const size = await view.innerSize();
@@ -89,6 +91,10 @@
         const size = await view.innerSize();
         settings.bounds = util.toBounds(position, size);
         await view.minimize();
+    };
+
+    const onTabWindowSizeChangeEvent = async (isMaximized: boolean) => {
+        dispatch({ type: "isMaximized", value: isMaximized });
     };
 
     const handleContextMenuEvent = async (e: Mp.ContextMenuEvent) => {
@@ -445,9 +451,10 @@
     const beforeClose = async () => {
         if (!contentState.isDirty) return tryDestory();
 
-        const isMinimized = await getCurrentWebviewWindow().isMinimized();
+        const thisWindow = getCurrentWebviewWindow();
+        const isMinimized = await thisWindow.isMinimized();
         if (isMinimized) {
-            await getCurrentWebviewWindow().unminimize();
+            await thisWindow.unminimize();
         }
         const name = contentState.fullPath ? path.basename(contentState.fullPath) : UNTITLED;
         const shouldSave = await helper.confirm(`"${name}" is changed. Do you want to save?`);
@@ -479,12 +486,12 @@
     };
 
     const destroy = async (host?: Mp.WebviewTab) => {
-        const currentWindow = getCurrentWebviewWindow();
+        const thisWindow = getCurrentWebviewWindow();
         /* In tab mode, hide before destroy */
         if (settings.tabMode) {
-            await currentWindow.hide();
+            await thisWindow.hide();
         }
-        await ipc.invoke("restore_webview", currentWindow.label);
+        await ipc.invoke("restore_webview", thisWindow.label);
 
         settingStore.data = $state.snapshot(settings);
 
@@ -492,10 +499,10 @@
             settingStore.data.isMaximized = host.isMaximized;
             settingStore.data.bounds = host.bounds;
         } else {
-            const isMinimized = await currentWindow.isMinimized();
+            const isMinimized = await thisWindow.isMinimized();
             if (!settings.isMaximized && !isMinimized) {
-                const position = await currentWindow.innerPosition();
-                const size = await currentWindow.innerSize();
+                const position = await thisWindow.innerPosition();
+                const size = await thisWindow.innerSize();
                 settingStore.data.bounds = util.toBounds(position, size);
             }
         }
@@ -503,7 +510,7 @@
         await helper.unlistenAll();
         await settingStore.save();
 
-        currentWindow.destroy();
+        thisWindow.destroy();
     };
 
     const onSettingsChange = async () => {
@@ -612,10 +619,6 @@
         return title;
     };
 
-    const onTabWindowSizeChangeEvent = (isMaximized: boolean) => {
-        dispatch({ type: "isMaximized", value: isMaximized });
-    };
-
     const bringToFront = async () => {
         if (settings.tabMode) {
             switchTab(label);
@@ -631,6 +634,8 @@
 
     const prepare = async () => {
         const e = await helper.onMainReady("root");
+
+        isWayland = e.isWayland;
 
         await settingStore.init(e.appDataDir);
         initSettings(settingStore.data);
@@ -697,7 +702,7 @@
 <svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} />
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
-    {#if util.isLinux()}
+    {#if util.isLinux() && isWayland}
         <WaylandResize />
     {/if}
     {#if ready}

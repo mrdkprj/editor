@@ -27,8 +27,7 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
     #[cfg(target_os = "linux")]
     {
         use gtk::glib::Cast;
-        use gtk::traits::ContainerExt;
-        use gtk::traits::{OverlayExt, WidgetExt};
+        use gtk::traits::{ContainerExt, OverlayExt, WidgetExt};
 
         let host = app.get_webview_window("Main").unwrap();
         let vbox = host.default_vbox().unwrap();
@@ -48,6 +47,8 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
                 tab_webview.hide();
 
                 overlay.add_overlay(tab_webview);
+                /* Place the webview at the bottom of the overlay stack */
+                overlay.reorder_overlay(tab_webview, 0);
             }
         }
     }
@@ -67,9 +68,7 @@ pub fn restore_webview(app: tauri::AppHandle, label: String) {
         #[cfg(target_os = "linux")]
         {
             use gtk::glib::Cast;
-            use gtk::traits::BoxExt;
-            use gtk::traits::ContainerExt;
-            use gtk::traits::WidgetExt;
+            use gtk::traits::{BoxExt, ContainerExt, WidgetExt};
 
             let host = app.get_webview_window("Main").unwrap();
             let vbox = host.default_vbox().unwrap();
@@ -85,6 +84,26 @@ pub fn restore_webview(app: tauri::AppHandle, label: String) {
                         child_vbox.pack_start(&child, true, true, 0);
                     }
                 }
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn bring_to_front(app: tauri::AppHandle, label: String) {
+    use gtk::glib::Cast;
+    use gtk::traits::{ContainerExt, OverlayExt, WidgetExt};
+
+    let host = app.get_webview_window("Main").unwrap();
+    let vbox = host.default_vbox().unwrap();
+    let vbox_children = vbox.children();
+    if vbox_children.len() > 1 {
+        let widget = vbox_children.get(1).unwrap();
+        let overlay: gtk::Overlay = widget.clone().downcast().unwrap();
+
+        for child in overlay.children() {
+            if child.widget_name() == label {
+                overlay.reorder_overlay(&child, -1);
             }
         }
     }

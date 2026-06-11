@@ -8,6 +8,7 @@ use encoding_rs::Encoding;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    env,
     sync::{
         atomic::{AtomicU16, Ordering::Relaxed},
         Mutex, OnceLock,
@@ -17,6 +18,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 static UUID: AtomicU16 = AtomicU16::new(0);
 static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
+static WAYLAND: OnceLock<bool> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OpenedWebview {
@@ -50,6 +52,7 @@ pub struct InitArgs {
     locales: Vec<String>,
     app_data_dir: String,
     restore_position: bool,
+    is_wayland: bool,
 }
 
 pub fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>) {
@@ -106,11 +109,13 @@ pub fn setup(app: &tauri::AppHandle, args: Vec<String>) -> Option<String> {
     } else {
         false
     };
+    let is_wayland = *WAYLAND.get_or_init(is_wayland);
 
     let mut init_args = InitArgs {
         locales: vec![locale],
         restore_position,
         app_data_dir: app.path().app_data_dir().unwrap_or_default().to_string_lossy().to_string(),
+        is_wayland,
         ..Default::default()
     };
 
@@ -151,7 +156,7 @@ pub fn setup(app: &tauri::AppHandle, args: Vec<String>) -> Option<String> {
     opening_file
 }
 
-// Check if the file is already opened. If any, returns the window label
+/* Check if the file is already opened. If any, returns the window label */
 pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> Option<String> {
     let opening_file_path = opening_file_path.unwrap_or_default();
     let state = app.state::<Mutex<OpenedWebview>>();
@@ -162,6 +167,23 @@ pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>)
     } else {
         Some(already_opened[0].to_string())
     }
+}
+
+/* Check if DisplayServer is Wayland or not */
+fn is_wayland() -> bool {
+    if let Ok(session_type) = env::var("XDG_SESSION_TYPE") {
+        match session_type.to_lowercase().as_str() {
+            "wayland" => return true,
+            "x11" => return false,
+            _ => {}
+        }
+    }
+
+    if env::var("WAYLAND_DISPLAY").is_ok() {
+        return true;
+    }
+
+    false
 }
 
 pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<String>) {

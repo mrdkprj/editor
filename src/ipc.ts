@@ -37,6 +37,7 @@ type InitArgs = {
     locales: string[];
     restore_position: boolean;
     app_data_dir: string;
+    is_wayland: boolean;
 };
 
 type ReadResult = {
@@ -77,6 +78,7 @@ type TauriCommandMap = {
     get_webview_labels: TauriCommand<undefined, Mp.OpenedWebview>;
     update_webview_label: TauriCommand<Mp.WebviewTitle, undefined>;
     is_file_opened: TauriCommand<string, string | null>;
+    bring_to_front: TauriCommand<string, undefined>;
 };
 
 export class IPCBase {

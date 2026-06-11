@@ -295,6 +295,12 @@ fn is_file_opened(app: tauri::AppHandle, payload: String) -> Option<String> {
     helper::is_file_opened(&app, Some(payload))
 }
 
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn bring_to_front(app: tauri::AppHandle, payload: String) {
+    tab::bring_to_front(app, payload)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -303,7 +309,7 @@ pub fn run() {
             let args: Vec<String> = env::args().collect();
             helper::start(app.app_handle());
             helper::setup(app.app_handle(), args);
-
+            // app.get_webview_window("Main").unwrap().open_devtools();
             #[cfg(target_os = "linux")]
             {
                 let window = app.get_webview_window("Main").unwrap();
@@ -349,6 +355,8 @@ pub fn run() {
             change_encoding,
             restore_webview,
             to_child_window,
+            #[cfg(target_os = "linux")]
+            bring_to_front,
             get_webview_labels,
             update_webview_label,
         ])

@@ -215,6 +215,7 @@ declare global {
             encoding?: string;
             restorePosition: boolean;
             appDataDir: string;
+            isWayland: boolean;
         };
 
         type ClipboardData = {
