@@ -1,3 +1,8 @@
+#[cfg(target_os = "linux")]
+use gtk::{
+    glib::Cast,
+    traits::{BoxExt, ContainerExt, OverlayExt, WidgetExt},
+};
 use tauri::Manager;
 #[cfg(target_os = "windows")]
 use windows::Win32::{
@@ -26,9 +31,6 @@ pub fn to_child_window(app: tauri::AppHandle, labels: Vec<String>) {
     }
     #[cfg(target_os = "linux")]
     {
-        use gtk::glib::Cast;
-        use gtk::traits::{ContainerExt, OverlayExt, WidgetExt};
-
         let host = app.get_webview_window("Main").unwrap();
         let vbox = host.default_vbox().unwrap();
         let host_children = vbox.children();
@@ -67,9 +69,6 @@ pub fn restore_webview(app: tauri::AppHandle, label: String) {
         }
         #[cfg(target_os = "linux")]
         {
-            use gtk::glib::Cast;
-            use gtk::traits::{BoxExt, ContainerExt, WidgetExt};
-
             let host = app.get_webview_window("Main").unwrap();
             let vbox = host.default_vbox().unwrap();
             let vbox_children = vbox.children();
@@ -91,9 +90,6 @@ pub fn restore_webview(app: tauri::AppHandle, label: String) {
 
 #[cfg(target_os = "linux")]
 pub fn bring_to_front(app: tauri::AppHandle, label: String) {
-    use gtk::glib::Cast;
-    use gtk::traits::{ContainerExt, OverlayExt, WidgetExt};
-
     let host = app.get_webview_window("Main").unwrap();
     let vbox = host.default_vbox().unwrap();
     let vbox_children = vbox.children();
