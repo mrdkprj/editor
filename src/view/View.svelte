@@ -18,13 +18,12 @@
     import Preference from "./Preference.svelte";
     import TabControl from "./TabControl.svelte";
     import Deferred from "../deferred";
-    import WaylandResize from "./WaylandResize.svelte";
+    import GtkResize from "./GtkResize.svelte";
 
     const label = getCurrentWebviewWindow().label;
     const ipc = new IPC(label);
     let grepPromise: Deferred<number> | null;
     let settingStore = new Settings();
-    let isWayland = $state(false);
     let ready = $state(false);
     // Linux only
     let handleKeyUp = false;
@@ -635,8 +634,6 @@
     const prepare = async () => {
         const e = await helper.onMainReady("root");
 
-        isWayland = e.isWayland;
-
         await settingStore.init(e.appDataDir);
         initSettings(settingStore.data);
         textState.encoding = e.encoding ?? DEFAULT_ENCODING;
@@ -702,8 +699,8 @@
 <svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} />
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
-    {#if util.isLinux() && isWayland}
-        <WaylandResize />
+    {#if util.isLinux()}
+        <GtkResize />
     {/if}
     {#if ready}
         <Bar {label} {openNewWindow} close={tryClose} {toggleMaximize} {minimize} />

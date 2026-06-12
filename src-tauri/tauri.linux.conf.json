@@ -18,7 +18,6 @@
         "transparent":false,
         "dragDropEnabled":true,
         "shadow":true,
-        "theme":"Dark",
         "url":"src/main/index.html"
       },
       {

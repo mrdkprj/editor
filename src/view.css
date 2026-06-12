@@ -7,6 +7,7 @@
     cursor: default;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .title-bar{
@@ -128,14 +129,6 @@
 .close:hover{
     background-color: var(--close-hover-bgcolor);
     color: var(--close-hover-color);
-}
-
-.viewport{
-    display:flex;
-    flex-direction: column;
-    overflow: hidden;
-    width: 100%;
-    height: 100%;
 }
 
 #root {

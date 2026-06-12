@@ -66,14 +66,14 @@
         </div>
     </div>
 {:else}
-    <div class="title-bar no-print" onmousedown={dragGtkWindow} class:bar-disabled={disabled} role="button" tabindex="-1">
+    <div class="title-bar no-print" data-tauri-drag-region={true} onmousedown={dragGtkWindow} class:bar-disabled={disabled} role="button" tabindex="-1">
         <div class="icon-area" {onmousedown} onclick={() => openNewWindow("")} onkeydown={handleKeyEvent} role="button" tabindex="-1">
             <img src={icon} alt="" width="20" height="20" />
         </div>
         <div class="menu-bar-area" {onmousedown} role="button" tabindex="-1">
             <Menubar {label} />
         </div>
-        <div class="title" title={contentState.fullPath} onmousedown={dragGtkWindow} role="button" tabindex="-1">
+        <div class="title" data-tauri-drag-region={true} title={contentState.fullPath} onmousedown={dragGtkWindow} role="button" tabindex="-1">
             {contentState.fullPath ? path.basename(contentState.fullPath) : contentState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
         </div>
         <div class="window-area">

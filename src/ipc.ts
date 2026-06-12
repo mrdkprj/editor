@@ -37,7 +37,6 @@ type InitArgs = {
     locales: string[];
     restore_position: boolean;
     app_data_dir: string;
-    is_wayland: boolean;
 };
 
 type ReadResult = {

@@ -53,6 +53,8 @@
     };
 
     const onWindowSizeChanged = async (e: ResizeEvent) => {
+        if (!active) return;
+
         await updateWindowState(e);
         await ipc.sendOthers("tabWindowSizeChange", windowState.isMaximized);
 
@@ -60,19 +62,8 @@
 
         /* On Windows, windows other than the current Windowresize are not autimatically resized */
         for (const tab of webviewTabs) {
-            if (tab.label != currentTabLabel) {
-                const webviewWindow = await WebviewWindow.getByLabel(tab.label);
-                await webviewWindow?.setSize(util.toPhysicalSize(windowState.bounds));
-            }
-        }
-    };
-
-    const onResize = async (e: ResizeEvent) => {
-        /* On Windows, resize is not autimatic */
-        if (!isLinux && active) {
-            await updateWindowState(e);
-            const toActive = await WebviewWindow.getByLabel(currentTabLabel);
-            await toActive?.setSize(util.toPhysicalSize(windowState.bounds));
+            const webviewWindow = await WebviewWindow.getByLabel(tab.label);
+            await webviewWindow?.setSize(util.toPhysicalSize(windowState.bounds));
         }
     };
 
@@ -335,7 +326,6 @@
     onMount(() => {
         ipc.receiveTauri("tauri://close-requested", beforeClose);
         ipc.receiveTauri("tauri://resize", onWindowSizeChanged);
-        ipc.receiveTauri("tauri://resize", onResize);
         ipc.receiveTauri("tauri://focus", onFocus);
         ipc.receive("toggleMaximize", toggleMaximize);
         ipc.receive("minimize", minimize);
