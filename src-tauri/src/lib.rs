@@ -106,10 +106,8 @@ fn change_theme(window: WebviewWindow, payload: String) {
         "light" => (tauri::Theme::Light, wcpopup::config::Theme::Light),
         _ => (tauri::Theme::Light, wcpopup::config::Theme::System),
     };
-    if let Some(main) = window.get_webview_window("Main") {
-        let _ = main.set_theme(Some(tauri_theme));
-    }
     let _ = window.set_theme(Some(tauri_theme));
+    helper::change_theme(window.app_handle(), tauri_theme == tauri::Theme::Dark);
     menu::change_menu_theme(window.app_handle(), menu_theme);
 }
 

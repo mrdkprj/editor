@@ -19,6 +19,11 @@ static UUID: AtomicU16 = AtomicU16::new(0);
 static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct CurrentTheme {
+    is_dark: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OpenedWebview {
     webviews: HashMap<String, WebviewTitle>,
 }
@@ -64,6 +69,7 @@ pub fn start(app: &tauri::AppHandle) {
 
     app.manage(Mutex::new(InitArgs::default()));
     app.manage(Mutex::new(OpenedWebview::default()));
+    app.manage(Mutex::new(CurrentTheme::default()));
     app.manage(smol::lock::Mutex::new(AppMenu::default()));
 
     #[cfg(target_os = "linux")]
@@ -164,6 +170,12 @@ pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>)
     }
 }
 
+pub fn change_theme(app: &tauri::AppHandle, is_dark: bool) {
+    let state = app.state::<Mutex<CurrentTheme>>();
+    let mut state = state.lock().unwrap();
+    state.is_dark = is_dark;
+}
+
 pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<String>) {
     if let Some(label) = is_file_opened(app, opening_file_path) {
         app.emit_to(
@@ -180,6 +192,13 @@ pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<Strin
     let config = &app.config().app.windows[1];
     let mut config = config.clone();
     config.label = format!("{}-{:?}", config.label, id);
+    let current_theme = app.state::<Mutex<CurrentTheme>>();
+    let current_theme = current_theme.lock().unwrap();
+    config.theme = if current_theme.is_dark {
+        Some(tauri::Theme::Dark)
+    } else {
+        Some(tauri::Theme::Light)
+    };
     tauri::WebviewWindowBuilder::from_config(app, &config).unwrap().build().unwrap();
 }
 
