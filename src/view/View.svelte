@@ -700,7 +700,6 @@
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
     {#if util.isLinux()}
-        <!-- Something(maybe Editor) prevents resize cursor -->
         <GtkResize />
     {/if}
     {#if ready}
