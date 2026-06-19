@@ -6,16 +6,16 @@ authors = ["mrdkprj"]
 edition = "2021"
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "~2.6.0", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [ "devtools", "protocol-asset"] }
+tauri = { version = "~2.11.0", features = [ "devtools", "protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
 smol = "2.0.2"
 notify-debouncer-full = "0.6.0"
 grep = "0.4.1"
 wcpopup = { version = "0.9.5", features = ["webview"] }
-zouni = { version = "0.2.0", features = ["webview2"] }
+zouni = { version = "0.2.2", features = ["webview2"] }
 globset = "0.4.18"
 chardetng = "0.1.17"
 encoding_rs = "0.8.35"
