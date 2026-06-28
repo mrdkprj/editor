@@ -667,6 +667,7 @@
             await ipc.sendTo(MAIN_LABEL, "addTab", label);
         } else {
             await thisWindow.show();
+            await thisWindow.setFocus();
         }
     };
 
