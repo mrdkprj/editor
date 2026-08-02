@@ -235,7 +235,6 @@ pub fn get_init_args(app: AppHandle) -> Result<InitArgs, String> {
 }
 
 pub fn update_title(app: &tauri::AppHandle, title: WindowTitle) {
-    println!("update_title");
     let state = app.state::<Mutex<WindowLabels>>();
     let mut state = state.lock().unwrap();
     state.labels.insert(title.label.to_string(), title.clone());

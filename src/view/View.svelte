@@ -55,7 +55,7 @@
 
     const toggleMaximize = async () => {
         if (settings.tabMode) {
-            return ipc.sendTo(MAIN_LABEL, "toggleMaximize", {});
+            return ipc.invoke("tab_request", { name: "toggleMaximize" });
         }
 
         const view = getCurrentWebviewWindow();
@@ -83,7 +83,7 @@
 
     const minimize = async () => {
         if (settings.tabMode) {
-            return ipc.sendTo(MAIN_LABEL, "minimize", {});
+            return ipc.invoke("tab_request", { name: "minimize" });
         }
 
         const view = getCurrentWebviewWindow();
@@ -654,8 +654,6 @@
             if (!toggled) {
                 await ipc.invoke("tab_request", { name: "add" });
             }
-            // await thisWindow.show();
-            // await thisWindow.setFocus();
         } else {
             await thisWindow.show();
             await thisWindow.setFocus();

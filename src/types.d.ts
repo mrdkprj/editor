@@ -72,6 +72,8 @@ declare global {
             | { name: "update"; data: WebviewTitle }
             | { name: "add"; data?: never }
             | { name: "detach"; data?: never }
+            | { name: "minimize"; data?: never }
+            | { name: "toggleMaximize"; data?: never }
             | { name: "toggleTabMode"; data: boolean };
 
         type WebviewTitle = {

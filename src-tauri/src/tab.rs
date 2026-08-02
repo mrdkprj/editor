@@ -42,6 +42,8 @@ pub enum TabRequest {
     Add,
     ToggleTabMode(bool),
     Detach,
+    ToggleMaximize,
+    Minimize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,8 +63,7 @@ pub struct WindowMode {
     pub tab_mode: bool,
     pub active_tab_label: String,
     pub close_all: bool,
-    pub maximized: bool,
-    pub minimized: bool,
+    pub window_handle: isize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -137,7 +138,7 @@ pub fn init(app: &tauri::AppHandle) {
         tauri::WindowEvent::Resized(size) => {
             let mode = cloned.state::<Mutex<WindowMode>>();
             if let Ok(mode) = mode.try_lock() {
-                if mode.tab_mode && !mode.maximized && !mode.minimized {
+                if mode.tab_mode {
                     let state = cloned.state::<Mutex<TabState>>();
                     let state = state.lock().unwrap();
                     on_resizing(&state.tabs, size.width as i32, size.height as i32);
@@ -157,6 +158,8 @@ pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
         TabRequest::CloseAll => close_all(window.app_handle()),
         TabRequest::Update(webview_title) => update(window.app_handle(), &webview_title.label, &webview_title.title, &webview_title.path),
         TabRequest::Detach => detach(window.app_handle(), window.label()),
+        TabRequest::ToggleMaximize => toggle_maximize(window.app_handle()),
+        TabRequest::Minimize => minimize(window.app_handle()),
         TabRequest::ToggleTabMode(tab_mode) => return toggle_tab_mode(window, tab_mode),
     }
     true
@@ -323,24 +326,27 @@ pub fn cancel(app: &tauri::AppHandle) {
     mode.close_all = false;
 }
 
-unsafe extern "system" fn proc(
-    hwnd: HWND,
-    umsg: u32,
-    wparam: windows::Win32::Foundation::WPARAM,
-    lparam: windows::Win32::Foundation::LPARAM,
-    _uidsubclass: usize,
-    dwrefdata: usize,
-) -> windows::Win32::Foundation::LRESULT {
-    if umsg == WM_EXITSIZEMOVE {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let state = app.state::<Mutex<WindowMode>>();
-        if let Ok(state) = state.try_lock() {
-            on_resized(app.get_webview_window(&state.active_tab_label).unwrap().hwnd().unwrap());
-        };
+pub fn toggle_maximize(app: &tauri::AppHandle) {
+    let host = app.get_webview_window("Main").unwrap();
+    if host.is_maximized().unwrap_or_default() {
+        let _ = host.unmaximize();
+        emit(app, TabEvent::Unmaximized, None);
+    } else {
+        let _ = host.maximize();
+        emit(app, TabEvent::Maximized, None);
     }
+    after_toggle(app);
+}
 
-    DefSubclassProc(hwnd, umsg, wparam, lparam)
+fn after_toggle(app: &tauri::AppHandle) {
+    let mode = app.state::<Mutex<WindowMode>>();
+    if let Ok(mode) = mode.try_lock() {
+        on_resized(mode.window_handle);
+    };
+}
+
+pub fn minimize(app: &tauri::AppHandle) {
+    let _ = app.get_webview_window("Main").unwrap().minimize();
 }
 
 fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMode, activator: &str) {
@@ -348,12 +354,12 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
 
     #[cfg(target_os = "windows")]
     {
-        unsafe {
-            let current_style = GetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE) as u32;
-            if (current_style & WS_CLIPCHILDREN.0) == 0 {
-                SetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE, (current_style | WS_CLIPCHILDREN.0) as isize);
-            }
-        }
+        // unsafe {
+        //     let current_style = GetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE) as u32;
+        //     if (current_style & WS_CLIPCHILDREN.0) == 0 {
+        //         SetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE, (current_style | WS_CLIPCHILDREN.0) as isize);
+        //     }
+        // }
 
         /* Must show parent first. Otherwise, extra top margin shows */
         let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED) };
@@ -408,11 +414,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
     }
 }
 
-#[cfg(target_os = "windows")]
-fn remove_subclass(hwnd: HWND) {
-    let _ = unsafe { RemoveWindowSubclass(hwnd, Some(proc), 200) };
-}
-
+//   host.as_ref().window().start_resize_dragging(direction);
 fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
     #[cfg(target_os = "windows")]
     {
@@ -494,21 +496,14 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
 
     let mut style = unsafe { GetWindowLongPtrW(child, GWL_STYLE) } as u32;
     style &= !(WS_POPUP.0);
+    style &= !(WS_SIZEBOX.0);
     style |= WS_CLIPSIBLINGS.0;
     style |= WS_CHILD.0;
     unsafe { SetWindowLongPtrW(child, GWL_STYLE, style as isize) };
-    //test
-    unsafe {
-        let mut ex_style = GetWindowLongPtrW(child, GWL_EXSTYLE) as u32;
-        ex_style &= !(WS_EX_APPWINDOW.0);
-        ex_style |= WS_EX_TOOLWINDOW.0;
-        SetWindowLongPtrW(child, GWL_EXSTYLE, ex_style as isize);
-    }
-    //test
 
     unsafe { SetParent(child, Some(parent)).unwrap() };
 
-    let _ = unsafe { SetWindowPos(child, Some(HWND_BOTTOM), -tab.inset.x, -1, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_FRAMECHANGED | SWP_NOACTIVATE) };
+    let _ = unsafe { SetWindowPos(child, Some(HWND_BOTTOM), -tab.inset.x, 4, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_FRAMECHANGED | SWP_NOACTIVATE) };
 }
 
 fn bring_to_front(_app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, label: String) {
@@ -592,34 +587,42 @@ fn detach_from_tab(removed: &Tab, show: bool) {
     }
 }
 
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn proc(
+    hwnd: HWND,
+    umsg: u32,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+    _uidsubclass: usize,
+    dwrefdata: usize,
+) -> windows::Win32::Foundation::LRESULT {
+    if umsg == WM_EXITSIZEMOVE {
+        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
+        let app = &*item_data_ptr;
+        let mode = app.state::<Mutex<WindowMode>>();
+        if let Ok(mode) = mode.try_lock() {
+            on_resized(mode.window_handle);
+        };
+    }
+
+    DefSubclassProc(hwnd, umsg, wparam, lparam)
+}
+
+#[cfg(target_os = "windows")]
+fn remove_subclass(hwnd: HWND) {
+    let _ = unsafe { RemoveWindowSubclass(hwnd, Some(proc), 200) };
+}
+
 fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
     for tab in tabs {
         let _ = unsafe {
-            SetWindowPos(
-                to_hwnd(tab.window_handle),
-                None,
-                -tab.inset.x,
-                0,
-                width + tab.inset.x * 2,
-                height + tab.inset.y * 2,
-                //SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOCOPYBITS | SWP_NOREDRAW,
-                SWP_NOMOVE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOSENDCHANGING,
-            )
+            SetWindowPos(to_hwnd(tab.window_handle), None, 0, 0, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_NOMOVE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOSENDCHANGING)
         };
-        // unsafe { remove_dwm_top_inset2(to_hwnd(tab.window_handle)) };
-        // let _ = unsafe { SetWindowPos(to_hwnd(tab.window_handle), Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING) };
-        // unsafe {
-        //     if let Ok(hdwp) = BeginDeferWindowPos(1) {
-        //         if let Ok(hdwp) = DeferWindowPos(hdwp, to_hwnd(tab.window_handle), Some(HWND_TOP), 0, 0, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_NOMOVE | SWP_NOACTIVATE) {
-        //             let _ = EndDeferWindowPos(hdwp);
-        //         }
-        //     }
-        // }
     }
 }
 
-fn on_resized(hwnd: HWND) {
-    let _ = unsafe { SetWindowPos(hwnd, Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
+fn on_resized(window_handle: isize) {
+    let _ = unsafe { SetWindowPos(to_hwnd(window_handle), Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
 }
 
 fn to_hwnd(ptr: isize) -> HWND {
@@ -639,7 +642,6 @@ fn get_exact_hwnd_insets(hwnd: HWND) -> WindowInset {
         let mut client_rect = RECT::default();
         let _ = GetClientRect(hwnd, &mut client_rect);
 
-        // Convert the Client top-left corner (0,0) to absolute screen coordinates
         let mut client_top_left = POINT {
             x: 0,
             y: 0,
@@ -650,7 +652,6 @@ fn get_exact_hwnd_insets(hwnd: HWND) -> WindowInset {
         let client_width = client_rect.right - client_rect.left;
         let window_height = window_rect.bottom - window_rect.top;
         let client_height = client_rect.bottom - client_rect.top;
-        // Calculate the exact pixel difference
 
         let left_inset = window_width - client_width;
         let top_inset = window_height - client_height;
