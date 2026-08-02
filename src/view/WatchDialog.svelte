@@ -6,6 +6,7 @@
 
     let { label }: { label: string } = $props();
 
+    // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
     let doNotNotify = $state(false);
 

@@ -20,6 +20,7 @@
         toggleMaximize: () => void;
         minimize: () => void;
     } = $props();
+
     let disabled = $derived($appState.anyDialogOpened);
 
     const onmousedown = async (e: MouseEvent) => {

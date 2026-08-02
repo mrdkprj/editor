@@ -4,14 +4,9 @@
     import util from "../util";
     import { IPC } from "../ipc";
 
-    let {
-        label,
-        switchTab,
-        closeTab,
-        onTabScroll,
-        onTabMoved,
-    }: { label: string; switchTab: (label: string) => void; closeTab: (label: string) => void; onTabScroll: (scrollLeft: number) => void; onTabMoved: () => void } = $props();
+    let { label }: { label: string } = $props();
 
+    // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
     let tab: HTMLDivElement;
 
@@ -19,10 +14,14 @@
         tab.scrollLeft = tabs.scrollLeft;
     });
 
+    const closeTab = async (label: string) => {
+        await ipc.sendTo(label, "tab_event", { name: "close" });
+    };
+
     const onTabClick = (e: MouseEvent, selected: string) => {
         e.preventDefault();
         if (selected != label) {
-            switchTab(selected);
+            ipc.invoke("tab_request", { name: "select", data: selected });
         }
     };
 
@@ -32,7 +31,7 @@
         } else {
             tab.scrollBy(-20, 0);
         }
-        onTabScroll(tab.scrollLeft);
+        ipc.sendOthers("tab_event", { name: "scrolled", data: tab.scrollLeft });
     };
 
     const startDrag = async (e: DragEvent) => {
@@ -106,7 +105,7 @@
         if (!tabState.dragging) return;
         ipc.sendTo(label, "dragEnd", {});
         tabState.dragging = false;
-        onTabMoved();
+        ipc.invoke("tab_request", { name: "reorder", data: tabs.webviews });
     };
 
     const onMouseDown = () => {
@@ -123,7 +122,7 @@
     };
 </script>
 
-<div class="tab" bind:this={tab} onwheel={onmousewheel}>
+<div class="tab no-print" bind:this={tab} onwheel={onmousewheel}>
     {#each tabs.webviews as tab (tab.label)}
         <div
             id={tab.label}

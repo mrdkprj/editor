@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
     import { onMount } from "svelte";
     import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { Webview } from "@tauri-apps/api/webview";
@@ -346,4 +346,7 @@
 
 <svelte:document ondragover={(e) => e.preventDefault()} onkeydown={onKeyDown} />
 
+<div class="viewport"><div class="title-bar no-print"></div></div> -->
+
+<!-- <div style="background:blue;width:1000px;height:200px;"></div> -->
 <div class="viewport"><div class="title-bar no-print"></div></div>

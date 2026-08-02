@@ -19,6 +19,7 @@
     import TabControl from "./TabControl.svelte";
     import Deferred from "../deferred";
     import GtkResize from "./GtkResize.svelte";
+    import { getCurrentWebview } from "@tauri-apps/api/webview";
 
     const label = getCurrentWebviewWindow().label;
     const ipc = new IPC(label);
@@ -225,7 +226,7 @@
                 case "w":
                     e.preventDefault();
                     if (settings.tabMode) {
-                        closeTab(label);
+                        tryClose();
                     } else {
                         showPreference();
                     }
@@ -440,15 +441,8 @@
         await helper.abortWatch();
     };
 
-    const onAnotherWindowClose = (label: string) => {
-        const index = tabs.webviews.findIndex((tab) => tab.label == label);
-        if (index >= 0) {
-            tabs.webviews.splice(index, 1);
-        }
-    };
-
     const beforeClose = async () => {
-        if (!contentState.isDirty) return tryDestory();
+        if (!contentState.isDirty) return destroy();
 
         const thisWindow = getCurrentWebviewWindow();
         const isMinimized = await thisWindow.isMinimized();
@@ -458,29 +452,28 @@
         const name = contentState.fullPath ? path.basename(contentState.fullPath) : UNTITLED;
         const shouldSave = await helper.confirm(`"${name}" is changed. Do you want to save?`);
 
-        if (shouldSave.cancelled) return;
-        if (shouldSave.button == "No") return tryDestory();
+        if (shouldSave.cancelled) return cancelCloseAll();
+        if (shouldSave.button == "No") return destroy();
 
         const saved = await trySaveFile();
         if (saved) {
-            await tryDestory();
+            await destroy();
+        } else {
+            await cancelCloseAll();
         }
     };
 
     const tryClose = async () => {
         if (settings.tabMode) {
-            await ipc.sendTo(MAIN_LABEL, "closeAll", {});
+            await ipc.invoke("tab_request", { name: "closeAll" });
         } else {
             await getCurrentWebviewWindow().close();
         }
     };
 
-    const tryDestory = async () => {
+    const cancelCloseAll = async () => {
         if (settings.tabMode) {
-            /* Switch tab before "destroy" to prevent flickering */
-            await ipc.sendOthers("closed", label);
-        } else {
-            destroy();
+            await ipc.invoke("tab_request", { name: "cancel" });
         }
     };
 
@@ -488,8 +481,8 @@
         const thisWindow = getCurrentWebviewWindow();
 
         /* On Linux, must move webview back to its original parent window */
-        if (settings.tabMode && util.isLinux()) {
-            await ipc.invoke("restore_webview", label);
+        if (settings.tabMode) {
+            await ipc.invoke("tab_request", { name: "detach" });
         }
 
         settingStore.data = $state.snapshot(settings);
@@ -532,56 +525,73 @@
         settingStore.data = $state.snapshot(settings);
         settingStore.data.tabMode = !settingStore.data.tabMode;
         await settingStore.save();
+        dispatch({ type: "toggleTabMode", value: settingStore.data.tabMode });
     };
 
     const toggleTabMode = async () => {
-        if (settings.tabMode) {
-            saveTabMode();
-            await ipc.sendTo(MAIN_LABEL, "endTabMode", {});
-        } else {
-            saveTabMode();
-            await ipc.sendTo(MAIN_LABEL, "startTabMode", label);
+        await saveTabMode();
+        await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
+    };
+
+    const onTabEvent = async (e: Mp.TabEvent) => {
+        switch (e.name) {
+            case "activated": {
+                getCurrentWebview().setFocus();
+                break;
+            }
+            case "maximized": {
+                onTabWindowSizeChangeEvent(true);
+                return;
+            }
+            case "unmaximized": {
+                onTabWindowSizeChangeEvent(false);
+                return;
+            }
+            case "titleChanged": {
+                updateTabTitle(e.data);
+                break;
+            }
+            case "reordered": {
+                tabs.webviews = e.data;
+                break;
+            }
+            case "closed": {
+                let index = tabs.webviews.findIndex((tab) => tab.label == e.data);
+                tabs.webviews.splice(index, 1);
+                break;
+            }
+            case "modeChanged": {
+                dispatch({ type: "toggleTabMode", value: e.data.tab_mode });
+                if (e.data.tabs.length) {
+                    tabs.webviews = e.data.tabs;
+                }
+                break;
+            }
+            case "added": {
+                tabs.webviews.push(e.data);
+                break;
+            }
+            case "close": {
+                beforeClose();
+                break;
+            }
+            case "scrolled": {
+                tabs.scrollLeft = e.data;
+                break;
+            }
         }
-    };
-
-    const onEnterTabMode = async (webviewTabs: Mp.WebviewTab[]) => {
-        tabs.webviews = webviewTabs;
-        dispatch({ type: "toggleTabMode", value: true });
-    };
-
-    const onExitTabMode = (isMaximized: boolean) => {
-        dispatch({ type: "toggleTabMode", value: false });
-        dispatch({ type: "isMaximized", value: isMaximized });
-
-        tabs.webviews = [];
-    };
-
-    const switchTab = (label: string) => {
-        ipc.sendTo(MAIN_LABEL, "switchTab", label);
-    };
-
-    const closeTab = (label: string) => {
-        ipc.sendTo(MAIN_LABEL, "closeTab", label);
-    };
-
-    const onTabScroll = (scrollLeft: number) => {
-        ipc.sendOthers("scrollTab", scrollLeft);
-    };
-
-    const onTabMoved = () => {
-        ipc.sendOthers("updateTab", { tabs: $state.snapshot(tabs.webviews) });
     };
 
     const scrollTab = (scrollLeft: number) => {
         tabs.scrollLeft = scrollLeft;
     };
 
-    const onTabActivated = () => {
-        if (grepPromise) {
-            grepPromise.resolve(0);
-            grepPromise = null;
-        }
-    };
+    // const onTabActivated = () => {
+    //     if (grepPromise) {
+    //         grepPromise.resolve(0);
+    //         grepPromise = null;
+    //     }
+    // };
 
     const updateTabTitle = (e: Mp.WebviewTitle) => {
         tabs.webviews
@@ -592,23 +602,12 @@
             });
     };
 
-    const onUpdateTab = (e: Mp.UpdateTabsEvent) => {
-        if (e.webviewTitle) {
-            updateTabTitle(e.webviewTitle);
-        }
-
-        if (e.tabs) {
-            tabs.webviews = e.tabs;
-        }
-    };
-
     const updateThisTitle = async (fullPath: string, isDirty: boolean, mode: Mp.Mode) => {
         const title = getTitle(fullPath, isDirty, mode);
         const path = contentState.fullPath;
         const webviewTitle = { label, title, path };
         updateTabTitle(webviewTitle);
-        ipc.invoke("update_webview_label", webviewTitle);
-        ipc.sendOthers("updateTab", { webviewTitle });
+        ipc.invoke("update_title", webviewTitle);
         await getCurrentWebviewWindow().setTitle(title);
     };
 
@@ -616,19 +615,6 @@
         const mark = isDirty ? "*" : "";
         const title = fullPath ? `${path.basename(fullPath)}${mark}` : mode == "grep" ? `${GREP}${mark}` : `${UNTITLED}${mark}`;
         return title;
-    };
-
-    const bringToFront = async () => {
-        if (settings.tabMode) {
-            switchTab(label);
-        } else {
-            const thiswindow = getCurrentWebviewWindow();
-            const minimized = await thiswindow.isMinimized();
-            if (minimized) {
-                await thiswindow.show();
-            }
-            thiswindow.setFocus();
-        }
     };
 
     const prepare = async () => {
@@ -664,7 +650,12 @@
         }
 
         if (settings.tabMode) {
-            await ipc.sendTo(MAIN_LABEL, "addTab", label);
+            const toggled = await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
+            if (!toggled) {
+                await ipc.invoke("tab_request", { name: "add" });
+            }
+            // await thisWindow.show();
+            // await thisWindow.setFocus();
         } else {
             await thisWindow.show();
             await thisWindow.setFocus();
@@ -678,17 +669,11 @@
         ipc.receive("contextmenu_event", handleContextMenuEvent);
         ipc.receiveTauri<Mp.FileDropEvent>("tauri://drag-drop", onFileDrop);
         ipc.receive("grep_progress", onGrepProgress);
-        ipc.receive("tabActivated", onTabActivated);
-        ipc.receive("bring_to_frong", bringToFront);
         ipc.receive("tabWindowSizeChange", onTabWindowSizeChangeEvent);
         ipc.receive("settingChanged", onSettingsChange);
         ipc.receive("reloadSettings", onReloadSettings);
-        ipc.receive("enterTabMode", onEnterTabMode);
-        ipc.receive("exitTabMode", onExitTabMode);
-        ipc.receive("updateTab", onUpdateTab);
+        ipc.receive("tab_event", onTabEvent);
         ipc.receive("scrollTab", scrollTab);
-        ipc.receive("closed", onAnotherWindowClose);
-        ipc.receive("destory", destroy);
 
         return () => {
             ipc.release();
@@ -718,7 +703,7 @@
             <Preference {label} />
         {/if}
         {#if settings.tabMode}
-            <TabControl {label} {switchTab} {closeTab} {onTabScroll} {onTabMoved} />
+            <TabControl {label} />
         {/if}
         <div class="editor">
             <Editor

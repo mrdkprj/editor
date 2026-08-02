@@ -427,6 +427,12 @@
         updateModel(restoreDecoration);
     };
 
+    const onTabEvent = (e: Mp.TabEvent) => {
+        if (e.name == "activated") {
+            restoreFocus();
+        }
+    };
+
     const restoreFocus = () => {
         if (state) {
             editor.restoreViewState(state);
@@ -628,7 +634,7 @@
         ipc.receive("encoding_changed", onEncodingChanged);
         ipc.receive("settingChanged", reflectSettings);
         ipc.receive("refelect_settings", () => updateModel(true));
-        ipc.receive("tabActivated", restoreFocus);
+        ipc.receive("tab_event", onTabEvent);
         ipc.receive("dragEnd", restoreFocus);
 
         return () => {

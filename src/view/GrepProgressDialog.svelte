@@ -6,6 +6,7 @@
 
     let { label, abortGrep }: { label: string; abortGrep: () => Promise<void> } = $props();
 
+    // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
 
     const onkeydown = (e: KeyboardEvent) => {

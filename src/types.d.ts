@@ -21,20 +21,10 @@ declare global {
         refelect_settings: Mp.AnyEvent;
         settingChanged: Mp.SettingChangeType;
         reloadSettings: Mp.AnyEvent;
-        startTabMode: string;
-        endTabMode: Mp.AnyEvent;
-        enterTabMode: Mp.WebviewTab[];
-        exitTabMode: boolean;
-        switchTab: string;
-        addTab: string;
-        updateTab: Mp.UpdateTabsEvent;
-        tabActivated: Mp.AnyEvent;
-        closeTab: string;
+        closeTab: Mp.AnyEvent;
         scrollTab: number;
-        closed: string;
-        destory: Mp.TabbedWebview;
-        closeAll: Mp.AnyEvent;
         dragEnd: Mp.AnyEvent;
+        tab_event: Mp.TabEvent;
     };
 
     namespace Mp {
@@ -61,6 +51,28 @@ declare global {
             | "searchHighlight"
             | "searchHighlightBackground"
             | "link";
+
+        type TabEvent =
+            | { name: "maximized"; data?: never }
+            | { name: "unmaximized"; data?: never }
+            | { name: "titleChanged"; data: WebviewTitle }
+            | { name: "reordered"; data: Mp.WebviewTitle[] }
+            | { name: "closed"; data: string }
+            | { name: "modeChanged"; data: { tab_mode: boolean; tabs: WebviewTitle[] } }
+            | { name: "close"; data?: never }
+            | { name: "scrolled"; data: number }
+            | { name: "activated"; data?: never }
+            | { name: "added"; data: WebviewTitle };
+
+        type TabRequest =
+            | { name: "select"; data: string }
+            | { name: "reorder"; data: WebviewTitle[] }
+            | { name: "closeAll"; data?: never }
+            | { name: "cancel"; data?: never }
+            | { name: "update"; data: WebviewTitle }
+            | { name: "add"; data?: never }
+            | { name: "detach"; data?: never }
+            | { name: "toggleTabMode"; data: boolean };
 
         type WebviewTitle = {
             label: string;

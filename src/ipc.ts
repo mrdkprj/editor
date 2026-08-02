@@ -72,12 +72,9 @@ type TauriCommandMap = {
     abort_grep: TauriCommand<undefined, undefined>;
     is_file: TauriCommand<string, boolean>;
     change_encoding: TauriCommand<Mp.EncodeArg, string>;
-    to_child_window: TauriCommand<string[], undefined>;
-    restore_webview: TauriCommand<string, undefined>;
-    get_webview_labels: TauriCommand<undefined, Mp.OpenedWebview>;
-    update_webview_label: TauriCommand<Mp.WebviewTitle, undefined>;
+    update_title: TauriCommand<Mp.WebviewTitle, null>;
     is_file_opened: TauriCommand<string, string | null>;
-    bring_to_front: TauriCommand<string, undefined>;
+    tab_request: TauriCommand<Mp.TabRequest, boolean>;
 };
 
 export class IPCBase {
