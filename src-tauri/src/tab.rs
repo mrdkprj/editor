@@ -12,8 +12,7 @@ use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
 use windows::Win32::{
     Foundation::{HWND, POINT, RECT},
     Graphics::Gdi::ClientToScreen,
-    //UI::WindowsAndMessaging::{GetWindowLongPtrW, SetParent, SetWindowLongPtrW, GWL_STYLE, WS_CHILD, WS_POPUP},
-    UI::WindowsAndMessaging::*,
+    UI::{Shell::RemoveWindowSubclass, WindowsAndMessaging::*},
 };
 
 use crate::helper::WindowLabels;
@@ -64,8 +63,6 @@ pub struct WindowMode {
     pub close_all: bool,
     pub maximized: bool,
     pub minimized: bool,
-    pub window_handle: isize,
-    pub resizing: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -127,19 +124,7 @@ const OFF_SCREEN: i32 = -30000;
 pub fn init(app: &tauri::AppHandle) {
     app.manage(Mutex::new(TabState::default()));
     app.manage(Mutex::new(WindowMode::default()));
-    println!("init");
-    // let cloned = app.clone();
-    // app.get_webview_window("Main").unwrap().on_window_event(move |e| {
-    //     if let tauri::WindowEvent::Resized(size) = e {
-    //         let width = size.width as i32;
-    //         let height = size.height as i32;
-    //         let state = cloned.state::<Mutex<TabState>>();
-    //         let state = state.lock().unwrap();
-    //         for tab in &state.webviews {
-    //             let _ = unsafe { SetWindowPos(to_hwnd(tab.window_handle), None, 0, 0, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_NOMOVE | SWP_NOZORDER) };
-    //         }
-    //     }
-    // });
+
     let cloned = app.clone();
     app.get_webview_window("Main").unwrap().on_window_event(move |e| match e {
         tauri::WindowEvent::Focused(focused) => {
@@ -150,15 +135,14 @@ pub fn init(app: &tauri::AppHandle) {
             }
         }
         tauri::WindowEvent::Resized(size) => {
-            // let mode_state = cloned.state::<Mutex<WindowMode>>();
-            // let _ = unsafe { SetWindowPos(cloned.get_webview_window("Main").unwrap().hwnd().unwrap(), Some(HWND_BOTTOM), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
-            // if let Ok(mode) = mode_state.try_lock() {
-            //     if mode.tab_mode && !mode.maximized && !mode.minimized {
-            //         let state = cloned.state::<Mutex<TabState>>();
-            //         let state = state.lock().unwrap();
-            //         on_resize(&state.tabs, size.width as i32, size.height as i32);
-            //     }
-            // };
+            let mode = cloned.state::<Mutex<WindowMode>>();
+            if let Ok(mode) = mode.try_lock() {
+                if mode.tab_mode && !mode.maximized && !mode.minimized {
+                    let state = cloned.state::<Mutex<TabState>>();
+                    let state = state.lock().unwrap();
+                    on_resizing(&state.tabs, size.width as i32, size.height as i32);
+                }
+            };
         }
         _ => {}
     });
@@ -223,6 +207,7 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
             exit_tab_mode(app, &state.tabs, &mut mode);
         };
     }
+
     let titles: Vec<WebviewTitle> = if mode.tab_mode {
         state
             .tabs
@@ -236,6 +221,7 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     } else {
         Vec::new()
     };
+
     emit(
         app,
         TabEvent::ModeChanged(ModeChangedArg {
@@ -337,33 +323,6 @@ pub fn cancel(app: &tauri::AppHandle) {
     mode.close_all = false;
 }
 
-pub unsafe fn remove_dwm_top_inset(app: &tauri::AppHandle, parent: HWND) {
-    let _ = SetWindowSubclass(parent, Some(proc), 200, Box::into_raw(Box::new(app.clone())) as usize);
-}
-/*
-pub unsafe fn remove_dwm_top_inset(parent: HWND) {
-    // Setting margins to -1 or 0 removes DWM-rendered non-client top borders
-    let margins = MARGINS {
-        cxLeftWidth: 0,
-        cxRightWidth: 0,
-        cyTopHeight: 0,
-        cyBottomHeight: 0,
-    };
-    let _ = DwmExtendFrameIntoClientArea(parent, &margins);
-}
- */
-
-// pub fn disable_parent_rounded_corners(hwnd: HWND) {
-//     unsafe {
-//         windows::Win32::Graphics::Dwm::DwmSetWindowAttribute(
-//             hwnd,
-//             windows::Win32::Graphics::Dwm::DWMWA_WINDOW_CORNER_PREFERENCE,
-//             &windows::Win32::Graphics::Dwm::DWMWCP_ROUND as *const _ as *const _,
-//             size_of::<windows::Win32::Graphics::Dwm::DWM_WINDOW_CORNER_PREFERENCE>() as u32,
-//         )
-//         .unwrap()
-//     };
-// }
 unsafe extern "system" fn proc(
     hwnd: HWND,
     umsg: u32,
@@ -372,79 +331,18 @@ unsafe extern "system" fn proc(
     _uidsubclass: usize,
     dwrefdata: usize,
 ) -> windows::Win32::Foundation::LRESULT {
-    if umsg == WM_WINDOWPOSCHANGING {
+    if umsg == WM_EXITSIZEMOVE {
         let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        if !item_data_ptr.is_null() {
-            let app = &*item_data_ptr;
-            let mode = app.state::<Mutex<WindowMode>>();
-            if let Ok(mode) = mode.try_lock() {
-                if mode.resizing {
-                    println!("WM_WINDOWPOSCHANGING");
-                    let pos = &mut *(lparam.0 as *mut WINDOWPOS);
-                    // pos.flags = SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_DEFERERASE | SWP_NOSIZE;
-                    // pos.flags |= SWP_NOCOPYBITS;
-                    // pos.flags |= SWP_NOZORDER;
-                    // pos.hwndInsertAfter = HWND_BOTTOM;
-                    // let _ = SetWindowPos(hwnd, None, 0, 0, pos.cx, pos.cy, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOREDRAW);
-                    // let state = app.state::<Mutex<TabState>>();
-                    // if let Ok(state) = state.try_lock() {
-                    //     on_resize(&state.tabs, pos.cx, pos.cy);
-                    // };
-                    // return windows::Win32::Foundation::LRESULT(0);
-
-                    if mode.window_handle > 0 {
-                        pos.flags = SWP_NOSIZE;
-                        pos.hwndInsertAfter = to_hwnd(mode.window_handle);
-                    }
-                    // pos.flags |= SWP_NOZORDER;
-
-                    let _ = SetWindowPos(hwnd, None, 0, 0, pos.cx, pos.cy, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING);
-                    // disable_parent_rounded_corners(hwnd);
-                    let state = app.state::<Mutex<TabState>>();
-                    if let Ok(state) = state.try_lock() {
-                        on_resize(&state.tabs, pos.cx, pos.cy);
-                    };
-                }
-            };
-        }
-        // Tell DWM NOT to blit old surface bits during live drag
-        // pos.flags |= SWP_NOCOPYBITS;
-        // pos.flags |= SWP_NOZORDER;
-    }
-    if umsg == WM_SIZING {
-        println!("size");
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        if !item_data_ptr.is_null() {
-            let app = &*item_data_ptr;
-            let state = app.state::<Mutex<WindowMode>>();
-            if let Ok(mut state) = state.try_lock() {
-                state.resizing = true;
-                // let mut client_rect = RECT::default();
-                // if GetClientRect(hwnd, &mut client_rect).is_ok() {
-                //     let width = client_rect.right - client_rect.left;
-                //     let height = client_rect.bottom - client_rect.top;
-                //     let _ = SetWindowPos(hwnd, None, 0, 0, width, height, SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOSENDCHANGING);
-                //     let state = app.state::<Mutex<TabState>>();
-                //     if let Ok(state) = state.try_lock() {
-                //         on_resize(&state.tabs, width, height);
-                //     };
-                // }
-            };
-        }
-    }
-    if umsg == WM_SIZE {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        if !item_data_ptr.is_null() {
-            let app = &*item_data_ptr;
-            let state = app.state::<Mutex<WindowMode>>();
-            if let Ok(mut state) = state.try_lock() {
-                state.resizing = false;
-            };
-        }
+        let app = &*item_data_ptr;
+        let state = app.state::<Mutex<WindowMode>>();
+        if let Ok(state) = state.try_lock() {
+            on_resized(app.get_webview_window(&state.active_tab_label).unwrap().hwnd().unwrap());
+        };
     }
 
     DefSubclassProc(hwnd, umsg, wparam, lparam)
 }
+
 fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMode, activator: &str) {
     let host = app.get_webview_window("Main").unwrap();
 
@@ -480,8 +378,8 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
         bring_to_front(app, tabs, mode, activator.to_string());
 
         host.set_position(pos).unwrap();
-        println!("assign");
-        unsafe { remove_dwm_top_inset(app, host.hwnd().unwrap()) };
+
+        let _ = unsafe { SetWindowSubclass(host.hwnd().unwrap(), Some(proc), 200, Box::into_raw(Box::new(app.clone())) as usize) };
     }
     #[cfg(target_os = "linux")]
     {
@@ -510,6 +408,11 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
     }
 }
 
+#[cfg(target_os = "windows")]
+fn remove_subclass(hwnd: HWND) {
+    let _ = unsafe { RemoveWindowSubclass(hwnd, Some(proc), 200) };
+}
+
 fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
     #[cfg(target_os = "windows")]
     {
@@ -520,6 +423,8 @@ fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
         for tab in tabs.iter() {
             detach_from_tab(tab, true);
         }
+
+        remove_subclass(host.hwnd().unwrap());
         host.hide().unwrap();
     }
     #[cfg(target_os = "linux")]
@@ -554,7 +459,12 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
 
     if let Some(index) = state.tabs.iter().position(|tab| tab.label == label) {
         let _ = state.tabs.remove(index);
-        if !state.tabs.is_empty() {
+        if state.tabs.is_empty() {
+            let host = app.get_webview_window("Main").unwrap();
+            remove_subclass(host.hwnd().unwrap());
+            let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
+            let _ = host.hide();
+        } else {
             let is_last = index == state.tabs.len();
 
             if mode.active_tab_label == label && !state.tabs.is_empty() {
@@ -682,7 +592,7 @@ fn detach_from_tab(removed: &Tab, show: bool) {
     }
 }
 
-fn on_resize(tabs: &[Tab], width: i32, height: i32) {
+fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
     for tab in tabs {
         let _ = unsafe {
             SetWindowPos(
@@ -696,7 +606,7 @@ fn on_resize(tabs: &[Tab], width: i32, height: i32) {
                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOSENDCHANGING,
             )
         };
-
+        // unsafe { remove_dwm_top_inset2(to_hwnd(tab.window_handle)) };
         // let _ = unsafe { SetWindowPos(to_hwnd(tab.window_handle), Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING) };
         // unsafe {
         //     if let Ok(hdwp) = BeginDeferWindowPos(1) {
@@ -706,6 +616,10 @@ fn on_resize(tabs: &[Tab], width: i32, height: i32) {
         //     }
         // }
     }
+}
+
+fn on_resized(hwnd: HWND) {
+    let _ = unsafe { SetWindowPos(hwnd, Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
 }
 
 fn to_hwnd(ptr: isize) -> HWND {
