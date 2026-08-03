@@ -477,7 +477,7 @@
         }
     };
 
-    const destroy = async (host?: Mp.WebviewTab) => {
+    const destroy = async () => {
         const thisWindow = getCurrentWebviewWindow();
 
         /* On Linux, must move webview back to its original parent window */
@@ -487,17 +487,13 @@
 
         settingStore.data = $state.snapshot(settings);
 
-        if (host) {
-            settingStore.data.isMaximized = host.isMaximized;
-            settingStore.data.bounds = host.bounds;
-        } else {
-            const isMinimized = await thisWindow.isMinimized();
-            if (!settings.isMaximized && !isMinimized) {
-                const position = await thisWindow.innerPosition();
-                const size = await thisWindow.innerSize();
-                settingStore.data.bounds = util.toBounds(position, size);
-            }
+        const isMinimized = await thisWindow.isMinimized();
+        if (!settings.isMaximized && !isMinimized) {
+            const position = await thisWindow.innerPosition();
+            const size = await thisWindow.innerSize();
+            settingStore.data.bounds = util.toBounds(position, size);
         }
+
         settingStore.data.grepHistory = $appState.grepRequest;
         await helper.unlistenAll();
         await settingStore.save();

@@ -51,6 +51,7 @@ struct ModeChangedArg {
     tab_mode: bool,
     tabs: Vec<WebviewTitle>,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Title {
     label: String,
@@ -64,6 +65,11 @@ pub struct WindowMode {
     pub active_tab_label: String,
     pub close_all: bool,
     pub window_handle: isize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ChildState {
+    pub resizing: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -125,6 +131,7 @@ const OFF_SCREEN: i32 = -30000;
 pub fn init(app: &tauri::AppHandle) {
     app.manage(Mutex::new(TabState::default()));
     app.manage(Mutex::new(WindowMode::default()));
+    app.manage(Mutex::new(ChildState::default()));
 
     let cloned = app.clone();
     app.get_webview_window("Main").unwrap().on_window_event(move |e| match e {
@@ -424,6 +431,7 @@ fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
 
         for tab in tabs.iter() {
             detach_from_tab(tab, true);
+            after_detach(tab.window_handle);
         }
 
         remove_subclass(host.hwnd().unwrap());
@@ -488,6 +496,11 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
 fn before_attach(window: &tauri::WebviewWindow) {
     /* On Windows, window must be shown before attach. Otherwise, focus can be moved to the parent */
     let _ = unsafe { SetWindowPos(window.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
+    let _ = unsafe { SetWindowSubclass(window.hwnd().unwrap(), Some(child_proc), 300, Box::into_raw(Box::new(window.app_handle().clone())) as usize) };
+}
+
+fn after_detach(window_handle: isize) {
+    let _ = unsafe { RemoveWindowSubclass(to_hwnd(window_handle), Some(child_proc), 300) };
 }
 
 fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i32) {
@@ -500,10 +513,12 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
     style |= WS_CLIPSIBLINGS.0;
     style |= WS_CHILD.0;
     unsafe { SetWindowLongPtrW(child, GWL_STYLE, style as isize) };
+    let ex_style = unsafe { GetWindowLongPtrW(child, GWL_EXSTYLE) } as u32;
+    unsafe { SetWindowLongPtrW(child, GWL_EXSTYLE, (ex_style | WS_EX_LAYERED.0) as isize) };
 
     unsafe { SetParent(child, Some(parent)).unwrap() };
 
-    let _ = unsafe { SetWindowPos(child, Some(HWND_BOTTOM), -tab.inset.x, 4, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_FRAMECHANGED | SWP_NOACTIVATE) };
+    let _ = unsafe { SetWindowPos(child, Some(HWND_BOTTOM), -tab.inset.x, 0, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_FRAMECHANGED | SWP_NOACTIVATE) };
 }
 
 fn bring_to_front(_app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, label: String) {
@@ -578,12 +593,14 @@ fn detach_from_tab(removed: &Tab, show: bool) {
         unsafe { SetWindowLongPtrW(to_hwnd(removed.window_handle), GWLP_HWNDPARENT, owner) };
     }
 
-    let _ = unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED) };
-
     if show {
-        let _ = unsafe { ShowWindow(to_hwnd(removed.window_handle), SW_SHOW) };
+        let _ =
+            unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED | SWP_SHOWWINDOW) };
+        // let _ = unsafe { ShowWindow(to_hwnd(removed.window_handle), SW_SHOW) };
     } else {
-        let _ = unsafe { ShowWindow(to_hwnd(removed.window_handle), SW_HIDE) };
+        let _ = unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, OFF_SCREEN, OFF_SCREEN, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED | SWP_SHOWWINDOW) };
+        let _ = unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, 0, 0, SWP_NOSIZE | SWP_HIDEWINDOW) };
+        // let _ = unsafe { ShowWindow(to_hwnd(removed.window_handle), SW_HIDE) };
     }
 }
 
@@ -604,6 +621,52 @@ unsafe extern "system" fn proc(
             on_resized(mode.window_handle);
         };
     }
+
+    DefSubclassProc(hwnd, umsg, wparam, lparam)
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn child_proc(
+    hwnd: HWND,
+    umsg: u32,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+    _uidsubclass: usize,
+    dwrefdata: usize,
+) -> windows::Win32::Foundation::LRESULT {
+    // if umsg == WM_WINDOWPOSCHANGING {
+    //     let item_data_ptr = dwrefdata as *const tauri::AppHandle;
+    //     let app = &*item_data_ptr;
+    //     let mode = app.state::<Mutex<ChildState>>();
+    //     if let Ok(mode) = mode.try_lock() {
+    //         if mode.resizing {
+    //             let pos = &mut *(lparam.0 as *mut WINDOWPOS);
+    //             // Tell DWM NOT to blit old surface bits during live drag
+    //             pos.flags |= SWP_NOMOVE;
+    //         }
+    //     };
+    // }
+
+    if umsg == WM_ENTERSIZEMOVE {
+        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
+        let app = &*item_data_ptr;
+        let mode = app.state::<Mutex<ChildState>>();
+        if let Ok(mut mode) = mode.try_lock() {
+            mode.resizing = true;
+            let _ = SendMessageW(app.get_webview_window("Main").unwrap().hwnd().unwrap(), umsg, Some(wparam), Some(lparam));
+        };
+    }
+
+    if umsg == WM_EXITSIZEMOVE {
+        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
+        let app = &*item_data_ptr;
+        let mode = app.state::<Mutex<ChildState>>();
+        if let Ok(mut mode) = mode.try_lock() {
+            mode.resizing = false;
+        };
+    }
+
+    // if umsg == WM_SIZING
 
     DefSubclassProc(hwnd, umsg, wparam, lparam)
 }
