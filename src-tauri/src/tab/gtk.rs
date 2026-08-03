@@ -1,4 +1,10 @@
 #![allow(unused_imports)]
+#[cfg(target_os = "windows")]
+use crate::tab::WindowInset;
+use crate::{
+    helper::WindowLabels,
+    tab::{Bounds, ModeChangedArg, Tab, TabEvent, TabRequest, TabState, Title, WebviewTitle, WindowMode},
+};
 #[cfg(target_os = "linux")]
 use gtk::{
     glib::Cast,
@@ -15,108 +21,7 @@ use windows::Win32::{
     UI::{Shell::RemoveWindowSubclass, WindowsAndMessaging::*},
 };
 
-use crate::helper::WindowLabels;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "name", content = "data", rename_all = "camelCase")]
-enum TabEvent {
-    Maximized,
-    Unmaximized,
-    TitleChanged(Title),
-    Reordered(Vec<WebviewTitle>),
-    Closed(String),
-    ModeChanged(ModeChangedArg),
-    Added(Title),
-    Activated,
-    Close(),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "name", content = "data", rename_all = "camelCase")]
-pub enum TabRequest {
-    Select(String),
-    Reorder(Vec<WebviewTitle>),
-    CloseAll,
-    Cancel,
-    Update(WebviewTitle),
-    Add,
-    ToggleTabMode(bool),
-    Detach,
-    ToggleMaximize,
-    Minimize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ModeChangedArg {
-    tab_mode: bool,
-    tabs: Vec<WebviewTitle>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Title {
-    label: String,
-    title: String,
-    path: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct WindowMode {
-    pub tab_mode: bool,
-    pub active_tab_label: String,
-    pub close_all: bool,
-    pub window_handle: isize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ChildState {
-    pub resizing: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct TabState {
-    pub tabs: Vec<Tab>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct WindowInset {
-    x: i32,
-    y: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct WebviewTitle {
-    pub label: String,
-    pub title: String,
-    pub path: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct Bounds {
-    width: u32,
-    height: u32,
-    x: i32,
-    y: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct Tab {
-    window_handle: isize,
-    pub label: String,
-    pub title: String,
-    pub path: String,
-    active: bool,
-    inset: WindowInset,
-    style: isize,
-    parent: Option<isize>,
-    owner: Option<isize>,
-    bounds: Bounds,
-}
-
-impl PartialEq for Tab {
-    fn eq(&self, other: &Self) -> bool {
-        self.label.eq(&other.label)
-    }
-}
+const OFF_SCREEN: i32 = -30000;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum WindowType {
@@ -125,13 +30,9 @@ pub(crate) enum WindowType {
     Owned,
 }
 
-#[cfg(target_os = "windows")]
-const OFF_SCREEN: i32 = -30000;
-
 pub fn init(app: &tauri::AppHandle) {
     app.manage(Mutex::new(TabState::default()));
     app.manage(Mutex::new(WindowMode::default()));
-    app.manage(Mutex::new(ChildState::default()));
 
     let cloned = app.clone();
     app.get_webview_window("Main").unwrap().on_window_event(move |e| match e {
@@ -509,7 +410,7 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
 
     let mut style = unsafe { GetWindowLongPtrW(child, GWL_STYLE) } as u32;
     style &= !(WS_POPUP.0);
-    style &= !(WS_SIZEBOX.0);
+    // style &= !(WS_SIZEBOX.0);
     style |= WS_CLIPSIBLINGS.0;
     style |= WS_CHILD.0;
     unsafe { SetWindowLongPtrW(child, GWL_STYLE, style as isize) };
@@ -604,78 +505,6 @@ fn detach_from_tab(removed: &Tab, show: bool) {
     }
 }
 
-#[cfg(target_os = "windows")]
-unsafe extern "system" fn proc(
-    hwnd: HWND,
-    umsg: u32,
-    wparam: windows::Win32::Foundation::WPARAM,
-    lparam: windows::Win32::Foundation::LPARAM,
-    _uidsubclass: usize,
-    dwrefdata: usize,
-) -> windows::Win32::Foundation::LRESULT {
-    if umsg == WM_EXITSIZEMOVE {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let mode = app.state::<Mutex<WindowMode>>();
-        if let Ok(mode) = mode.try_lock() {
-            on_resized(mode.window_handle);
-        };
-    }
-
-    DefSubclassProc(hwnd, umsg, wparam, lparam)
-}
-
-#[cfg(target_os = "windows")]
-unsafe extern "system" fn child_proc(
-    hwnd: HWND,
-    umsg: u32,
-    wparam: windows::Win32::Foundation::WPARAM,
-    lparam: windows::Win32::Foundation::LPARAM,
-    _uidsubclass: usize,
-    dwrefdata: usize,
-) -> windows::Win32::Foundation::LRESULT {
-    // if umsg == WM_WINDOWPOSCHANGING {
-    //     let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-    //     let app = &*item_data_ptr;
-    //     let mode = app.state::<Mutex<ChildState>>();
-    //     if let Ok(mode) = mode.try_lock() {
-    //         if mode.resizing {
-    //             let pos = &mut *(lparam.0 as *mut WINDOWPOS);
-    //             // Tell DWM NOT to blit old surface bits during live drag
-    //             pos.flags |= SWP_NOMOVE;
-    //         }
-    //     };
-    // }
-
-    if umsg == WM_ENTERSIZEMOVE {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let mode = app.state::<Mutex<ChildState>>();
-        if let Ok(mut mode) = mode.try_lock() {
-            mode.resizing = true;
-            let _ = SendMessageW(app.get_webview_window("Main").unwrap().hwnd().unwrap(), umsg, Some(wparam), Some(lparam));
-        };
-    }
-
-    if umsg == WM_EXITSIZEMOVE {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let mode = app.state::<Mutex<ChildState>>();
-        if let Ok(mut mode) = mode.try_lock() {
-            mode.resizing = false;
-        };
-    }
-
-    // if umsg == WM_SIZING
-
-    DefSubclassProc(hwnd, umsg, wparam, lparam)
-}
-
-#[cfg(target_os = "windows")]
-fn remove_subclass(hwnd: HWND) {
-    let _ = unsafe { RemoveWindowSubclass(hwnd, Some(proc), 200) };
-}
-
 fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
     for tab in tabs {
         let _ = unsafe {
@@ -686,60 +515,6 @@ fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
 
 fn on_resized(window_handle: isize) {
     let _ = unsafe { SetWindowPos(to_hwnd(window_handle), Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
-}
-
-fn to_hwnd(ptr: isize) -> HWND {
-    HWND(ptr as *mut std::ffi::c_void)
-}
-
-fn vtoi(hwnd: HWND) -> isize {
-    hwnd.0 as isize
-}
-
-#[cfg(target_os = "windows")]
-fn get_exact_hwnd_insets(hwnd: HWND) -> WindowInset {
-    unsafe {
-        let mut window_rect = RECT::default();
-
-        let _ = GetWindowRect(hwnd, &mut window_rect);
-        let mut client_rect = RECT::default();
-        let _ = GetClientRect(hwnd, &mut client_rect);
-
-        let mut client_top_left = POINT {
-            x: 0,
-            y: 0,
-        };
-        let _ = ClientToScreen(hwnd, &mut client_top_left);
-
-        let window_width = window_rect.right - window_rect.left;
-        let client_width = client_rect.right - client_rect.left;
-        let window_height = window_rect.bottom - window_rect.top;
-        let client_height = client_rect.bottom - client_rect.top;
-
-        let left_inset = window_width - client_width;
-        let top_inset = window_height - client_height;
-
-        WindowInset {
-            x: left_inset / 2,
-            y: top_inset / 2,
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-pub(crate) fn get_window_type(hwnd: HWND) -> WindowType {
-    unsafe {
-        let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
-        if (style & WS_CHILD.0) != 0 {
-            return WindowType::Child;
-        }
-
-        if GetWindow(hwnd, GW_OWNER).is_ok() {
-            return WindowType::Owned;
-        }
-
-        WindowType::Top
-    }
 }
 
 fn get_bounds(window: &tauri::WebviewWindow) -> Bounds {

@@ -73,7 +73,7 @@ pub fn start(app: &tauri::AppHandle) {
     app.manage(Mutex::new(CurrentTheme::default()));
     app.manage(Mutex::new(WindowLabels::default()));
     app.manage(smol::lock::Mutex::new(AppMenu::default()));
-    tab::init(app);
+    tab::platform_impl::init(app);
 
     #[cfg(target_os = "linux")]
     {
@@ -238,7 +238,7 @@ pub fn update_title(app: &tauri::AppHandle, title: WindowTitle) {
     let state = app.state::<Mutex<WindowLabels>>();
     let mut state = state.lock().unwrap();
     state.labels.insert(title.label.to_string(), title.clone());
-    tab::update(app, &title.label, &title.title, &title.path);
+    tab::platform_impl::update(app, &title.label, &title.title, &title.path);
 }
 
 pub fn remove_window(app: &tauri::AppHandle, label: &str) {
@@ -249,7 +249,7 @@ pub fn remove_window(app: &tauri::AppHandle, label: &str) {
     /* Remove from Menu map too */
     menu::remove(app, label);
     /* Remove from tab  */
-    tab::remove(app, label);
+    tab::platform_impl::remove(app, label);
 
     if state.labels.is_empty() {
         if let Some(main) = app.get_webview_window("Main") {

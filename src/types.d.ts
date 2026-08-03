@@ -62,6 +62,7 @@ declare global {
             | { name: "close"; data?: never }
             | { name: "scrolled"; data: number }
             | { name: "activated"; data?: never }
+            | { name: "dragResize"; data: string }
             | { name: "added"; data: WebviewTitle };
 
         type TabRequest =
@@ -75,6 +76,8 @@ declare global {
             | { name: "minimize"; data?: never }
             | { name: "toggleMaximize"; data?: never }
             | { name: "toggleTabMode"; data: boolean };
+
+        type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
 
         type WebviewTitle = {
             label: string;
