@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+use tauri::{Emitter, EventTarget, Manager};
 
 #[cfg(target_os = "linux")]
 #[path = "gtk.rs"]
@@ -6,6 +8,8 @@ pub(crate) mod platform_impl;
 #[cfg(target_os = "windows")]
 #[path = "windows.rs"]
 pub(crate) mod platform_impl;
+
+const TAB_WINDOW_LABEL: &str = "Main";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "name", content = "data", rename_all = "camelCase")]
@@ -104,4 +108,56 @@ impl PartialEq for Tab {
 struct WindowInset {
     x: i32,
     y: i32,
+}
+
+pub fn init(app: &tauri::AppHandle) {
+    app.manage(Mutex::new(TabState::default()));
+    app.manage(Mutex::new(WindowMode::default()));
+
+    let host = app.get_webview_window("Main").unwrap();
+    let cloned = app.clone();
+    host.on_window_event(move |e| match e {
+        tauri::WindowEvent::Focused(focused) => {
+            let mode = cloned.state::<Mutex<WindowMode>>();
+            let mode = mode.lock().unwrap();
+            if mode.tab_mode && *focused {
+                emit_to(&cloned, TabEvent::Activated, &mode.active_tab_label);
+            }
+        }
+        #[cfg(target_os = "windows")]
+        tauri::WindowEvent::Resized(size) => {
+            let mode = cloned.state::<Mutex<WindowMode>>();
+            if let Ok(mode) = mode.try_lock() {
+                if mode.tab_mode {
+                    let state = cloned.state::<Mutex<TabState>>();
+                    let state = state.lock().unwrap();
+                    on_resizing(&state.tabs, size.width as i32, size.height as i32);
+                }
+            };
+        }
+        _ => {}
+    });
+}
+
+fn emit(app: &tauri::AppHandle, event: TabEvent, except: Option<&str>) {
+    if let Some(except) = except {
+        let _ = app.emit_filter("tab_event", event, |t| match t {
+            EventTarget::WebviewWindow {
+                label,
+            } => label != except,
+            _ => false,
+        });
+    } else {
+        let _ = app.emit("tab_event", event);
+    }
+}
+
+fn emit_to(app: &tauri::AppHandle, event: TabEvent, target: &str) {
+    let _ = app.emit_to(
+        EventTarget::WebviewWindow {
+            label: target.to_string(),
+        },
+        "tab_event",
+        event,
+    );
 }

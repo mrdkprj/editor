@@ -532,7 +532,7 @@
     const onTabEvent = async (e: Mp.TabEvent) => {
         switch (e.name) {
             case "activated": {
-                // getCurrentWebview().setFocus();
+                getCurrentWebview().setFocus();
                 break;
             }
             case "maximized": {
