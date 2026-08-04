@@ -131,7 +131,7 @@ pub fn init(app: &tauri::AppHandle) {
                 if mode.tab_mode {
                     let state = cloned.state::<Mutex<TabState>>();
                     let state = state.lock().unwrap();
-                    on_resizing(&state.tabs, size.width as i32, size.height as i32);
+                    platform_impl::on_resizing(&state.tabs, size.width as i32, size.height as i32);
                 }
             };
         }
@@ -160,4 +160,20 @@ fn emit_to(app: &tauri::AppHandle, event: TabEvent, target: &str) {
         "tab_event",
         event,
     );
+}
+
+pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
+    match req {
+        TabRequest::Add => platform_impl::add(window),
+        TabRequest::Cancel => platform_impl::cancel(window.app_handle()),
+        TabRequest::Select(label) => platform_impl::select_tab(window.app_handle(), label),
+        TabRequest::Reorder(tabs) => platform_impl::reorder_tab(window, tabs),
+        TabRequest::CloseAll => platform_impl::close_all(window.app_handle()),
+        TabRequest::Update(webview_title) => platform_impl::update(window.app_handle(), &webview_title.label, &webview_title.title, &webview_title.path),
+        TabRequest::Detach => platform_impl::detach(window.app_handle(), window.label()),
+        TabRequest::ToggleMaximize => platform_impl::toggle_maximize(window.app_handle()),
+        TabRequest::Minimize => platform_impl::minimize(window.app_handle()),
+        TabRequest::ToggleTabMode(tab_mode) => return platform_impl::toggle_tab_mode(window, tab_mode),
+    }
+    true
 }

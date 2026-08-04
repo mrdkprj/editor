@@ -280,7 +280,7 @@ fn is_file_opened(app: tauri::AppHandle, payload: String) -> Option<String> {
 
 #[tauri::command]
 fn tab_request(window: WebviewWindow, payload: tab::TabRequest) -> bool {
-    tab::platform_impl::handle_request(&window, payload)
+    tab::handle_request(&window, payload)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

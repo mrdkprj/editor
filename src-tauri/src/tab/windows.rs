@@ -1,9 +1,9 @@
 use crate::{
     helper::WindowLabels,
-    tab::{Bounds, ModeChangedArg, Tab, TabEvent, TabRequest, TabState, Title, WebviewTitle, WindowInset, WindowMode},
+    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowInset, WindowMode, TAB_WINDOW_LABEL},
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
-use tauri::{Emitter, EventTarget, Manager, WebviewWindow};
+use tauri::{Manager, WebviewWindow};
 use windows::Win32::{
     Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
     Graphics::Gdi::ClientToScreen,
@@ -21,72 +21,6 @@ pub(crate) enum WindowType {
     Top,
     Child,
     Owned,
-}
-
-pub fn init(app: &tauri::AppHandle) {
-    app.manage(Mutex::new(TabState::default()));
-    app.manage(Mutex::new(WindowMode::default()));
-
-    let cloned = app.clone();
-    app.get_webview_window("Main").unwrap().on_window_event(move |e| match e {
-        tauri::WindowEvent::Focused(focused) => {
-            let mode = cloned.state::<Mutex<WindowMode>>();
-            let mode = mode.lock().unwrap();
-            if mode.tab_mode && *focused {
-                emit_to(&cloned, TabEvent::Activated, &mode.active_tab_label);
-            }
-        }
-        tauri::WindowEvent::Resized(size) => {
-            let mode = cloned.state::<Mutex<WindowMode>>();
-            if let Ok(mode) = mode.try_lock() {
-                if mode.tab_mode {
-                    let state = cloned.state::<Mutex<TabState>>();
-                    let state = state.lock().unwrap();
-                    on_resizing(&state.tabs, size.width as i32, size.height as i32);
-                }
-            };
-        }
-        _ => {}
-    });
-}
-
-pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
-    match req {
-        TabRequest::Add => add(window),
-        TabRequest::Cancel => cancel(window.app_handle()),
-        TabRequest::Select(label) => select_tab(window.app_handle(), label),
-        TabRequest::Reorder(tabs) => reorder_tab(window, tabs),
-        TabRequest::CloseAll => close_all(window.app_handle()),
-        TabRequest::Update(webview_title) => update(window.app_handle(), &webview_title.label, &webview_title.title, &webview_title.path),
-        TabRequest::Detach => detach(window.app_handle(), window.label()),
-        TabRequest::ToggleMaximize => toggle_maximize(window.app_handle()),
-        TabRequest::Minimize => minimize(window.app_handle()),
-        TabRequest::ToggleTabMode(tab_mode) => return toggle_tab_mode(window, tab_mode),
-    }
-    true
-}
-
-fn emit(app: &tauri::AppHandle, event: TabEvent, except: Option<&str>) {
-    if let Some(except) = except {
-        let _ = app.emit_filter("tab_event", event, |t| match t {
-            EventTarget::WebviewWindow {
-                label,
-            } => label != except,
-            _ => false,
-        });
-    } else {
-        let _ = app.emit("tab_event", event);
-    }
-}
-
-fn emit_to(app: &tauri::AppHandle, event: TabEvent, target: &str) {
-    let _ = app.emit_to(
-        EventTarget::WebviewWindow {
-            label: target.to_string(),
-        },
-        "tab_event",
-        event,
-    );
 }
 
 pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
@@ -152,7 +86,7 @@ pub fn add(window: &tauri::WebviewWindow) {
         state.tabs.last_mut().unwrap()
     };
     tab.bounds = get_bounds(&app.get_webview_window(label).unwrap());
-    let host = app.get_webview_window("Main").unwrap();
+    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
     let size = host.inner_size().unwrap();
     before_attach(window);
     attach_to_tab(&host, tab, size.width as _, size.height as _);
@@ -228,7 +162,7 @@ pub fn cancel(app: &tauri::AppHandle) {
 }
 
 pub fn toggle_maximize(app: &tauri::AppHandle) {
-    let host = app.get_webview_window("Main").unwrap();
+    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
     if host.is_maximized().unwrap_or_default() {
         let _ = host.unmaximize();
         emit(app, TabEvent::Unmaximized, None);
@@ -247,11 +181,11 @@ fn after_toggle(app: &tauri::AppHandle) {
 }
 
 pub fn minimize(app: &tauri::AppHandle) {
-    let _ = app.get_webview_window("Main").unwrap().minimize();
+    let _ = app.get_webview_window(TAB_WINDOW_LABEL).unwrap().minimize();
 }
 
 fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMode, activator: &str) {
-    let host = app.get_webview_window("Main").unwrap();
+    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
 
     // unsafe {
     //     let current_style = GetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE) as u32;
@@ -290,7 +224,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
 fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
     mode.active_tab_label = String::new();
 
-    let host = app.get_webview_window("Main").unwrap();
+    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
 
     for tab in tabs.iter() {
         detach_from_tab(tab, true);
@@ -314,7 +248,7 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
     if let Some(index) = state.tabs.iter().position(|tab| tab.label == label) {
         let _ = state.tabs.remove(index);
         if state.tabs.is_empty() {
-            let host = app.get_webview_window("Main").unwrap();
+            let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
             remove_subclass(host.hwnd().unwrap());
             let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
             let _ = host.hide();
@@ -509,7 +443,7 @@ fn remove_subclass(hwnd: HWND) {
     let _ = unsafe { RemoveWindowSubclass(hwnd, Some(proc), 200) };
 }
 
-fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
+pub fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
     for tab in tabs {
         let _ = unsafe {
             SetWindowPos(to_hwnd(tab.window_handle), None, 0, 0, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_NOMOVE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOSENDCHANGING)
