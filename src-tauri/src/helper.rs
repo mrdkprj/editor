@@ -75,24 +75,24 @@ pub fn start(app: &tauri::AppHandle) {
     app.manage(smol::lock::Mutex::new(AppMenu::default()));
     tab::platform_impl::init(app);
 
-    #[cfg(target_os = "linux")]
-    {
-        use gtk::traits::{BoxExt, ContainerExt, WidgetExt};
+    // #[cfg(target_os = "linux")]
+    // {
+    //     use gtk::traits::{BoxExt, ContainerExt, WidgetExt};
 
-        let host = app.get_webview_window("Main").unwrap();
-        let vbox = host.default_vbox().unwrap();
-        let host_children = vbox.children();
+    //     let host = app.get_webview_window("Main").unwrap();
+    //     let vbox = host.default_vbox().unwrap();
+    //     let host_children = vbox.children();
 
-        let host_webview = host_children.first().unwrap();
-        host_webview.set_size_request(-1, 0);
-        host_webview.set_vexpand(false);
-        vbox.set_child_packing(host_webview, false, false, 0, gtk::PackType::Start);
+    //     let host_webview = host_children.first().unwrap();
+    //     host_webview.set_size_request(-1, 0);
+    //     host_webview.set_vexpand(false);
+    //     vbox.set_child_packing(host_webview, false, false, 0, gtk::PackType::Start);
 
-        let overlay = gtk::Overlay::new();
-        overlay.set_hexpand(true);
-        overlay.set_vexpand(true);
-        vbox.pack_start(&overlay, true, true, 0);
-    }
+    //     let overlay = gtk::Overlay::new();
+    //     overlay.set_hexpand(true);
+    //     overlay.set_vexpand(true);
+    //     vbox.pack_start(&overlay, true, true, 0);
+    // }
 }
 
 fn update_init_arg(app: &tauri::AppHandle, args: Option<InitArgs>) {
