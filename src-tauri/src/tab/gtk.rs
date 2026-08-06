@@ -1,6 +1,6 @@
 use crate::{
     helper::WindowLabels,
-    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabRequest, TabState, Title, WebviewTitle, WindowMode, TAB_WINDOW_LABEL},
+    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowMode, TAB_WINDOW_LABEL},
 };
 use gtk::{
     ffi::GtkWidget,
@@ -12,22 +12,6 @@ use gtk::{
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewWindow};
-
-pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
-    match req {
-        TabRequest::Add => add(window),
-        TabRequest::Cancel => cancel(window.app_handle()),
-        TabRequest::Select(label) => select_tab(window.app_handle(), label),
-        TabRequest::Reorder(tabs) => reorder_tab(window, tabs),
-        TabRequest::CloseAll => close_all(window.app_handle()),
-        TabRequest::Update(webview_title) => update(window.app_handle(), &webview_title.label, &webview_title.title, &webview_title.path),
-        TabRequest::Detach => detach(window.app_handle(), window.label()),
-        TabRequest::ToggleMaximize => toggle_maximize(window.app_handle()),
-        TabRequest::Minimize => minimize(window.app_handle()),
-        TabRequest::ToggleTabMode(tab_mode) => return toggle_tab_mode(window, tab_mode),
-    }
-    true
-}
 
 pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     let app = window.app_handle();
