@@ -62,6 +62,7 @@ pub struct WindowMode {
     pub window_handle: isize,
     pub resizing: bool,
     pub propagated: bool,
+    pub minimized: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -137,6 +138,14 @@ pub fn init(app: &tauri::AppHandle) {
         }
         _ => {}
     });
+}
+
+pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
+    platform_impl::update(app, label, title, path);
+}
+
+pub fn remove(app: &tauri::AppHandle, label: &str) {
+    platform_impl::remove(app, label);
 }
 
 fn emit(app: &tauri::AppHandle, event: TabEvent, except: Option<&str>) {

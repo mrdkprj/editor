@@ -117,8 +117,30 @@ pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
 pub fn detach(app: &tauri::AppHandle, label: &str) {
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
-    if let Some(tab) = state.tabs.iter().find(|tab| tab.label == label) {
-        detach_from_tab(tab, false);
+
+    if let Some((index, tab)) = state.tabs.iter().enumerate().find(|(_, tab)| tab.label == label) {
+        after_detach(tab.window_handle);
+
+        if state.tabs.len() == 1 {
+            /* If this is the last tab, hide the host */
+            let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+            remove_subclass(host.hwnd().unwrap());
+            let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
+            let _ = host.hide();
+        } else {
+            /* Change active tab only instead of changing child to top-level window */
+            let mode = app.state::<Mutex<WindowMode>>();
+            let mut mode = mode.lock().unwrap();
+            if mode.active_tab_label == label {
+                let is_last = index == state.tabs.len() - 1;
+                let tab = if is_last {
+                    state.tabs.get(index - 1).unwrap()
+                } else {
+                    state.tabs.get(index).unwrap()
+                };
+                bring_to_front(app, &state.tabs, &mut mode, &tab.label);
+            }
+        }
     }
 }
 
@@ -127,7 +149,7 @@ pub fn select_tab(app: &tauri::AppHandle, label: String) {
     let state = state.lock().unwrap();
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
-    bring_to_front(app, &state.tabs, &mut mode, label);
+    bring_to_front(app, &state.tabs, &mut mode, &label);
 }
 
 pub fn reorder_tab(window: &tauri::WebviewWindow, tabs: Vec<WebviewTitle>) {
@@ -187,12 +209,12 @@ pub fn minimize(app: &tauri::AppHandle) {
 fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMode, activator: &str) {
     let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
 
-    // unsafe {
-    //     let current_style = GetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE) as u32;
-    //     if (current_style & WS_CLIPCHILDREN.0) == 0 {
-    //         SetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE, (current_style | WS_CLIPCHILDREN.0) as isize);
-    //     }
-    // }
+    unsafe {
+        let current_style = GetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE) as u32;
+        if (current_style & WS_CLIPCHILDREN.0) == 0 {
+            SetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE, (current_style | WS_CLIPCHILDREN.0) as isize);
+        }
+    }
 
     /* Must show parent first. Otherwise, extra top margin shows */
     let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED) };
@@ -214,7 +236,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
         attach_to_tab(&host, tab, size.width as _, size.height as _);
     }
 
-    bring_to_front(app, tabs, mode, activator.to_string());
+    bring_to_front(app, tabs, mode, activator);
 
     host.set_position(pos).unwrap();
 
@@ -235,46 +257,9 @@ fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
     host.hide().unwrap();
 }
 
-pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
-    let state = app.state::<Mutex<TabState>>();
-    let mut state = state.lock().unwrap();
-    let mode = app.state::<Mutex<WindowMode>>();
-    let mut mode = mode.lock().unwrap();
-
-    if !mode.tab_mode {
-        return;
-    }
-
-    if let Some(index) = state.tabs.iter().position(|tab| tab.label == label) {
-        let _ = state.tabs.remove(index);
-        if state.tabs.is_empty() {
-            let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
-            remove_subclass(host.hwnd().unwrap());
-            let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
-            let _ = host.hide();
-        } else {
-            let is_last = index == state.tabs.len();
-
-            if mode.active_tab_label == label && !state.tabs.is_empty() {
-                let tab = if is_last {
-                    state.tabs.get(index - 1).unwrap()
-                } else {
-                    state.tabs.get(index).unwrap()
-                };
-                bring_to_front(app, &state.tabs, &mut mode, tab.label.clone());
-            }
-            emit(app, TabEvent::Closed(label.to_string()), None);
-            if mode.close_all {
-                emit_to(app, TabEvent::Close(), &state.tabs.last().unwrap().label);
-            }
-        }
-    }
-}
-
 fn before_attach(window: &tauri::WebviewWindow) {
     /* On Windows, window must be shown before attach. Otherwise, focus can be moved to the parent */
-    let _ = unsafe { SetWindowPos(window.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
-    let _ = unsafe { SetWindowSubclass(window.hwnd().unwrap(), Some(child_proc), 300, Box::into_raw(Box::new(window.app_handle().clone())) as usize) };
+    let _ = unsafe { SetWindowPos(window.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_FRAMECHANGED) };
 }
 
 fn after_detach(window_handle: isize) {
@@ -287,7 +272,6 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
 
     let mut style = unsafe { GetWindowLongPtrW(child, GWL_STYLE) } as u32;
     style &= !(WS_POPUP.0);
-    // style &= !(WS_SIZEBOX.0);
     style |= WS_CLIPSIBLINGS.0;
     style |= WS_CHILD.0;
     unsafe { SetWindowLongPtrW(child, GWL_STYLE, style as isize) };
@@ -297,21 +281,20 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
     unsafe { SetParent(child, Some(parent)).unwrap() };
 
     let _ = unsafe { SetWindowPos(child, Some(HWND_BOTTOM), -tab.inset.x, 0, width + tab.inset.x * 2, height + tab.inset.y * 2, SWP_FRAMECHANGED | SWP_NOACTIVATE) };
+    let _ = unsafe { SetWindowSubclass(child, Some(child_proc), 300, Box::into_raw(Box::new(parent_window.app_handle().clone())) as usize) };
 }
 
-fn bring_to_front(_app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, label: String) {
+fn bring_to_front(_app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, label: &str) {
     if mode.active_tab_label == label {
         return;
     }
 
     if let Some(new) = tabs.iter().find(|tab| tab.label == label) {
         let _ = unsafe { SetWindowPos(to_hwnd(new.window_handle), Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
+        emit_to(_app, TabEvent::Activated, label);
+        let _ = unsafe { SetFocus(Some(to_hwnd(new.window_handle))) };
 
-        emit_to(_app, TabEvent::Activated, &label);
-        unsafe {
-            let _ = SetFocus(Some(to_hwnd(new.window_handle)));
-        }
-        mode.active_tab_label = label;
+        mode.active_tab_label = label.to_string();
         mode.window_handle = new.window_handle;
     }
 }
@@ -321,21 +304,47 @@ fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab) {
     smol::spawn(async move {
         smol::Timer::after(Duration::from_millis(50)).await;
         let state = app.state::<Mutex<TabState>>();
-        let state = state.lock().unwrap();
-        let mode = app.state::<Mutex<WindowMode>>();
-        let mut mode = mode.lock().unwrap();
-        bring_to_front(&app, &state.tabs, &mut mode, tab.label.clone());
-        emit(
-            &app,
-            TabEvent::Added(Title {
-                label: tab.label,
-                title: tab.title,
-                path: tab.path,
-            }),
-            None,
-        );
+        if let Ok(state) = state.try_lock() {
+            let mode = app.state::<Mutex<WindowMode>>();
+            if let Ok(mut mode) = mode.try_lock() {
+                bring_to_front(&app, &state.tabs, &mut mode, &tab.label);
+                emit(
+                    &app,
+                    TabEvent::Added(Title {
+                        label: tab.label,
+                        title: tab.title,
+                        path: tab.path,
+                    }),
+                    None,
+                );
+            };
+        };
     })
     .detach();
+}
+
+pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
+    let mode = app.state::<Mutex<WindowMode>>();
+    let mode = mode.lock().unwrap();
+
+    if !mode.tab_mode {
+        return;
+    }
+
+    let state = app.state::<Mutex<TabState>>();
+    let mut state = state.lock().unwrap();
+
+    if let Some(index) = state.tabs.iter().position(|tab| tab.label == label) {
+        let _ = state.tabs.remove(index);
+
+        if !state.tabs.is_empty() {
+            emit(app, TabEvent::Closed(label.to_string()), None);
+
+            if mode.close_all {
+                emit_to(app, TabEvent::Close(), &state.tabs.last().unwrap().label);
+            }
+        }
+    }
 }
 
 fn detach_from_tab(removed: &Tab, show: bool) {
@@ -354,11 +363,6 @@ fn detach_from_tab(removed: &Tab, show: bool) {
     if show {
         let _ =
             unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED | SWP_SHOWWINDOW) };
-        // let _ = unsafe { ShowWindow(to_hwnd(removed.window_handle), SW_SHOW) };
-    } else {
-        let _ = unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, OFF_SCREEN, OFF_SCREEN, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED | SWP_SHOWWINDOW) };
-        let _ = unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, 0, 0, SWP_NOSIZE | SWP_HIDEWINDOW) };
-        // let _ = unsafe { ShowWindow(to_hwnd(removed.window_handle), SW_HIDE) };
     }
 }
 
@@ -370,6 +374,29 @@ unsafe extern "system" fn proc(hwnd: HWND, umsg: u32, wparam: WPARAM, lparam: LP
         if let Ok(mode) = mode.try_lock() {
             on_resized(mode.window_handle);
         };
+    }
+
+    if umsg == WM_SIZE {
+        if wparam.0 as u32 == SIZE_MINIMIZED {
+            let item_data_ptr = dwrefdata as *const tauri::AppHandle;
+            let app = &*item_data_ptr;
+            let mode = app.state::<Mutex<WindowMode>>();
+            if let Ok(mut mode) = mode.try_lock() {
+                mode.minimized = true;
+            };
+        }
+
+        if wparam.0 as u32 == SIZE_RESTORED {
+            let item_data_ptr = dwrefdata as *const tauri::AppHandle;
+            let app = &*item_data_ptr;
+            let mode = app.state::<Mutex<WindowMode>>();
+            if let Ok(mut mode) = mode.try_lock() {
+                if mode.minimized {
+                    mode.minimized = false;
+                    on_restore(mode.window_handle);
+                }
+            };
+        }
     }
 
     DefSubclassProc(hwnd, umsg, wparam, lparam)
@@ -453,6 +480,15 @@ pub fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
 
 fn on_resized(window_handle: isize) {
     let _ = unsafe { SetWindowPos(to_hwnd(window_handle), Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
+}
+
+fn on_restore(window_handle: isize) {
+    /* Restore z order after 5 millisecs when the parent is restored from minimized state */
+    smol::spawn(async move {
+        smol::Timer::after(Duration::from_millis(5)).await;
+        on_resized(window_handle);
+    })
+    .detach();
 }
 
 fn to_hwnd(ptr: isize) -> HWND {
