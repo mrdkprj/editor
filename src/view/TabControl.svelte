@@ -209,6 +209,7 @@
         height: 20px;
         margin-left: 5px;
         border-radius: 8px;
+        flex-shrink: 0;
     }
 
     .tab-close-btn:hover {

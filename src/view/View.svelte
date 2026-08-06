@@ -533,6 +533,10 @@
         switch (e.name) {
             case "activated": {
                 getCurrentWebview().setFocus();
+                if (grepPromise) {
+                    grepPromise.resolve(0);
+                    grepPromise = null;
+                }
                 break;
             }
             case "maximized": {
@@ -587,13 +591,6 @@
     const scrollTab = (scrollLeft: number) => {
         tabs.scrollLeft = scrollLeft;
     };
-
-    // const onTabActivated = () => {
-    //     if (grepPromise) {
-    //         grepPromise.resolve(0);
-    //         grepPromise = null;
-    //     }
-    // };
 
     const updateTabTitle = (e: Mp.WebviewTitle) => {
         tabs.webviews

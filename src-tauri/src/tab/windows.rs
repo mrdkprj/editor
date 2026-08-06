@@ -219,7 +219,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
     /* Must show parent first. Otherwise, extra top margin shows */
     let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED) };
     host.unmaximize().unwrap();
-    host.with_webview(|w| unsafe { w.controller().SetIsVisible(false).unwrap() }).unwrap();
+    // host.with_webview(|w| unsafe { w.controller().SetIsVisible(false).unwrap() }).unwrap();
     host.show().unwrap();
 
     let activator_window = app.get_webview_window(activator).unwrap();
