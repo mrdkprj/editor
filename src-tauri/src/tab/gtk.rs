@@ -256,6 +256,17 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
     }
 }
 
+pub(crate) fn start_drag(window: &tauri::WebviewWindow) {
+    let app = window.app_handle();
+    let mode = app.state::<Mutex<WindowMode>>();
+    let mode = mode.lock().unwrap();
+    if mode.tab_mode {
+        let _ = app.get_webview_window(TAB_WINDOW_LABEL).unwrap().start_dragging();
+    } else {
+        let _ = window.start_dragging();
+    }
+}
+
 fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab) {
     let vbox = get_overlay(parent_window);
     let child = parent_window.get_webview_window(&tab.label).unwrap();
@@ -356,7 +367,6 @@ fn new_tab(app: &tauri::AppHandle, window_handle: isize, label: &str) -> Tab {
         style: 0,
         parent: None,
         owner: None,
-        active: false,
         bounds: Bounds::default(),
     }
 }

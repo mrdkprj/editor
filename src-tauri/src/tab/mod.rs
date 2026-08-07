@@ -39,6 +39,7 @@ pub enum TabRequest {
     Detach,
     ToggleMaximize,
     Minimize,
+    StartDrag,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,7 +92,6 @@ pub(crate) struct Tab {
     pub label: String,
     pub title: String,
     pub path: String,
-    active: bool,
     inset: WindowInset,
     style: isize,
     parent: Option<isize>,
@@ -182,6 +182,7 @@ pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
         TabRequest::Detach => platform_impl::detach(window.app_handle(), window.label()),
         TabRequest::ToggleMaximize => platform_impl::toggle_maximize(window.app_handle()),
         TabRequest::Minimize => platform_impl::minimize(window.app_handle()),
+        TabRequest::StartDrag => platform_impl::start_drag(window),
         TabRequest::ToggleTabMode(tab_mode) => return platform_impl::toggle_tab_mode(window, tab_mode),
     }
     true
