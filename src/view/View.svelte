@@ -2,7 +2,7 @@
     import { onMount, tick, untrack } from "svelte";
     import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
-    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, MAIN_LABEL, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
+    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
     import util from "../util";
@@ -580,8 +580,8 @@
             }
             case "dragResize": {
                 /* Only on Windows, drag-resize can happen on child */
-                const main = await WebviewWindow.getByLabel(MAIN_LABEL);
-                main?.startResizeDragging(e.data as Mp.ResizeDirection);
+                const target = await WebviewWindow.getByLabel(e.data.label);
+                target?.startResizeDragging(e.data.direction as Mp.ResizeDirection);
                 break;
             }
         }

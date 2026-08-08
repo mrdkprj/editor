@@ -7,7 +7,6 @@ export const OS = {
     linux: "Linux",
 };
 
-export const MAIN_LABEL = "Main";
 export const SEPARATOR = navigator.userAgent.includes(OS.windows) ? "\\" : "/";
 export const DEFAULT_FONT = "Consolas";
 export const BROWSER_SHORTCUT_KEYS = ["g", "r", "+", "-", "u", "j"];

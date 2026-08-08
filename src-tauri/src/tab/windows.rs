@@ -1,6 +1,6 @@
 use crate::{
     helper::WindowLabels,
-    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowInset, WindowMode, TAB_WINDOW_LABEL},
+    tab::{emit, emit_to, Bounds, DragResizeEvent, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowInset, WindowMode, HOST},
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewWindow};
@@ -86,7 +86,7 @@ pub fn add(window: &tauri::WebviewWindow) {
         state.tabs.last_mut().unwrap()
     };
     tab.bounds = get_bounds(&app.get_webview_window(label).unwrap());
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
     let size = host.inner_size().unwrap();
     before_attach(window);
     attach_to_tab(&host, tab, size.width as _, size.height as _);
@@ -123,7 +123,7 @@ pub fn detach(app: &tauri::AppHandle, label: &str) {
 
         if state.tabs.len() == 1 {
             /* If this is the last tab, hide the host */
-            let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+            let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
             remove_subclass(host.hwnd().unwrap());
             let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
             let _ = host.hide();
@@ -184,7 +184,7 @@ pub fn cancel(app: &tauri::AppHandle) {
 }
 
 pub fn toggle_maximize(app: &tauri::AppHandle) {
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
     if host.is_maximized().unwrap_or_default() {
         let _ = host.unmaximize();
         emit(app, TabEvent::Unmaximized, None);
@@ -203,11 +203,11 @@ fn after_toggle(app: &tauri::AppHandle) {
 }
 
 pub fn minimize(app: &tauri::AppHandle) {
-    let _ = app.get_webview_window(TAB_WINDOW_LABEL).unwrap().minimize();
+    let _ = app.get_webview_window(HOST.get().unwrap()).unwrap().minimize();
 }
 
 fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMode, activator: &str) {
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
 
     unsafe {
         let current_style = GetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE) as u32;
@@ -246,7 +246,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
 fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
     mode.active_tab_label = String::new();
 
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
 
     for tab in tabs.iter() {
         detach_from_tab(tab, true);
@@ -460,7 +460,14 @@ unsafe extern "system" fn child_proc(hwnd: HWND, umsg: u32, wparam: WPARAM, lpar
             mode.resizing = false;
             if !mode.propagated {
                 let direction = get_resize_direction(wparam.0 as u32);
-                emit_to(app, TabEvent::DragResize(direction.to_string()), &mode.active_tab_label);
+                emit_to(
+                    app,
+                    TabEvent::DragResize(DragResizeEvent {
+                        label: HOST.get().unwrap().to_string(),
+                        direction: direction.to_string(),
+                    }),
+                    &mode.active_tab_label,
+                );
                 mode.propagated = true;
             }
         };

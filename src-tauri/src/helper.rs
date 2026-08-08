@@ -73,7 +73,7 @@ pub fn start(app: &tauri::AppHandle) {
     app.manage(Mutex::new(CurrentTheme::default()));
     app.manage(Mutex::new(WindowLabels::default()));
     app.manage(smol::lock::Mutex::new(AppMenu::default()));
-    tab::init(app);
+    tab::init(app, "Main");
 }
 
 fn update_init_arg(app: &tauri::AppHandle, args: Option<InitArgs>) {

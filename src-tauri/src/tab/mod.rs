@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use tauri::{Emitter, EventTarget, Manager};
 
 #[cfg(target_os = "linux")]
@@ -9,7 +9,11 @@ pub(crate) mod platform_impl;
 #[path = "windows.rs"]
 pub(crate) mod platform_impl;
 
-const TAB_WINDOW_LABEL: &str = "Main";
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct DragResizeEvent {
+    label: String,
+    direction: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "name", content = "data", rename_all = "camelCase")]
@@ -23,7 +27,7 @@ enum TabEvent {
     Added(Title),
     Activated,
     Close(),
-    DragResize(String),
+    DragResize(DragResizeEvent),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +61,7 @@ struct Title {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WindowMode {
+    pub host: String,
     pub tab_mode: bool,
     pub active_tab_label: String,
     pub close_all: bool,
@@ -111,11 +116,14 @@ struct WindowInset {
     y: i32,
 }
 
-pub fn init(app: &tauri::AppHandle) {
+pub(crate) static HOST: OnceLock<String> = OnceLock::new();
+
+pub fn init(app: &tauri::AppHandle, host: &str) {
     app.manage(Mutex::new(TabState::default()));
     app.manage(Mutex::new(WindowMode::default()));
+    let _ = HOST.set(host.to_string());
 
-    let host = app.get_webview_window("Main").unwrap();
+    let host = app.get_webview_window(host).unwrap();
     let cloned = app.clone();
     host.on_window_event(move |e| match e {
         tauri::WindowEvent::Focused(focused) => {

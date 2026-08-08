@@ -1,6 +1,6 @@
 use crate::{
     helper::WindowLabels,
-    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowMode, TAB_WINDOW_LABEL},
+    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowMode},
 };
 use gtk::{
     ffi::GtkWidget,
@@ -75,7 +75,7 @@ pub fn add(window: &tauri::WebviewWindow) {
         state.tabs.last_mut().unwrap()
     };
     tab.bounds = get_bounds(&app.get_webview_window(label).unwrap());
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
     attach_to_tab(&host, tab);
     /* Delay switching for smooth rendering */
     bring_to_front_async(app, tab.clone());
@@ -149,7 +149,7 @@ pub fn cancel(app: &tauri::AppHandle) {
 }
 
 pub fn toggle_maximize(app: &tauri::AppHandle) {
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
     if host.is_maximized().unwrap_or_default() {
         let _ = host.unmaximize();
         emit(app, TabEvent::Unmaximized, None);
@@ -160,11 +160,11 @@ pub fn toggle_maximize(app: &tauri::AppHandle) {
 }
 
 pub fn minimize(app: &tauri::AppHandle) {
-    let _ = app.get_webview_window(TAB_WINDOW_LABEL).unwrap().minimize();
+    let _ = app.get_webview_window(HOST.get().unwrap()).unwrap().minimize();
 }
 
 fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMode, activator: &str) {
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
 
     change_to_overlay(&host);
 
@@ -209,7 +209,7 @@ fn restore_box(host: &tauri::WebviewWindow) {
 }
 
 fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
 
     mode.active_tab_label = String::new();
 
@@ -235,7 +235,7 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
     if let Some(index) = state.tabs.iter().position(|tab| tab.label == label) {
         let _ = state.tabs.remove(index);
         if state.tabs.is_empty() {
-            let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+            let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
             let _ = host.hide();
         } else {
             let is_last = index == state.tabs.len();
@@ -261,7 +261,7 @@ pub(crate) fn start_drag(window: &tauri::WebviewWindow) {
     let mode = app.state::<Mutex<WindowMode>>();
     let mode = mode.lock().unwrap();
     if mode.tab_mode {
-        let _ = app.get_webview_window(TAB_WINDOW_LABEL).unwrap().start_dragging();
+        let _ = app.get_webview_window(HOST.get().unwrap()).unwrap().start_dragging();
     } else {
         let _ = window.start_dragging();
     }
@@ -293,7 +293,7 @@ fn bring_to_front(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, l
         return;
     }
 
-    let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
     let overlay = get_overlay(&host);
 
     if let Some(new) = tabs.iter().find(|s| s.label == label) {
@@ -327,7 +327,7 @@ fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab) {
 
 fn detach_from_tab(app: &tauri::AppHandle, removed: &Tab, show: bool) {
     if let Some(window) = app.get_webview_window(&removed.label) {
-        let host = app.get_webview_window(TAB_WINDOW_LABEL).unwrap();
+        let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
         let overlay = get_overlay(&host);
 
         if overlay.children().len() > 1 {

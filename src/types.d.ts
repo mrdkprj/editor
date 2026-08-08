@@ -52,6 +52,11 @@ declare global {
             | "searchHighlightBackground"
             | "link";
 
+        type DragResizeEvent = {
+            label: string;
+            direction: string;
+        };
+
         type TabEvent =
             | { name: "maximized"; data?: never }
             | { name: "unmaximized"; data?: never }
@@ -62,7 +67,7 @@ declare global {
             | { name: "close"; data?: never }
             | { name: "scrolled"; data: number }
             | { name: "activated"; data?: never }
-            | { name: "dragResize"; data: string }
+            | { name: "dragResize"; data: DragResizeEvent }
             | { name: "added"; data: WebviewTitle };
 
         type TabRequest =
