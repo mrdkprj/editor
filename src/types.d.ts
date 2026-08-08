@@ -81,6 +81,7 @@ declare global {
             | { name: "minimize"; data?: never }
             | { name: "toggleMaximize"; data?: never }
             | { name: "startDrag"; data?: never }
+            | { name: "startResizeDrag"; data: ResizeDirection }
             | { name: "toggleTabMode"; data: boolean };
 
         type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";

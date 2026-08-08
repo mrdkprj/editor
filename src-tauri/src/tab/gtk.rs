@@ -1,9 +1,13 @@
 use crate::{
     helper::WindowLabels,
-    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowMode},
+    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowMode, HOST},
 };
 use gtk::{
     ffi::GtkWidget,
+    gdk::{
+        traits::{DeviceExt, SeatExt},
+        WindowEdge,
+    },
     glib::{
         translate::{FromGlibPtrNone, ToGlibPtr},
         Cast,
@@ -264,6 +268,36 @@ pub(crate) fn start_drag(window: &tauri::WebviewWindow) {
         let _ = app.get_webview_window(HOST.get().unwrap()).unwrap().start_dragging();
     } else {
         let _ = window.start_dragging();
+    }
+}
+
+fn get_resize_edge(direction: &str) -> WindowEdge {
+    match direction {
+        "South" => WindowEdge::South,
+        "SouthWest" => WindowEdge::SouthWest,
+        "SouthEast" => WindowEdge::SouthEast,
+        "West" => WindowEdge::West,
+        "East" => WindowEdge::East,
+        "North" => WindowEdge::North,
+        "NorthWest" => WindowEdge::NorthWest,
+        "NorthEast" => WindowEdge::NorthEast,
+        _ => WindowEdge::North,
+    }
+}
+
+pub(crate) fn start_resize_dragging(window: &tauri::WebviewWindow, direction: String) {
+    let app = window.app_handle();
+    let mode = app.state::<Mutex<WindowMode>>();
+    let mode = mode.lock().unwrap();
+
+    let window = if mode.tab_mode {
+        app.get_webview_window(HOST.get().unwrap()).unwrap().gtk_window().unwrap()
+    } else {
+        window.gtk_window().unwrap()
+    };
+    if let Some(cursor) = window.display().default_seat().and_then(|seat| seat.pointer()) {
+        let (_, x, y) = cursor.position();
+        window.begin_resize_drag(get_resize_edge(&direction), 1, x, y, gtk::gdk::ffi::GDK_CURRENT_TIME as _);
     }
 }
 

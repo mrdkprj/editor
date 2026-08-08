@@ -44,6 +44,7 @@ pub enum TabRequest {
     ToggleMaximize,
     Minimize,
     StartDrag,
+    StartResizeDrag(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,6 +192,7 @@ pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
         TabRequest::ToggleMaximize => platform_impl::toggle_maximize(window.app_handle()),
         TabRequest::Minimize => platform_impl::minimize(window.app_handle()),
         TabRequest::StartDrag => platform_impl::start_drag(window),
+        TabRequest::StartResizeDrag(direction) => platform_impl::start_resize_dragging(window, direction),
         TabRequest::ToggleTabMode(tab_mode) => return platform_impl::toggle_tab_mode(window, tab_mode),
     }
     true
