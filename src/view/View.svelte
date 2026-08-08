@@ -41,11 +41,10 @@
         e.stopPropagation();
         closeMenu();
         if (util.isWin()) {
-            await helper.openContextMenu(label, label, { x: e.screenX, y: e.screenY });
+            await helper.openContextMenu(label, { x: e.screenX, y: e.screenY });
         } else {
             await awaitContextMenu();
-            const opener = settings.tabMode ? MAIN_LABEL : label;
-            await helper.openContextMenu(opener, label, { x: e.clientX, y: e.clientY });
+            await helper.openContextMenu(label, { x: e.clientX, y: e.clientY });
         }
     };
 

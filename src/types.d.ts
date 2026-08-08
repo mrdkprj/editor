@@ -102,8 +102,7 @@ declare global {
         };
 
         type OpenContextMenuRequest = {
-            opener: string;
-            receiver: string;
+            label: string;
             position: Mp.Position;
         };
 

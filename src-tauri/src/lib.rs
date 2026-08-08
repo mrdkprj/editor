@@ -292,13 +292,6 @@ pub fn run() {
             helper::start(app.app_handle());
             helper::setup(app.app_handle(), args);
 
-            #[cfg(target_os = "linux")]
-            {
-                let window = app.get_webview_window("Main").unwrap();
-                let label = window.label().to_string();
-                let window_handle = get_window_handle(&window);
-                menu::create(app.app_handle(), label, window_handle);
-            }
             Ok(())
         })
         .on_window_event(|window, event| {

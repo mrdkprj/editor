@@ -14,8 +14,7 @@ pub struct AppMenu(HashMap<String, Menu>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenContextMenuRequest {
-    opener: String,
-    receiver: String,
+    label: String,
     position: Position,
 }
 
@@ -34,14 +33,14 @@ struct ContextMenuEvent {
 pub async fn popup_menu(app_handle: &tauri::AppHandle, e: OpenContextMenuRequest) {
     let state = app_handle.state::<Mutex<AppMenu>>();
     let state = state.lock().await;
-    let menu = state.0.get(&e.opener).unwrap();
+    let menu = state.0.get(&e.label).unwrap();
     let result = menu.popup_at_async(e.position.x, e.position.y).await;
 
     if let Some(item) = result {
         app_handle
             .emit_to(
                 tauri::EventTarget::WebviewWindow {
-                    label: e.receiver,
+                    label: e.label,
                 },
                 MENU_EVENT_NAME,
                 ContextMenuEvent {

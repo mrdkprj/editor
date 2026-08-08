@@ -8,7 +8,7 @@ use gtk::{
         translate::{FromGlibPtrNone, ToGlibPtr},
         Cast,
     },
-    traits::{BinExt, BoxExt, ContainerExt, OverlayExt, WidgetExt},
+    traits::{BinExt, BoxExt, ContainerExt, GtkWindowExt, OverlayExt, WidgetExt},
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewWindow};
@@ -276,8 +276,15 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab) {
     vbox.add_overlay(&webview);
     vbox.reorder_overlay(&webview, 0);
     webview.show();
+    /* Must show so that menu can popup */
+    child.gtk_window().unwrap().show();
+    /*
+        Use set_transient_for to prevent warning for context menu
+        Couldn't map as window 0x609c56791bd0 as popup because it doesn't have a parent
+    */
+    child.gtk_window().unwrap().set_transient_for(Some(&parent_window.gtk_window().unwrap()));
 
-    /* Hide the original window */
+    /* Then Hide the original window */
     let _ = child.hide();
 }
 
@@ -327,8 +334,15 @@ fn detach_from_tab(app: &tauri::AppHandle, removed: &Tab, show: bool) {
             let webview = to_widget(removed.window_handle);
             overlay.remove(&webview);
             window.default_vbox().unwrap().pack_start(&webview, true, true, 0);
+
             if show {
-                let _ = window.show();
+                window.gtk_window().unwrap().hide();
+                window.gtk_window().unwrap().set_transient_for(None::<&gtk::Window>);
+                let child = app.clone();
+                let label = removed.label.clone();
+                gtk::glib::idle_add_local_once(move || {
+                    let _ = child.get_webview_window(&label).unwrap().show();
+                });
             }
         }
     }
