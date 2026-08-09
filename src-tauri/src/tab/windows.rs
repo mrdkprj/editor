@@ -119,6 +119,10 @@ pub fn detach(app: &tauri::AppHandle, label: &str) {
     let state = state.lock().unwrap();
 
     if let Some((index, tab)) = state.tabs.iter().enumerate().find(|(_, tab)| tab.label == label) {
+        let position = app.get_webview_window(HOST.get().unwrap()).unwrap().outer_position().unwrap();
+        /* Set parent's position */
+        let _ = unsafe { SetWindowPos(to_hwnd(tab.window_handle), Some(HWND_BOTTOM), position.x, position.y, tab.bounds.width as _, tab.bounds.height as _, SWP_HIDEWINDOW) };
+        detach_from_tab(tab, false);
         after_detach(tab.window_handle);
 
         if state.tabs.len() == 1 {
@@ -349,9 +353,14 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
 
 #[allow(dead_code, unused_variables)]
 pub(crate) fn start_drag(window: &tauri::WebviewWindow) {}
+#[allow(dead_code, unused_variables)]
+pub(crate) fn start_resize_dragging(window: &tauri::WebviewWindow, direction: String) {}
 
 fn detach_from_tab(removed: &Tab, show: bool) {
-    unsafe { SetWindowLongPtrW(to_hwnd(removed.window_handle), GWL_STYLE, removed.style) };
+    /* Restore style only when showing window. Otherwise, closing tabs causes flicker */
+    if show {
+        unsafe { SetWindowLongPtrW(to_hwnd(removed.window_handle), GWL_STYLE, removed.style) };
+    }
 
     if let Some(parent) = removed.parent {
         unsafe { SetParent(to_hwnd(removed.window_handle), Some(to_hwnd(parent))).unwrap() };
