@@ -13,7 +13,6 @@ declare global {
         contextmenu_event: Mp.ContextMenuEvent;
         watch_event: Mp.WatchEvent;
         watch_confirm_event: Mp.WatchConfirmEvent;
-        bring_to_frong: Mp.AnyEvent;
         grep_progress: Mp.GrepProgress;
         grep_end: Mp.AnyEvent;
         dialog: boolean;

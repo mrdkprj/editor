@@ -263,8 +263,13 @@ fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
 }
 
 fn before_attach(window: &tauri::WebviewWindow) {
+    let child = window.hwnd().unwrap();
+
     /* On Windows, window must be shown before attach. Otherwise, focus can be moved to the parent */
-    let _ = unsafe { SetWindowPos(window.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
+    // let _ = unsafe { SetWindowPos(child, None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
+    let _ = unsafe { SetWindowPos(child, None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
+    // window.show().unwrap();
+    // unsafe { SetWindowLongPtrW(child, GWL_EXSTYLE, ex_style as isize) };
 }
 
 fn after_detach(window_handle: isize) {
@@ -288,6 +293,7 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
     let _ = unsafe {
         SetWindowPos(child, Some(HWND_BOTTOM), -tab.inset.x, -TOP_RESIZE_BORDER_SIZE, width + tab.inset.x * 2, height + TOP_RESIZE_BORDER_SIZE + tab.inset.y * 2, SWP_FRAMECHANGED | SWP_NOACTIVATE)
     };
+
     let _ = unsafe { SetWindowSubclass(child, Some(child_proc), 300, Box::into_raw(Box::new(parent_window.app_handle().clone())) as usize) };
 }
 

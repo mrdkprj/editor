@@ -274,7 +274,7 @@ fn update_title(app: AppHandle, payload: helper::WindowTitle) {
 }
 
 #[tauri::command]
-fn is_file_opened(app: tauri::AppHandle, payload: String) -> Option<String> {
+fn is_file_opened(app: tauri::AppHandle, payload: String) -> bool {
     helper::is_file_opened(&app, Some(payload))
 }
 

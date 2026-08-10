@@ -298,10 +298,9 @@
         }
 
         if (!contentState.fullPath && !contentState.isDirty && contentState.mode != "grep") {
-            /* If any window already opens the file, bring it to front */
-            const openedWindowLabel = await ipc.invoke("is_file_opened", filePath);
-            if (openedWindowLabel) {
-                return ipc.sendTo(openedWindowLabel, "bring_to_frong", {});
+            const alreadyOpened = await ipc.invoke("is_file_opened", filePath);
+            if (alreadyOpened) {
+                return;
             }
 
             const data = await helper.readFile(filePath);

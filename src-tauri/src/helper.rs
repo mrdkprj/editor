@@ -1,7 +1,7 @@
 use crate::{
     fgrep::{self, GrepRequest},
     menu::{self, AppMenu},
-    tab,
+    tab::{self, WindowMode},
     watcher::{self, WatchTx},
     WriteFileInfo,
 };
@@ -14,7 +14,7 @@ use std::{
         Mutex, OnceLock,
     },
 };
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 static UUID: AtomicU16 = AtomicU16::new(0);
 static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
@@ -141,17 +141,31 @@ pub fn setup(app: &tauri::AppHandle, args: Vec<String>) -> Option<String> {
     opening_file
 }
 
-/* Check if the file is already opened. If any, returns the window label */
-pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> Option<String> {
+/* Check if the file is already opened. If any, bring the windwo to front */
+pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> bool {
     let opening_file_path = opening_file_path.unwrap_or_default();
     let state = app.state::<Mutex<WindowLabels>>();
     let state = state.lock().unwrap();
     let already_opened = state.labels.iter().filter(|(_, title)| !title.path.is_empty() && title.path == opening_file_path).map(|(label, _)| label).collect::<Vec<&String>>();
     if already_opened.is_empty() {
-        None
-    } else {
-        Some(already_opened[0].to_string())
+        return false;
     }
+
+    let label = already_opened[0];
+    let window = app.get_webview_window(label).unwrap();
+    let tab_mode = {
+        let mode = app.state::<Mutex<WindowMode>>();
+        let mode = mode.lock().unwrap();
+        mode.tab_mode
+    };
+
+    if tab_mode {
+        crate::tab::handle_request(&window, tab::TabRequest::Select(label.to_string()));
+    } else {
+        let _ = app.get_webview_window(label).unwrap().set_focus();
+    }
+
+    true
 }
 
 pub fn change_theme(app: &tauri::AppHandle, is_dark: bool) {
@@ -161,15 +175,7 @@ pub fn change_theme(app: &tauri::AppHandle, is_dark: bool) {
 }
 
 pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<String>) {
-    if let Some(label) = is_file_opened(app, opening_file_path) {
-        app.emit_to(
-            tauri::EventTarget::WebviewWindow {
-                label,
-            },
-            "bring_to_frong",
-            (),
-        )
-        .unwrap();
+    if is_file_opened(app, opening_file_path) {
         return;
     }
     let id = UUID.fetch_add(1, Relaxed);
