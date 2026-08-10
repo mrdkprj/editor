@@ -427,7 +427,7 @@
         updateModel(restoreDecoration);
     };
 
-    const onTabEvent = (e: Mp.TabEvent) => {
+    const onTabEvent = (e: Tab.TabEvent) => {
         if (e.name == "activated") {
             restoreFocus();
         }

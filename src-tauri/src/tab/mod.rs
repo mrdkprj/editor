@@ -10,12 +10,6 @@ pub(crate) mod platform_impl;
 pub(crate) mod platform_impl;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct DragResizeEvent {
-    label: String,
-    direction: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "name", content = "data", rename_all = "camelCase")]
 enum TabEvent {
     Maximized,
@@ -27,7 +21,6 @@ enum TabEvent {
     Added(Title),
     Activated,
     Close(),
-    DragResize(DragResizeEvent),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,8 +60,6 @@ pub struct WindowMode {
     pub active_tab_label: String,
     pub close_all: bool,
     pub window_handle: isize,
-    pub resizing: bool,
-    pub propagated: bool,
     pub minimized: bool,
 }
 

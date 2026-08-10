@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, tick, untrack } from "svelte";
-    import { getCurrentWebviewWindow, WebviewWindow } from "@tauri-apps/api/webviewWindow";
+    import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
     import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
@@ -528,7 +528,7 @@
         await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
     };
 
-    const onTabEvent = async (e: Mp.TabEvent) => {
+    const onTabEvent = async (e: Tab.TabEvent) => {
         switch (e.name) {
             case "activated": {
                 getCurrentWebview().setFocus();
@@ -576,12 +576,6 @@
             }
             case "scrolled": {
                 tabs.scrollLeft = e.data;
-                break;
-            }
-            case "dragResize": {
-                /* Only on Windows, drag-resize can happen on child */
-                const target = await WebviewWindow.getByLabel(e.data.label);
-                target?.startResizeDragging(e.data.direction as Mp.ResizeDirection);
                 break;
             }
         }

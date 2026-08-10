@@ -1,14 +1,14 @@
 use crate::{
     helper::WindowLabels,
-    tab::{emit, emit_to, Bounds, DragResizeEvent, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowInset, WindowMode, HOST},
+    tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowInset, WindowMode, HOST},
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewWindow};
 use windows::Win32::{
-    Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
+    Foundation::{HWND, LPARAM, LRESULT, POINT, POINTS, RECT, WPARAM},
     Graphics::Gdi::ClientToScreen,
     UI::{
-        Input::KeyboardAndMouse::SetFocus,
+        Input::KeyboardAndMouse::{ReleaseCapture, SetFocus},
         Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
         WindowsAndMessaging::*,
     },
@@ -141,7 +141,6 @@ pub fn detach(app: &tauri::AppHandle, label: &str) {
         if state.tabs.len() == 1 {
             /* If this is the last tab, hide the host */
             let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
-            remove_subclass(host.hwnd().unwrap());
             let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
             let _ = host.hide();
         } else {
@@ -209,14 +208,6 @@ pub fn toggle_maximize(app: &tauri::AppHandle) {
         let _ = host.maximize();
         emit(app, TabEvent::Maximized, None);
     }
-    after_toggle(app);
-}
-
-fn after_toggle(app: &tauri::AppHandle) {
-    let mode = app.state::<Mutex<WindowMode>>();
-    if let Ok(mode) = mode.try_lock() {
-        on_resized(mode.window_handle);
-    };
 }
 
 pub fn minimize(app: &tauri::AppHandle) {
@@ -256,8 +247,6 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
     bring_to_front(app, tabs, mode, activator);
 
     host.set_position(pos).unwrap();
-
-    let _ = unsafe { SetWindowSubclass(host.hwnd().unwrap(), Some(proc), 200, Box::into_raw(Box::new(app.clone())) as usize) };
 }
 
 fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
@@ -270,7 +259,6 @@ fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
         after_detach(tab.window_handle);
     }
 
-    remove_subclass(host.hwnd().unwrap());
     host.hide().unwrap();
 }
 
@@ -367,9 +355,45 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
 }
 
 #[allow(dead_code, unused_variables)]
-pub(crate) fn start_drag(window: &tauri::WebviewWindow) {}
-#[allow(dead_code, unused_variables)]
-pub(crate) fn start_resize_dragging(window: &tauri::WebviewWindow, direction: String) {}
+pub(crate) fn start_drag(window: &tauri::WebviewWindow) {
+    /* css "-webkit-app-region: drag" does on Windows */
+}
+
+fn get_resize_edge(direction: &str) -> u32 {
+    match direction {
+        "South" => WMSZ_BOTTOM,
+        "SouthWest" => WMSZ_BOTTOMLEFT,
+        "SouthEast" => WMSZ_BOTTOMRIGHT,
+        "West" => WMSZ_LEFT,
+        "East" => WMSZ_RIGHT,
+        "North" => WMSZ_TOP,
+        "NorthWest" => WMSZ_TOPLEFT,
+        "NorthEast" => WMSZ_TOPRIGHT,
+        _ => WMSZ_TOP,
+    }
+}
+
+pub(crate) fn start_resize_dragging(window: &tauri::WebviewWindow, direction: String) {
+    let edge = get_resize_edge(&direction);
+    if let Ok(hwnd) = window.hwnd() {
+        let points = {
+            let mut pos = POINT::default();
+            let _ = unsafe { GetCursorPos(&mut pos) };
+            pos
+        };
+        let points = POINTS {
+            x: points.x as i16,
+            y: points.y as i16,
+        };
+
+        drag_resize_window(hwnd, WPARAM(edge as usize), LPARAM(&points as *const _ as _));
+    }
+}
+
+fn drag_resize_window(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) {
+    let _ = unsafe { ReleaseCapture() };
+    let _ = unsafe { PostMessageW(Some(hwnd), WM_NCLBUTTONDOWN, wparam, lparam) };
+}
 
 fn detach_from_tab(removed: &Tab, show: bool) {
     /* Restore style only when showing window. Otherwise, closing tabs causes flicker */
@@ -393,115 +417,27 @@ fn detach_from_tab(removed: &Tab, show: bool) {
     }
 }
 
-unsafe extern "system" fn proc(hwnd: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
-    if umsg == WM_EXITSIZEMOVE {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let mode = app.state::<Mutex<WindowMode>>();
-        if let Ok(mode) = mode.try_lock() {
-            on_resized(mode.window_handle);
-        };
-    }
-
-    if umsg == WM_SIZE {
-        if wparam.0 as u32 == SIZE_MINIMIZED {
-            let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-            let app = &*item_data_ptr;
-            let mode = app.state::<Mutex<WindowMode>>();
-            if let Ok(mut mode) = mode.try_lock() {
-                mode.minimized = true;
-            };
-        }
-
-        if wparam.0 as u32 == SIZE_RESTORED {
-            let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-            let app = &*item_data_ptr;
-            let mode = app.state::<Mutex<WindowMode>>();
-            if let Ok(mut mode) = mode.try_lock() {
-                if mode.minimized {
-                    mode.minimized = false;
-                    on_restore(mode.window_handle);
-                }
-            };
-        }
-    }
-
-    DefSubclassProc(hwnd, umsg, wparam, lparam)
-}
-
-fn get_resize_direction(flag: u32) -> &'static str {
-    match flag {
-        WMSZ_BOTTOM => "South",
-        WMSZ_BOTTOMLEFT => "SouthWest",
-        WMSZ_BOTTOMRIGHT => "SouthEast",
-        WMSZ_LEFT => "West",
-        WMSZ_RIGHT => "East",
-        WMSZ_TOP => "North",
-        WMSZ_TOPLEFT => "NorthWest",
-        WMSZ_TOPRIGHT => "NorthEast",
-        _ => "North",
-    }
-}
-
 unsafe extern "system" fn child_proc(hwnd: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
-    if umsg == WM_WINDOWPOSCHANGING {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let mode = app.state::<Mutex<WindowMode>>();
-        if let Ok(mode) = mode.try_lock() {
-            if mode.resizing {
-                let pos = &mut *(lparam.0 as *mut WINDOWPOS);
-                pos.flags |= SWP_NOMOVE;
+    if umsg == WM_NCLBUTTONDOWN {
+        let hit_test = wparam.0 as u32;
+
+        let is_resize_edge = matches!(hit_test, HTTOP | HTBOTTOM | HTLEFT | HTRIGHT | HTTOPLEFT | HTTOPRIGHT | HTBOTTOMLEFT | HTBOTTOMRIGHT);
+
+        if is_resize_edge {
+            let item_data_ptr = dwrefdata as *const tauri::AppHandle;
+            let app = &*item_data_ptr;
+            if let Ok(parent_hwnd) = app.get_webview_window(HOST.get().unwrap()).unwrap().hwnd() {
+                drag_resize_window(parent_hwnd, wparam, lparam);
+                /*
+                   Return 0 so DefSubclassProc is NOT called for the child.
+                   This prevents the child from entering WM_ENTERSIZEMOVE entirely.
+                */
+                return LRESULT(0);
             }
-        };
-    }
-
-    if umsg == WM_ENTERSIZEMOVE {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let mode = app.state::<Mutex<WindowMode>>();
-        if let Ok(mut mode) = mode.try_lock() {
-            mode.resizing = true;
-            mode.propagated = false;
-        };
-    }
-
-    if umsg == WM_EXITSIZEMOVE {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let mode = app.state::<Mutex<WindowMode>>();
-        if let Ok(mut mode) = mode.try_lock() {
-            mode.resizing = false;
-            mode.propagated = false;
-        };
-    }
-
-    if umsg == WM_SIZING {
-        let item_data_ptr = dwrefdata as *const tauri::AppHandle;
-        let app = &*item_data_ptr;
-        let mode = app.state::<Mutex<WindowMode>>();
-        if let Ok(mut mode) = mode.try_lock() {
-            mode.resizing = false;
-            if !mode.propagated {
-                let direction = get_resize_direction(wparam.0 as u32);
-                emit_to(
-                    app,
-                    TabEvent::DragResize(DragResizeEvent {
-                        label: HOST.get().unwrap().to_string(),
-                        direction: direction.to_string(),
-                    }),
-                    &mode.active_tab_label,
-                );
-                mode.propagated = true;
-            }
-        };
+        }
     }
 
     DefSubclassProc(hwnd, umsg, wparam, lparam)
-}
-
-fn remove_subclass(hwnd: HWND) {
-    let _ = unsafe { RemoveWindowSubclass(hwnd, Some(proc), 200) };
 }
 
 pub fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
@@ -518,19 +454,6 @@ pub fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
             )
         };
     }
-}
-
-fn on_resized(window_handle: isize) {
-    let _ = unsafe { SetWindowPos(to_hwnd(window_handle), Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
-}
-
-fn on_restore(window_handle: isize) {
-    /* Restore z order after 5 millisecs when the parent is restored from minimized state */
-    smol::spawn(async move {
-        smol::Timer::after(Duration::from_millis(5)).await;
-        on_resized(window_handle);
-    })
-    .detach();
 }
 
 fn to_hwnd(ptr: isize) -> HWND {

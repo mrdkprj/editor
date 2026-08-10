@@ -27,6 +27,34 @@ declare global {
         tab_event: Mp.TabEvent;
     };
 
+    namespace Tab {
+        type TabEvent =
+            | { name: "maximized"; data?: never }
+            | { name: "unmaximized"; data?: never }
+            | { name: "titleChanged"; data: WebviewTitle }
+            | { name: "reordered"; data: Mp.WebviewTitle[] }
+            | { name: "closed"; data: string }
+            | { name: "modeChanged"; data: { tab_mode: boolean; tabs: WebviewTitle[] } }
+            | { name: "close"; data?: never }
+            | { name: "scrolled"; data: number }
+            | { name: "activated"; data?: never }
+            | { name: "added"; data: WebviewTitle };
+
+        type TabRequest =
+            | { name: "select"; data: string }
+            | { name: "reorder"; data: WebviewTitle[] }
+            | { name: "closeAll"; data?: never }
+            | { name: "cancel"; data?: never }
+            | { name: "update"; data: WebviewTitle }
+            | { name: "add"; data?: never }
+            | { name: "detach"; data?: never }
+            | { name: "minimize"; data?: never }
+            | { name: "toggleMaximize"; data?: never }
+            | { name: "startDrag"; data?: never }
+            | { name: "startResizeDrag"; data: ResizeDirection }
+            | { name: "toggleTabMode"; data: boolean };
+    }
+
     namespace Mp {
         type Theme = "dark" | "light" | "system";
         type Mode = "editor" | "grep" | "none";
@@ -51,38 +79,6 @@ declare global {
             | "searchHighlight"
             | "searchHighlightBackground"
             | "link";
-
-        type DragResizeEvent = {
-            label: string;
-            direction: string;
-        };
-
-        type TabEvent =
-            | { name: "maximized"; data?: never }
-            | { name: "unmaximized"; data?: never }
-            | { name: "titleChanged"; data: WebviewTitle }
-            | { name: "reordered"; data: Mp.WebviewTitle[] }
-            | { name: "closed"; data: string }
-            | { name: "modeChanged"; data: { tab_mode: boolean; tabs: WebviewTitle[] } }
-            | { name: "close"; data?: never }
-            | { name: "scrolled"; data: number }
-            | { name: "activated"; data?: never }
-            | { name: "dragResize"; data: DragResizeEvent }
-            | { name: "added"; data: WebviewTitle };
-
-        type TabRequest =
-            | { name: "select"; data: string }
-            | { name: "reorder"; data: WebviewTitle[] }
-            | { name: "closeAll"; data?: never }
-            | { name: "cancel"; data?: never }
-            | { name: "update"; data: WebviewTitle }
-            | { name: "add"; data?: never }
-            | { name: "detach"; data?: never }
-            | { name: "minimize"; data?: never }
-            | { name: "toggleMaximize"; data?: never }
-            | { name: "startDrag"; data?: never }
-            | { name: "startResizeDrag"; data: ResizeDirection }
-            | { name: "toggleTabMode"; data: boolean };
 
         type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
 
