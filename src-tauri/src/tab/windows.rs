@@ -103,6 +103,7 @@ pub fn add(window: &tauri::WebviewWindow) {
         if host.is_minimized().unwrap() {
             host.unminimize().unwrap();
         }
+        let _ = host.set_focus();
     })
     .detach();
 }
@@ -264,12 +265,8 @@ fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
 
 fn before_attach(window: &tauri::WebviewWindow) {
     let child = window.hwnd().unwrap();
-
     /* On Windows, window must be shown before attach. Otherwise, focus can be moved to the parent */
-    // let _ = unsafe { SetWindowPos(child, None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
     let _ = unsafe { SetWindowPos(child, None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
-    // window.show().unwrap();
-    // unsafe { SetWindowLongPtrW(child, GWL_EXSTYLE, ex_style as isize) };
 }
 
 fn after_detach(window_handle: isize) {

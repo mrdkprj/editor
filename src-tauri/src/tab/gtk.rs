@@ -83,6 +83,18 @@ pub fn add(window: &tauri::WebviewWindow) {
     attach_to_tab(&host, tab);
     /* Delay switching for smooth rendering */
     bring_to_front_async(app, tab.clone());
+
+    /* Unminimize */
+    let app = app.clone();
+    smol::spawn(async move {
+        smol::Timer::after(Duration::from_millis(5)).await;
+        let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
+        if host.is_minimized().unwrap() {
+            host.unminimize().unwrap();
+        }
+        let _ = host.set_focus();
+    })
+    .detach();
 }
 
 pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {

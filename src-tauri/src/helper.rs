@@ -190,6 +190,13 @@ pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<Strin
     } else {
         Some(tauri::Theme::Light)
     };
+    {
+        let mode = app.state::<Mutex<WindowMode>>();
+        let mode = mode.lock().unwrap();
+        if mode.tab_mode {
+            config.focus = false;
+        }
+    }
     tauri::WebviewWindowBuilder::from_config(app, &config).unwrap().build().unwrap();
 }
 
