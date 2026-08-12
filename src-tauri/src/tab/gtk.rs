@@ -79,6 +79,15 @@ pub fn add(window: &tauri::WebviewWindow) {
         state.tabs.push(tab);
         state.tabs.last_mut().unwrap()
     };
+
+    /* First send TabEvent::Added to the created window so that the tab looks active */
+    let event = TabEvent::Added(Title {
+        label: tab.label.clone(),
+        title: tab.title.clone(),
+        path: tab.path.clone(),
+    });
+    emit_to(app, event, &tab.label);
+
     tab.bounds = get_bounds(&app.get_webview_window(label).unwrap());
     let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
     attach_to_tab(&host, tab);
@@ -121,8 +130,27 @@ pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
 pub fn detach(app: &tauri::AppHandle, label: &str) {
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
-    if let Some(tab) = state.tabs.iter().find(|tab| tab.label == label) {
+    if let Some((index, tab)) = state.tabs.iter().enumerate().find(|(_, tab)| tab.label == label) {
         detach_from_tab(app, tab, false);
+
+        if state.tabs.len() == 1 {
+            /* If this is the last tab, hide the host */
+            let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
+            let _ = host.hide();
+        } else {
+            /* Change active tab only instead of changing child to top-level window */
+            let mode = app.state::<Mutex<WindowMode>>();
+            let mut mode = mode.lock().unwrap();
+            if mode.active_tab_label == label {
+                let is_last = index == state.tabs.len() - 1;
+                let tab = if is_last {
+                    state.tabs.get(index - 1).unwrap()
+                } else {
+                    state.tabs.get(index).unwrap()
+                };
+                bring_to_front(app, &state.tabs, &mut mode, &tab.label);
+            }
+        }
     }
 }
 
@@ -240,32 +268,22 @@ fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
 }
 
 pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
-    let state = app.state::<Mutex<TabState>>();
-    let mut state = state.lock().unwrap();
     let mode = app.state::<Mutex<WindowMode>>();
-    let mut mode = mode.lock().unwrap();
+    let mode = mode.lock().unwrap();
 
     if !mode.tab_mode {
         return;
     }
 
+    let state = app.state::<Mutex<TabState>>();
+    let mut state = state.lock().unwrap();
+
     if let Some(index) = state.tabs.iter().position(|tab| tab.label == label) {
         let _ = state.tabs.remove(index);
-        if state.tabs.is_empty() {
-            let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
-            let _ = host.hide();
-        } else {
-            let is_last = index == state.tabs.len();
 
-            if mode.active_tab_label == label && !state.tabs.is_empty() {
-                let tab = if is_last {
-                    state.tabs.get(index - 1).unwrap()
-                } else {
-                    state.tabs.get(index).unwrap()
-                };
-                bring_to_front(app, &state.tabs, &mut mode, &tab.label);
-            }
+        if !state.tabs.is_empty() {
             emit(app, TabEvent::Closed(label.to_string()), None);
+
             if mode.close_all {
                 emit_to(app, TabEvent::Close(), &state.tabs.last().unwrap().label);
             }
@@ -352,35 +370,8 @@ fn bring_to_front(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, l
 }
 
 fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab) {
-    // smol::spawn(async move {
-    //     smol::Timer::after(Duration::from_millis(50)).await;
-    //     let state = app.state::<Mutex<TabState>>();
-    //     if let Ok(state) = state.try_lock() {
-    //         let mode = app.state::<Mutex<WindowMode>>();
-    //         if let Ok(mut mode) = mode.try_lock() {
-    //             bring_to_front(&app, &state.tabs, &mut mode, &tab.label);
-    //             emit(
-    //                 &app,
-    //                 TabEvent::Added(Title {
-    //                     label: tab.label,
-    //                     title: tab.title,
-    //                     path: tab.path,
-    //                 }),
-    //                 None,
-    //             );
-    //         };
-    //     };
-    // })
-    // .detach();
-
     let app = app.clone();
-    gtk::glib::spawn_future_local(async move {
-        let event = TabEvent::Added(Title {
-            label: tab.label.clone(),
-            title: tab.title,
-            path: tab.path,
-        });
-        emit_to(&app, event.clone(), &tab.label);
+    smol::spawn(async move {
         let state = app.state::<Mutex<TabState>>();
         if let Ok(state) = state.try_lock() {
             let mode = app.state::<Mutex<WindowMode>>();
@@ -388,31 +379,19 @@ fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab) {
                 bring_to_front(&app, &state.tabs, &mut mode, &tab.label);
             };
         };
-
-        smol::Timer::after(Duration::from_millis(500)).await;
-        emit(&app, event, Some(&tab.label));
-    });
-    // smol::spawn(async move {
-    //     // smol::Timer::after(Duration::from_millis(50)).await;
-    //     let state = app.state::<Mutex<TabState>>();
-    //     if let Ok(state) = state.try_lock() {
-    //         let mode = app.state::<Mutex<WindowMode>>();
-    //         if let Ok(mut mode) = mode.try_lock() {
-    //             bring_to_front(&app, &state.tabs, &mut mode, &tab.label);
-    //         };
-    //     };
-    //     smol::Timer::after(Duration::from_millis(500)).await;
-    //     emit(
-    //         &app,
-    //         TabEvent::Added(Title {
-    //             label: tab.label,
-    //             title: tab.title,
-    //             path: tab.path,
-    //         }),
-    //         None,
-    //     );
-    // })
-    // .detach();
+        /* Send TabEvent::Added to others in delay to decrease flicker*/
+        smol::Timer::after(Duration::from_millis(50)).await;
+        emit(
+            &app,
+            TabEvent::Added(Title {
+                label: tab.label.clone(),
+                title: tab.title,
+                path: tab.path,
+            }),
+            Some(&tab.label),
+        );
+    })
+    .detach();
 }
 
 fn detach_from_tab(app: &tauri::AppHandle, removed: &Tab, show: bool) {
