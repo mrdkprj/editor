@@ -29,7 +29,7 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     if mode.tab_mode != tab_mode {
         mode.tab_mode = tab_mode;
         if tab_mode {
-            let tab = new_tab(app, from_widget(window.default_vbox().unwrap().children().first().unwrap()), window.label());
+            let tab = new_tab(app, window);
             if !state.tabs.contains(&tab) {
                 state.tabs.push(tab);
             }
@@ -65,6 +65,7 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     changed
 }
 
+// added sent to current active child and then added child reordered
 pub fn add(window: &tauri::WebviewWindow) {
     let app = window.app_handle();
     let label = window.label();
@@ -74,7 +75,7 @@ pub fn add(window: &tauri::WebviewWindow) {
     let tab = if let Some(tab) = state.tabs.iter_mut().find(|tab| tab.label == label) {
         tab
     } else {
-        let tab = new_tab(app, from_widget(window.default_vbox().unwrap().children().first().unwrap()), window.label());
+        let tab = new_tab(app, window);
         state.tabs.push(tab);
         state.tabs.last_mut().unwrap()
     };
@@ -130,7 +131,7 @@ pub fn select_tab(app: &tauri::AppHandle, label: String) {
     let state = state.lock().unwrap();
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
-    bring_to_front(app, &state.tabs, &mut mode, label);
+    bring_to_front(app, &state.tabs, &mut mode, &label);
 }
 
 pub fn reorder_tab(window: &tauri::WebviewWindow, tabs: Vec<WebviewTitle>) {
@@ -188,7 +189,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
         attach_to_tab(&host, tab);
     }
 
-    bring_to_front(app, tabs, mode, activator.to_string());
+    bring_to_front(app, tabs, mode, activator);
 
     let _ = host.show();
 }
@@ -262,7 +263,7 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
                 } else {
                     state.tabs.get(index).unwrap()
                 };
-                bring_to_front(app, &state.tabs, &mut mode, tab.label.clone());
+                bring_to_front(app, &state.tabs, &mut mode, &tab.label);
             }
             emit(app, TabEvent::Closed(label.to_string()), None);
             if mode.close_all {
@@ -326,7 +327,7 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab) {
     child.gtk_window().unwrap().show();
     /*
         Use set_transient_for to prevent warning for context menu
-        Couldn't map as window 0x609c56791bd0 as popup because it doesn't have a parent
+        Couldn't map as window as popup because it doesn't have a parent
     */
     child.gtk_window().unwrap().set_transient_for(Some(&parent_window.gtk_window().unwrap()));
 
@@ -334,7 +335,7 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab) {
     let _ = child.hide();
 }
 
-fn bring_to_front(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, label: String) {
+fn bring_to_front(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, label: &str) {
     if mode.active_tab_label == label {
         return;
     }
@@ -343,32 +344,75 @@ fn bring_to_front(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, l
     let overlay = get_overlay(&host);
 
     if let Some(new) = tabs.iter().find(|s| s.label == label) {
-        overlay.reorder_overlay(&to_widget(new.window_handle), -1);
-        emit_to(app, TabEvent::Activated, &label);
-        mode.active_tab_label = label;
+        let webview = to_widget(new.window_handle);
+        overlay.reorder_overlay(&webview, -1);
+        emit_to(app, TabEvent::Activated, label);
+        mode.active_tab_label = label.to_string();
     }
 }
 
 fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab) {
+    // smol::spawn(async move {
+    //     smol::Timer::after(Duration::from_millis(50)).await;
+    //     let state = app.state::<Mutex<TabState>>();
+    //     if let Ok(state) = state.try_lock() {
+    //         let mode = app.state::<Mutex<WindowMode>>();
+    //         if let Ok(mut mode) = mode.try_lock() {
+    //             bring_to_front(&app, &state.tabs, &mut mode, &tab.label);
+    //             emit(
+    //                 &app,
+    //                 TabEvent::Added(Title {
+    //                     label: tab.label,
+    //                     title: tab.title,
+    //                     path: tab.path,
+    //                 }),
+    //                 None,
+    //             );
+    //         };
+    //     };
+    // })
+    // .detach();
+
     let app = app.clone();
-    smol::spawn(async move {
-        smol::Timer::after(Duration::from_millis(50)).await;
+    gtk::glib::spawn_future_local(async move {
+        let event = TabEvent::Added(Title {
+            label: tab.label.clone(),
+            title: tab.title,
+            path: tab.path,
+        });
+        emit_to(&app, event.clone(), &tab.label);
         let state = app.state::<Mutex<TabState>>();
-        let state = state.lock().unwrap();
-        let mode = app.state::<Mutex<WindowMode>>();
-        let mut mode = mode.lock().unwrap();
-        bring_to_front(&app, &state.tabs, &mut mode, tab.label.clone());
-        emit(
-            &app,
-            TabEvent::Added(Title {
-                label: tab.label,
-                title: tab.title,
-                path: tab.path,
-            }),
-            None,
-        );
-    })
-    .detach();
+        if let Ok(state) = state.try_lock() {
+            let mode = app.state::<Mutex<WindowMode>>();
+            if let Ok(mut mode) = mode.try_lock() {
+                bring_to_front(&app, &state.tabs, &mut mode, &tab.label);
+            };
+        };
+
+        smol::Timer::after(Duration::from_millis(500)).await;
+        emit(&app, event, Some(&tab.label));
+    });
+    // smol::spawn(async move {
+    //     // smol::Timer::after(Duration::from_millis(50)).await;
+    //     let state = app.state::<Mutex<TabState>>();
+    //     if let Ok(state) = state.try_lock() {
+    //         let mode = app.state::<Mutex<WindowMode>>();
+    //         if let Ok(mut mode) = mode.try_lock() {
+    //             bring_to_front(&app, &state.tabs, &mut mode, &tab.label);
+    //         };
+    //     };
+    //     smol::Timer::after(Duration::from_millis(500)).await;
+    //     emit(
+    //         &app,
+    //         TabEvent::Added(Title {
+    //             label: tab.label,
+    //             title: tab.title,
+    //             path: tab.path,
+    //         }),
+    //         None,
+    //     );
+    // })
+    // .detach();
 }
 
 fn detach_from_tab(app: &tauri::AppHandle, removed: &Tab, show: bool) {
@@ -405,19 +449,21 @@ fn get_bounds(window: &tauri::WebviewWindow) -> Bounds {
     }
 }
 
-fn new_tab(app: &tauri::AppHandle, window_handle: isize, label: &str) -> Tab {
+fn new_tab(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Tab {
     let state = app.state::<Mutex<WindowLabels>>();
     let state = state.lock().unwrap();
 
-    let (title, path) = if let Some(title) = state.labels.get(label) {
+    let (title, path) = if let Some(title) = state.labels.get(window.label()) {
         (title.title.clone(), title.path.clone())
     } else {
         (String::new(), String::new())
     };
 
+    let window_handle = from_widget(window.default_vbox().unwrap().children().first().unwrap());
+
     Tab {
         window_handle,
-        label: label.to_string(),
+        label: window.label().to_string(),
         title,
         path,
         inset: super::WindowInset {
