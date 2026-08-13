@@ -8,6 +8,10 @@ pub(crate) mod platform_impl;
 #[cfg(target_os = "windows")]
 #[path = "windows.rs"]
 pub(crate) mod platform_impl;
+// #[cfg(target_os = "windows")]
+// mod undecorated_resizing;
+// #[cfg(target_os = "windows")]
+// mod util;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "name", content = "data", rename_all = "camelCase")]
@@ -55,7 +59,6 @@ struct Title {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WindowMode {
-    pub host: String,
     pub tab_mode: bool,
     pub active_tab_label: String,
     pub close_all: bool,
@@ -89,11 +92,15 @@ pub(crate) struct Tab {
     pub label: String,
     pub title: String,
     pub path: String,
-    inset: WindowInset,
-    style: isize,
-    parent: Option<isize>,
-    owner: Option<isize>,
     bounds: Bounds,
+    #[cfg(windows)]
+    inset: WindowInset,
+    #[cfg(windows)]
+    style: isize,
+    #[cfg(windows)]
+    parent: Option<isize>,
+    #[cfg(windows)]
+    owner: Option<isize>,
 }
 
 impl PartialEq for Tab {
@@ -111,11 +118,15 @@ struct WindowInset {
 pub(crate) static HOST: OnceLock<String> = OnceLock::new();
 
 pub fn init(app: &tauri::AppHandle, host: &str) {
+    let _ = HOST.set(host.to_string());
+    let host = app.get_webview_window(host).unwrap();
+
     app.manage(Mutex::new(TabState::default()));
     app.manage(Mutex::new(WindowMode::default()));
-    let _ = HOST.set(host.to_string());
 
-    let host = app.get_webview_window(host).unwrap();
+    #[cfg(windows)]
+    platform_impl::prepare(app);
+
     let cloned = app.clone();
     host.on_window_event(move |e| match e {
         tauri::WindowEvent::Focused(focused) => {
@@ -132,7 +143,7 @@ pub fn init(app: &tauri::AppHandle, host: &str) {
                 if mode.tab_mode {
                     let state = cloned.state::<Mutex<TabState>>();
                     let state = state.lock().unwrap();
-                    platform_impl::on_resizing(&state.tabs, size.width as i32, size.height as i32);
+                    platform_impl::on_resized(&state.tabs, size.width as i32, size.height as i32);
                 }
             };
         }

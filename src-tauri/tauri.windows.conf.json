@@ -7,7 +7,7 @@
         "minHeight":400,
         "minWidth":400,
         "fullscreen": false,
-        "resizable": true,
+        "resizable": false,
         "maximizable":true,
         "minimizable":true,
         "closable":true,

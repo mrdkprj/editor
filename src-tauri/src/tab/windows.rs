@@ -4,24 +4,48 @@ use crate::{
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewWindow};
-use windows::Win32::{
-    Foundation::{HWND, LPARAM, LRESULT, POINT, POINTS, RECT, WPARAM},
-    Graphics::Gdi::ClientToScreen,
-    UI::{
-        Input::KeyboardAndMouse::{ReleaseCapture, SetFocus},
-        Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
-        WindowsAndMessaging::*,
+use windows::{
+    core::{w, Free, PCWSTR},
+    Win32::{
+        Foundation::{HWND, LPARAM, LRESULT, POINT, POINTS, RECT, WPARAM},
+        Graphics::Gdi::{ClientToScreen, CreateRectRgn, SetWindowRgn},
+        UI::{
+            Input::KeyboardAndMouse::{ReleaseCapture, SetFocus},
+            Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
+            WindowsAndMessaging::*,
+        },
     },
 };
 
 const OFF_SCREEN: i32 = -30000;
 const TOP_RESIZE_BORDER_SIZE: i32 = 1;
+const PARENT_SUBCLASS_ID: usize = 200;
+const CHILD_SUBCLASS_ID: usize = 300;
+/* Tauri's undecorated_resizing class name */
+const CLASS_NAME: PCWSTR = w!("TAURI_DRAG_RESIZE_BORDERS");
+const WINDOW_NAME: PCWSTR = w!("TAURI_DRAG_RESIZE_WINDOW");
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum WindowType {
     Top,
     Child,
     Owned,
+}
+
+#[derive(Debug, Default)]
+struct UndecoratedResizingData {
+    child: HWND,
+}
+
+pub fn prepare(app: &tauri::AppHandle) {
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
+    /*
+        Subclass is executed in LIFO (Last-In, First-Out) order.
+        To override the region set by Tauri's undecorated_resizing, install this subclass first.
+        Then set resizable true, which will install undecorated_resizing's subclass.
+    */
+    let _ = unsafe { SetWindowSubclass(host.hwnd().unwrap(), Some(subclass_parent), PARENT_SUBCLASS_ID, Box::into_raw(Box::new(UndecoratedResizingData::default())) as _) };
+    let _ = host.set_resizable(true);
 }
 
 pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
@@ -143,6 +167,7 @@ pub fn detach(app: &tauri::AppHandle, label: &str) {
             /* If this is the last tab, hide the host */
             let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
             let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
+            let _ = unsafe { RemoveWindowSubclass(host.hwnd().unwrap(), Some(subclass_parent), PARENT_SUBCLASS_ID) };
             let _ = host.hide();
         } else {
             /* Change active tab only instead of changing child to top-level window */
@@ -264,13 +289,12 @@ fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
 }
 
 fn before_attach(window: &tauri::WebviewWindow) {
-    let child = window.hwnd().unwrap();
     /* On Windows, window must be shown before attach. Otherwise, focus can be moved to the parent */
-    let _ = unsafe { SetWindowPos(child, None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
+    let _ = unsafe { SetWindowPos(window.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
 }
 
 fn after_detach(window_handle: isize) {
-    let _ = unsafe { RemoveWindowSubclass(to_hwnd(window_handle), Some(child_proc), 300) };
+    let _ = unsafe { RemoveWindowSubclass(to_hwnd(window_handle), Some(child_proc), CHILD_SUBCLASS_ID) };
 }
 
 fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i32) {
@@ -291,7 +315,7 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
         SetWindowPos(child, Some(HWND_BOTTOM), -tab.inset.x, -TOP_RESIZE_BORDER_SIZE, width + tab.inset.x * 2, height + TOP_RESIZE_BORDER_SIZE + tab.inset.y * 2, SWP_FRAMECHANGED | SWP_NOACTIVATE)
     };
 
-    let _ = unsafe { SetWindowSubclass(child, Some(child_proc), 300, Box::into_raw(Box::new(parent_window.app_handle().clone())) as usize) };
+    let _ = unsafe { SetWindowSubclass(child, Some(child_proc), CHILD_SUBCLASS_ID, Box::into_raw(Box::new(parent_window.app_handle().clone())) as usize) };
 }
 
 fn bring_to_front(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode, label: &str) {
@@ -419,6 +443,44 @@ fn detach_from_tab(removed: &Tab, show: bool) {
             unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED | SWP_SHOWWINDOW) };
     }
 }
+unsafe extern "system" fn subclass_parent(parent: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
+    if umsg == WM_SIZE {
+        let data = dwrefdata as *mut UndecoratedResizingData;
+        let data = &mut *data;
+
+        if data.child.is_invalid() {
+            if let Ok(undecorated) = unsafe { FindWindowExW(Some(parent), None, CLASS_NAME, WINDOW_NAME) } {
+                data.child = undecorated;
+            }
+        }
+
+        if !data.child.is_invalid() && !is_maximized(parent).unwrap_or(false) {
+            let mut rect = RECT::default();
+            if GetClientRect(parent, &mut rect).is_ok() {
+                let width = rect.right - rect.left;
+                /* Height must be 0 to remove extra top region */
+                /* hrgn1 must be mutable to call .free() later */
+                let mut hrgn1 = CreateRectRgn(0, 0, width, 0);
+
+                if SetWindowRgn(data.child, Some(hrgn1), true) == 0 {
+                    hrgn1.free();
+                }
+                return DefWindowProcW(parent, umsg, wparam, lparam);
+            }
+        }
+    }
+
+    DefSubclassProc(parent, umsg, wparam, lparam)
+}
+
+fn is_maximized(window: HWND) -> windows::core::Result<bool> {
+    let mut placement = WINDOWPLACEMENT {
+        length: std::mem::size_of::<WINDOWPLACEMENT>() as u32,
+        ..WINDOWPLACEMENT::default()
+    };
+    unsafe { GetWindowPlacement(window, &mut placement)? };
+    Ok(placement.showCmd == SW_MAXIMIZE.0 as u32)
+}
 
 unsafe extern "system" fn child_proc(hwnd: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
     if umsg == WM_NCLBUTTONDOWN {
@@ -443,7 +505,7 @@ unsafe extern "system" fn child_proc(hwnd: HWND, umsg: u32, wparam: WPARAM, lpar
     DefSubclassProc(hwnd, umsg, wparam, lparam)
 }
 
-pub fn on_resizing(tabs: &[Tab], width: i32, height: i32) {
+pub fn on_resized(tabs: &[Tab], width: i32, height: i32) {
     for tab in tabs {
         let _ = unsafe {
             SetWindowPos(

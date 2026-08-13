@@ -1093,6 +1093,7 @@ dependencies = [
  "grep",
  "gtk",
  "notify-debouncer-full",
+ "once_cell",
  "serde",
  "smol",
  "tauri",
