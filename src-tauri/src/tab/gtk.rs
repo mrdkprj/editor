@@ -445,13 +445,6 @@ fn new_tab(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Tab {
         label: window.label().to_string(),
         title,
         path,
-        inset: super::WindowInset {
-            x: 0,
-            y: 0,
-        },
-        style: 0,
-        parent: None,
-        owner: None,
         bounds: Bounds::default(),
     }
 }

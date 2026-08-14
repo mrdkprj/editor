@@ -107,6 +107,7 @@ impl PartialEq for Tab {
     }
 }
 
+#[cfg(windows)]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct WindowInset {
     x: i32,
