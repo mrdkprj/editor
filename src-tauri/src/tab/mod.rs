@@ -8,10 +8,6 @@ pub(crate) mod platform_impl;
 #[cfg(target_os = "windows")]
 #[path = "windows.rs"]
 pub(crate) mod platform_impl;
-// #[cfg(target_os = "windows")]
-// mod undecorated_resizing;
-// #[cfg(target_os = "windows")]
-// mod util;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "name", content = "data", rename_all = "camelCase")]
@@ -130,27 +126,15 @@ pub fn init(app: &tauri::AppHandle, host: &str) {
     platform_impl::prepare(app);
 
     let cloned = app.clone();
-    host.on_window_event(move |e| match e {
-        tauri::WindowEvent::Focused(focused) => {
-            let mode = cloned.state::<Mutex<WindowMode>>();
-            let mode = mode.lock().unwrap();
-            if mode.tab_mode && *focused {
-                emit_to(&cloned, TabEvent::Activated, &mode.active_tab_label);
-            }
-        }
-        #[cfg(target_os = "windows")]
-        tauri::WindowEvent::Resized(size) => {
+    host.on_window_event(move |e| {
+        if let tauri::WindowEvent::Focused(focused) = e {
             let mode = cloned.state::<Mutex<WindowMode>>();
             if let Ok(mode) = mode.try_lock() {
-                if mode.tab_mode {
-                    let state = cloned.state::<Mutex<TabState>>();
-                    if let Ok(state) = state.try_lock() {
-                        platform_impl::on_resized(&state.tabs, size.width as i32, size.height as i32);
-                    };
+                if mode.tab_mode && *focused {
+                    emit_to(&cloned, TabEvent::Activated, &mode.active_tab_label);
                 }
             };
         }
-        _ => {}
     });
 }
 

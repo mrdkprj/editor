@@ -19,8 +19,9 @@ use windows::{
 
 const OFF_SCREEN: i32 = -30000;
 const TOP_RESIZE_BORDER_SIZE: i32 = 1;
-const RESIZE_SUBCLASS_ID: usize = 200;
-const CHILD_SUBCLASS_ID: usize = 300;
+const PARENT_SUBCLASS_ID: usize = WM_USER as usize + 1;
+const RESIZE_SUBCLASS_ID: usize = WM_USER as usize + 2;
+const CHILD_SUBCLASS_ID: usize = WM_USER as usize + 3;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum WindowType {
@@ -35,8 +36,8 @@ pub fn prepare(app: &tauri::AppHandle) {
     let mut mode = mode.lock().unwrap();
 
     /*
-        To override the region set by Tauri's undecorated_resizing, install subclass to the resize window.
-        In case Tauri change will change class name, find the child window that has window region.
+        To override the region set by Tauri's undecorated_resizing, we need to install a subclass of the resize window.
+        In case Tauri change will change its class name, find the child window that has window region.
         If no window is found or multiple windows are found, cause panic not to proceed.
     */
     let mut children = Vec::new();
@@ -55,7 +56,6 @@ pub fn prepare(app: &tauri::AppHandle) {
     }
 
     mode.undecorated_resize = *children.first().unwrap();
-    let _ = unsafe { SetWindowSubclass(to_hwnd(mode.undecorated_resize), Some(subclass_parent), RESIZE_SUBCLASS_ID, host.hwnd().unwrap().0 as _) };
 }
 
 pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
@@ -171,7 +171,6 @@ pub fn detach(app: &tauri::AppHandle, label: &str) {
         /* Set parent's position */
         let _ = unsafe { SetWindowPos(to_hwnd(tab.window_handle), Some(HWND_BOTTOM), position.x, position.y, tab.bounds.width as _, tab.bounds.height as _, SWP_HIDEWINDOW) };
         detach_from_tab(tab, false);
-        after_detach(tab.window_handle);
 
         let mode = app.state::<Mutex<WindowMode>>();
         let mut mode = mode.lock().unwrap();
@@ -180,7 +179,7 @@ pub fn detach(app: &tauri::AppHandle, label: &str) {
             /* If this is the last tab, hide the host */
             let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
             let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
-            let _ = unsafe { RemoveWindowSubclass(to_hwnd(mode.undecorated_resize), Some(subclass_parent), RESIZE_SUBCLASS_ID) };
+            uninstall_subclass(host.hwnd().unwrap(), mode.undecorated_resize);
             let _ = host.hide();
         } else {
             /* Change active tab only instead of changing child to top-level window */
@@ -251,27 +250,30 @@ pub fn minimize(app: &tauri::AppHandle) {
     let _ = app.get_webview_window(HOST.get().unwrap()).unwrap().minimize();
 }
 
-fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMode, activator: &str) {
-    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
-
+fn install_subclass(app: &tauri::AppHandle, host: HWND, undecorated_resize: isize) {
     unsafe {
-        let current_style = GetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE) as u32;
+        let current_style = GetWindowLongPtrW(host, GWL_STYLE) as u32;
         if (current_style & WS_CLIPCHILDREN.0) == 0 {
-            SetWindowLongPtrW(host.hwnd().unwrap(), GWL_STYLE, (current_style | WS_CLIPCHILDREN.0) as isize);
+            SetWindowLongPtrW(host, GWL_STYLE, (current_style | WS_CLIPCHILDREN.0) as isize);
         }
     }
 
-    /* Must show parent first. Otherwise, extra top margin shows */
-    let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED) };
-    host.unmaximize().unwrap();
-    // host.with_webview(|w| unsafe { w.controller().SetIsVisible(false).unwrap() }).unwrap();
-    host.show().unwrap();
+    let _ = unsafe { SetWindowSubclass(host, Some(subclass_parent), PARENT_SUBCLASS_ID, Box::into_raw(Box::new(app.clone())) as _) };
+    let _ = unsafe { SetWindowSubclass(to_hwnd(undecorated_resize), Some(resize_subclass), RESIZE_SUBCLASS_ID, host.0 as _) };
+}
+
+fn uninstall_subclass(host: HWND, undecorated_resize: isize) {
+    let _ = unsafe { RemoveWindowSubclass(to_hwnd(undecorated_resize), Some(resize_subclass), RESIZE_SUBCLASS_ID) };
+    let _ = unsafe { RemoveWindowSubclass(host, Some(subclass_parent), PARENT_SUBCLASS_ID) };
+}
+
+fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMode, activator: &str) {
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
+    install_subclass(app, host.hwnd().unwrap(), mode.undecorated_resize);
 
     let activator_window = app.get_webview_window(activator).unwrap();
     let size = activator_window.outer_size().unwrap();
     let pos = activator_window.outer_position().unwrap();
-
-    host.set_size(size).unwrap();
 
     for tab in tabs.iter_mut() {
         let child = app.get_webview_window(&tab.label).unwrap();
@@ -283,29 +285,28 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
 
     bring_to_front(app, tabs, mode, activator);
 
+    host.set_size(size).unwrap();
     host.set_position(pos).unwrap();
+    host.unmaximize().unwrap();
+    host.show().unwrap();
 }
 
 fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
+    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
+    uninstall_subclass(host.hwnd().unwrap(), mode.undecorated_resize);
+
     mode.active_tab_label = String::new();
 
-    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
+    let _ = host.hide();
 
     for tab in tabs.iter() {
         detach_from_tab(tab, true);
-        after_detach(tab.window_handle);
     }
-
-    host.hide().unwrap();
 }
 
 fn before_attach(window: &tauri::WebviewWindow) {
-    /* On Windows, window must be shown before attach. Otherwise, focus can be moved to the parent */
+    /* Without this, focus is strange */
     let _ = unsafe { SetWindowPos(window.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOACTIVATE) };
-}
-
-fn after_detach(window_handle: isize) {
-    let _ = unsafe { RemoveWindowSubclass(to_hwnd(window_handle), Some(child_proc), CHILD_SUBCLASS_ID) };
 }
 
 fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i32) {
@@ -453,8 +454,30 @@ fn detach_from_tab(removed: &Tab, show: bool) {
         let _ =
             unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED | SWP_SHOWWINDOW) };
     }
+
+    let _ = unsafe { RemoveWindowSubclass(to_hwnd(removed.window_handle), Some(child_proc), CHILD_SUBCLASS_ID) };
 }
+
 unsafe extern "system" fn subclass_parent(child: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
+    if umsg == WM_WINDOWPOSCHANGED {
+        let mut rect = RECT::default();
+
+        if GetClientRect(child, &mut rect).is_ok() {
+            let width = rect.right - rect.left;
+            let height = rect.bottom - rect.top;
+            let item_data_ptr = dwrefdata as *const tauri::AppHandle;
+            let app = &*item_data_ptr;
+            let state = app.state::<Mutex<TabState>>();
+            if let Ok(state) = state.try_lock() {
+                on_resized(&state.tabs, width, height);
+            };
+        }
+    }
+
+    DefSubclassProc(child, umsg, wparam, lparam)
+}
+
+unsafe extern "system" fn resize_subclass(child: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
     if umsg == WM_WINDOWPOSCHANGED {
         let parent = to_hwnd(dwrefdata as _);
         if !is_maximized(parent).unwrap_or(false) {
