@@ -5,10 +5,10 @@ use crate::{
 use std::{collections::HashMap, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewWindow};
 use windows::{
-    core::{w, Free, PCWSTR},
+    core::{Free, PCWSTR},
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, POINT, POINTS, RECT, WPARAM},
-        Graphics::Gdi::{ClientToScreen, CreateRectRgn, SetWindowRgn},
+        Graphics::Gdi::{ClientToScreen, CreateRectRgn, GetWindowRgn, SetWindowRgn},
         UI::{
             Input::KeyboardAndMouse::{ReleaseCapture, SetFocus},
             Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
@@ -19,11 +19,8 @@ use windows::{
 
 const OFF_SCREEN: i32 = -30000;
 const TOP_RESIZE_BORDER_SIZE: i32 = 1;
-const PARENT_SUBCLASS_ID: usize = 200;
+const RESIZE_SUBCLASS_ID: usize = 200;
 const CHILD_SUBCLASS_ID: usize = 300;
-/* Tauri's undecorated_resizing class name */
-const CLASS_NAME: PCWSTR = w!("TAURI_DRAG_RESIZE_BORDERS");
-const WINDOW_NAME: PCWSTR = w!("TAURI_DRAG_RESIZE_WINDOW");
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum WindowType {
@@ -32,20 +29,33 @@ pub(crate) enum WindowType {
     Owned,
 }
 
-#[derive(Debug, Default)]
-struct UndecoratedResizingData {
-    child: HWND,
-}
-
 pub fn prepare(app: &tauri::AppHandle) {
     let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
+    let mode = app.state::<Mutex<WindowMode>>();
+    let mut mode = mode.lock().unwrap();
+
     /*
-        Subclass is executed in LIFO (Last-In, First-Out) order.
-        To override the region set by Tauri's undecorated_resizing, install this subclass first.
-        Then set resizable true, which will install undecorated_resizing's subclass.
+        To override the region set by Tauri's undecorated_resizing, install subclass to the resize window.
+        In case Tauri change will change class name, find the child window that has window region.
+        If no window is found or multiple windows are found, cause panic not to proceed.
     */
-    let _ = unsafe { SetWindowSubclass(host.hwnd().unwrap(), Some(subclass_parent), PARENT_SUBCLASS_ID, Box::into_raw(Box::new(UndecoratedResizingData::default())) as _) };
-    let _ = host.set_resizable(true);
+    let mut children = Vec::new();
+    let mut start_child = HWND::default();
+    while let Ok(child) = unsafe { FindWindowExW(Some(host.hwnd().unwrap()), Some(start_child), PCWSTR::null(), PCWSTR::null()) } {
+        let mut region = unsafe { CreateRectRgn(0, 0, 0, 0) };
+        if unsafe { GetWindowRgn(child, region) } != windows::Win32::Graphics::Gdi::RGN_ERROR {
+            children.push(child.0 as isize);
+        }
+        unsafe { region.free() };
+        start_child = child;
+    }
+
+    if children.is_empty() || children.len() > 1 {
+        panic!("Can't find undecorated_resize window");
+    }
+
+    mode.undecorated_resize = *children.first().unwrap();
+    let _ = unsafe { SetWindowSubclass(to_hwnd(mode.undecorated_resize), Some(subclass_parent), RESIZE_SUBCLASS_ID, host.hwnd().unwrap().0 as _) };
 }
 
 pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
@@ -163,16 +173,17 @@ pub fn detach(app: &tauri::AppHandle, label: &str) {
         detach_from_tab(tab, false);
         after_detach(tab.window_handle);
 
+        let mode = app.state::<Mutex<WindowMode>>();
+        let mut mode = mode.lock().unwrap();
+
         if state.tabs.len() == 1 {
             /* If this is the last tab, hide the host */
             let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
             let _ = unsafe { SetWindowPos(host.hwnd().unwrap(), None, OFF_SCREEN, OFF_SCREEN, 0, 0, SWP_NOSIZE) };
-            let _ = unsafe { RemoveWindowSubclass(host.hwnd().unwrap(), Some(subclass_parent), PARENT_SUBCLASS_ID) };
+            let _ = unsafe { RemoveWindowSubclass(to_hwnd(mode.undecorated_resize), Some(subclass_parent), RESIZE_SUBCLASS_ID) };
             let _ = host.hide();
         } else {
             /* Change active tab only instead of changing child to top-level window */
-            let mode = app.state::<Mutex<WindowMode>>();
-            let mut mode = mode.lock().unwrap();
             if mode.active_tab_label == label {
                 let is_last = index == state.tabs.len() - 1;
                 let tab = if is_last {
@@ -443,34 +454,28 @@ fn detach_from_tab(removed: &Tab, show: bool) {
             unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED | SWP_SHOWWINDOW) };
     }
 }
-unsafe extern "system" fn subclass_parent(parent: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
-    if umsg == WM_SIZE {
-        let data = dwrefdata as *mut UndecoratedResizingData;
-        let data = &mut *data;
-
-        if data.child.is_invalid() {
-            if let Ok(undecorated) = unsafe { FindWindowExW(Some(parent), None, CLASS_NAME, WINDOW_NAME) } {
-                data.child = undecorated;
-            }
-        }
-
-        if !data.child.is_invalid() && !is_maximized(parent).unwrap_or(false) {
+unsafe extern "system" fn subclass_parent(child: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
+    if umsg == WM_WINDOWPOSCHANGED {
+        let parent = to_hwnd(dwrefdata as _);
+        if !is_maximized(parent).unwrap_or(false) {
             let mut rect = RECT::default();
+
             if GetClientRect(parent, &mut rect).is_ok() {
                 let width = rect.right - rect.left;
+                let height = rect.bottom - rect.top;
+                let _ = SetWindowPos(child, Some(HWND_TOP), 0, 0, width, height, SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOMOVE | SWP_NOSIZE);
                 /* Height must be 0 to remove extra top region */
                 /* hrgn1 must be mutable to call .free() later */
                 let mut hrgn1 = CreateRectRgn(0, 0, width, 0);
 
-                if SetWindowRgn(data.child, Some(hrgn1), true) == 0 {
+                if SetWindowRgn(child, Some(hrgn1), true) == 0 {
                     hrgn1.free();
                 }
-                return DefWindowProcW(parent, umsg, wparam, lparam);
             }
         }
     }
 
-    DefSubclassProc(parent, umsg, wparam, lparam)
+    DefSubclassProc(child, umsg, wparam, lparam)
 }
 
 fn is_maximized(window: HWND) -> windows::core::Result<bool> {
@@ -515,7 +520,7 @@ pub fn on_resized(tabs: &[Tab], width: i32, height: i32) {
                 0,
                 width + tab.inset.x * 2,
                 height + TOP_RESIZE_BORDER_SIZE + tab.inset.y * 2,
-                SWP_NOMOVE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOSENDCHANGING,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_ASYNCWINDOWPOS,
             )
         };
     }

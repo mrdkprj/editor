@@ -64,6 +64,8 @@ pub struct WindowMode {
     pub close_all: bool,
     pub window_handle: isize,
     pub minimized: bool,
+    #[cfg(windows)]
+    undecorated_resize: isize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -142,8 +144,9 @@ pub fn init(app: &tauri::AppHandle, host: &str) {
             if let Ok(mode) = mode.try_lock() {
                 if mode.tab_mode {
                     let state = cloned.state::<Mutex<TabState>>();
-                    let state = state.lock().unwrap();
-                    platform_impl::on_resized(&state.tabs, size.width as i32, size.height as i32);
+                    if let Ok(state) = state.try_lock() {
+                        platform_impl::on_resized(&state.tabs, size.width as i32, size.height as i32);
+                    };
                 }
             };
         }
