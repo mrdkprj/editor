@@ -4,14 +4,9 @@
     import util from "../util";
     import { IPC } from "../ipc";
 
-    let {
-        label,
-        switchTab,
-        closeTab,
-        onTabScroll,
-        onTabMoved,
-    }: { label: string; switchTab: (label: string) => void; closeTab: (label: string) => void; onTabScroll: (scrollLeft: number) => void; onTabMoved: () => void } = $props();
+    let { label }: { label: string } = $props();
 
+    // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
     let tab: HTMLDivElement;
 
@@ -19,10 +14,21 @@
         tab.scrollLeft = tabs.scrollLeft;
     });
 
+    const onCloseButtonMousedown = (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const closeTab = async (e: MouseEvent, label: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await ipc.sendTo(label, "tab_event", { name: "close" });
+    };
+
     const onTabClick = (e: MouseEvent, selected: string) => {
         e.preventDefault();
         if (selected != label) {
-            switchTab(selected);
+            ipc.invoke("tab_request", { name: "select", data: selected });
         }
     };
 
@@ -32,7 +38,7 @@
         } else {
             tab.scrollBy(-20, 0);
         }
-        onTabScroll(tab.scrollLeft);
+        ipc.sendOthers("tab_event", { name: "scrolled", data: tab.scrollLeft });
     };
 
     const startDrag = async (e: DragEvent) => {
@@ -106,7 +112,7 @@
         if (!tabState.dragging) return;
         ipc.sendTo(label, "dragEnd", {});
         tabState.dragging = false;
-        onTabMoved();
+        ipc.invoke("tab_request", { name: "reorder", data: tabs.webviews });
     };
 
     const onMouseDown = () => {
@@ -123,7 +129,7 @@
     };
 </script>
 
-<div class="tab" bind:this={tab} onwheel={onmousewheel}>
+<div class="tab no-print" bind:this={tab} onwheel={onmousewheel}>
     {#each tabs.webviews as tab (tab.label)}
         <div
             id={tab.label}
@@ -144,7 +150,7 @@
             animate:flip={{ duration: tabState.dragging ? 400 : 0 }}
         >
             <div class="tab-title" title={tab.title}>{tab.title}</div>
-            <div class="tab-close-btn" onclick={() => closeTab(tab.label)} onkeydown={() => {}} role="button" tabindex="-1">
+            <div class="tab-close-btn" onclick={(e) => closeTab(e, tab.label)} onmousedown={onCloseButtonMousedown} onkeydown={() => {}} role="button" tabindex="-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x" viewBox="0 0 16 16">
                     <path
                         d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"
@@ -210,6 +216,7 @@
         height: 20px;
         margin-left: 5px;
         border-radius: 8px;
+        flex-shrink: 0;
     }
 
     .tab-close-btn:hover {

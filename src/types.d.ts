@@ -13,7 +13,6 @@ declare global {
         contextmenu_event: Mp.ContextMenuEvent;
         watch_event: Mp.WatchEvent;
         watch_confirm_event: Mp.WatchConfirmEvent;
-        bring_to_frong: Mp.AnyEvent;
         grep_progress: Mp.GrepProgress;
         grep_end: Mp.AnyEvent;
         dialog: boolean;
@@ -21,21 +20,39 @@ declare global {
         refelect_settings: Mp.AnyEvent;
         settingChanged: Mp.SettingChangeType;
         reloadSettings: Mp.AnyEvent;
-        startTabMode: string;
-        endTabMode: Mp.AnyEvent;
-        enterTabMode: Mp.WebviewTab[];
-        exitTabMode: boolean;
-        switchTab: string;
-        addTab: string;
-        updateTab: Mp.UpdateTabsEvent;
-        tabActivated: Mp.AnyEvent;
-        closeTab: string;
+        closeTab: Mp.AnyEvent;
         scrollTab: number;
-        closed: string;
-        destory: Mp.TabbedWebview;
-        closeAll: Mp.AnyEvent;
         dragEnd: Mp.AnyEvent;
+        tab_event: Mp.TabEvent;
     };
+
+    namespace Tab {
+        type TabEvent =
+            | { name: "maximized"; data?: never }
+            | { name: "unmaximized"; data?: never }
+            | { name: "titleChanged"; data: WebviewTitle }
+            | { name: "reordered"; data: Mp.WebviewTitle[] }
+            | { name: "closed"; data: string }
+            | { name: "modeChanged"; data: { tab_mode: boolean; tabs: WebviewTitle[] } }
+            | { name: "close"; data?: never }
+            | { name: "scrolled"; data: number }
+            | { name: "activated"; data?: never }
+            | { name: "added"; data: WebviewTitle };
+
+        type TabRequest =
+            | { name: "select"; data: string }
+            | { name: "reorder"; data: WebviewTitle[] }
+            | { name: "closeAll"; data?: never }
+            | { name: "cancel"; data?: never }
+            | { name: "update"; data: WebviewTitle }
+            | { name: "add"; data?: never }
+            | { name: "detach"; data?: never }
+            | { name: "minimize"; data?: never }
+            | { name: "toggleMaximize"; data?: never }
+            | { name: "startDrag"; data?: never }
+            | { name: "startResizeDrag"; data: ResizeDirection }
+            | { name: "toggleTabMode"; data: boolean };
+    }
 
     namespace Mp {
         type Theme = "dark" | "light" | "system";
@@ -62,6 +79,8 @@ declare global {
             | "searchHighlightBackground"
             | "link";
 
+        type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
+
         type WebviewTitle = {
             label: string;
             title: string;
@@ -84,8 +103,7 @@ declare global {
         };
 
         type OpenContextMenuRequest = {
-            opener: string;
-            receiver: string;
+            label: string;
             position: Mp.Position;
         };
 

@@ -269,34 +269,18 @@ fn change_encoding(payload: helper::EncodeArg) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn to_child_window(app: tauri::AppHandle, payload: Vec<String>) {
-    tab::to_child_window(app, payload);
+fn update_title(app: AppHandle, payload: helper::WindowTitle) {
+    helper::update_title(&app, payload);
 }
 
 #[tauri::command]
-fn restore_webview(app: tauri::AppHandle, payload: String) {
-    tab::restore_webview(app, payload);
-}
-
-#[tauri::command]
-fn get_webview_labels(app: tauri::AppHandle) -> helper::OpenedWebview {
-    helper::get_webview_labels(app)
-}
-
-#[tauri::command]
-fn update_webview_label(window: WebviewWindow, payload: helper::WebviewTitle) {
-    helper::update_webview_label(window.app_handle(), payload);
-}
-
-#[tauri::command]
-fn is_file_opened(app: tauri::AppHandle, payload: String) -> Option<String> {
+fn is_file_opened(app: tauri::AppHandle, payload: String) -> bool {
     helper::is_file_opened(&app, Some(payload))
 }
 
-#[cfg(target_os = "linux")]
 #[tauri::command]
-fn bring_to_front(app: tauri::AppHandle, payload: String) {
-    tab::bring_to_front(app, payload)
+fn tab_request(window: WebviewWindow, payload: tab::TabRequest) -> bool {
+    tab::handle_request(&window, payload)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -308,23 +292,17 @@ pub fn run() {
             helper::start(app.app_handle());
             helper::setup(app.app_handle(), args);
 
-            #[cfg(target_os = "linux")]
-            {
-                let window = app.get_webview_window("Main").unwrap();
-                let label = window.label().to_string();
-                let window_handle = get_window_handle(&window);
-                menu::create(app.app_handle(), label, window_handle);
-            }
             Ok(())
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                helper::remove_from_webview_label(window.app_handle(), window.label())
+                helper::remove_window(window.app_handle(), window.label())
             }
         })
         .invoke_handler(tauri::generate_handler![
             prepare_menu,
             open_list_context_menu,
+            update_title,
             is_file_opened,
             exists,
             is_file,
@@ -351,12 +329,7 @@ pub fn run() {
             run_grep,
             abort_grep,
             change_encoding,
-            restore_webview,
-            to_child_window,
-            #[cfg(target_os = "linux")]
-            bring_to_front,
-            get_webview_labels,
-            update_webview_label,
+            tab_request
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

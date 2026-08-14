@@ -6,6 +6,7 @@
 
     let { label, showErrorMessage, executeGrep }: { label: string; executeGrep: (reqeust: Mp.GrepRequest) => void; showErrorMessage: (message: string) => Promise<void> } = $props();
 
+    // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
     let request: Mp.GrepRequest = $state({
         condition: $appState.grepRequest?.condition,

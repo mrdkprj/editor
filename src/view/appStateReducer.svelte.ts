@@ -110,7 +110,7 @@ export const selectedPreference: SelectedPreferenceTab = $state({ tab: "appearan
 
 /* Webview Tabs */
 type Tabs = {
-    webviews: Mp.WebviewTab[];
+    webviews: Mp.WebviewTitle[];
     scrollLeft: number;
 };
 export const tabs: Tabs = $state({ webviews: [], scrollLeft: 0 });

@@ -7,6 +7,7 @@
 
     let { label }: { label: string } = $props();
 
+    // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
     const fontSizes = [10, 11, 12, 13, 14, 16, 18, 20];
     const indentSizes = [1, 2, 3, 4, 5, 6, 7, 8];

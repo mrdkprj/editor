@@ -4858,6 +4858,8 @@ dependencies = [
 [[package]]
 name = "tauri-runtime-wry"
 version = "2.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b83849ee63ecb27a8e8d0fe51915ca215076914aca43f96db1179f0f415f6cd9"
 dependencies = [
  "gtk",
  "http",
@@ -5665,9 +5667,9 @@ dependencies = [
 
 [[package]]
 name = "wcpopup"
-version = "0.9.5"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cde973a6ef260d6e91f6ba4dd40ac2dd8e3f8d9723dd6b69d71f79704d948d2"
+checksum = "7153315aa0d70de7974cec04b98ae23c0ba88fbf7956b1b9543b934f6a4f59a0"
 dependencies = [
  "gtk",
  "librsvg",

@@ -1,6 +1,7 @@
 use crate::{
     fgrep::{self, GrepRequest},
     menu::{self, AppMenu},
+    tab::{self, WindowMode},
     watcher::{self, WatchTx},
     WriteFileInfo,
 };
@@ -13,7 +14,7 @@ use std::{
         Mutex, OnceLock,
     },
 };
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 static UUID: AtomicU16 = AtomicU16::new(0);
 static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
@@ -21,18 +22,6 @@ static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct CurrentTheme {
     is_dark: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct OpenedWebview {
-    webviews: HashMap<String, WebviewTitle>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct WebviewTitle {
-    label: String,
-    title: String,
-    path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -48,6 +37,7 @@ pub struct FileArg {
     pub encoding: Option<String>,
     pub start_line: Option<Selection>,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct InitArgs {
     file: Option<FileArg>,
@@ -55,6 +45,18 @@ pub struct InitArgs {
     locales: Vec<String>,
     app_data_dir: String,
     restore_position: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub(crate) struct WindowLabels {
+    pub(crate) labels: HashMap<String, WindowTitle>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WindowTitle {
+    pub label: String,
+    pub title: String,
+    pub path: String,
 }
 
 pub fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>) {
@@ -68,28 +70,10 @@ pub fn start(app: &tauri::AppHandle) {
     watcher::spwan_watcher(app.app_handle(), rx_cmd).unwrap();
 
     app.manage(Mutex::new(InitArgs::default()));
-    app.manage(Mutex::new(OpenedWebview::default()));
     app.manage(Mutex::new(CurrentTheme::default()));
+    app.manage(Mutex::new(WindowLabels::default()));
     app.manage(smol::lock::Mutex::new(AppMenu::default()));
-
-    #[cfg(target_os = "linux")]
-    {
-        use gtk::traits::{BoxExt, ContainerExt, WidgetExt};
-
-        let host = app.get_webview_window("Main").unwrap();
-        let vbox = host.default_vbox().unwrap();
-        let host_children = vbox.children();
-
-        let host_webview = host_children.first().unwrap();
-        host_webview.set_size_request(-1, 0);
-        host_webview.set_vexpand(false);
-        vbox.set_child_packing(host_webview, false, false, 0, gtk::PackType::Start);
-
-        let overlay = gtk::Overlay::new();
-        overlay.set_hexpand(true);
-        overlay.set_vexpand(true);
-        vbox.pack_start(&overlay, true, true, 0);
-    }
+    tab::init(app, "Main");
 }
 
 fn update_init_arg(app: &tauri::AppHandle, args: Option<InitArgs>) {
@@ -157,17 +141,31 @@ pub fn setup(app: &tauri::AppHandle, args: Vec<String>) -> Option<String> {
     opening_file
 }
 
-/* Check if the file is already opened. If any, returns the window label */
-pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> Option<String> {
+/* Check if the file is already opened. If any, bring the windwo to front */
+pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> bool {
     let opening_file_path = opening_file_path.unwrap_or_default();
-    let state = app.state::<Mutex<OpenedWebview>>();
+    let state = app.state::<Mutex<WindowLabels>>();
     let state = state.lock().unwrap();
-    let already_opened = state.webviews.iter().filter(|webview| !webview.1.path.is_empty() && webview.1.path == opening_file_path).map(|webview| webview.0).collect::<Vec<&String>>();
+    let already_opened = state.labels.iter().filter(|(_, title)| !title.path.is_empty() && title.path == opening_file_path).map(|(label, _)| label).collect::<Vec<&String>>();
     if already_opened.is_empty() {
-        None
-    } else {
-        Some(already_opened[0].to_string())
+        return false;
     }
+
+    let label = already_opened[0];
+    let window = app.get_webview_window(label).unwrap();
+    let tab_mode = {
+        let mode = app.state::<Mutex<WindowMode>>();
+        let mode = mode.lock().unwrap();
+        mode.tab_mode
+    };
+
+    if tab_mode {
+        crate::tab::handle_request(&window, tab::TabRequest::Select(label.to_string()));
+    } else {
+        let _ = app.get_webview_window(label).unwrap().set_focus();
+    }
+
+    true
 }
 
 pub fn change_theme(app: &tauri::AppHandle, is_dark: bool) {
@@ -177,21 +175,14 @@ pub fn change_theme(app: &tauri::AppHandle, is_dark: bool) {
 }
 
 pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<String>) {
-    if let Some(label) = is_file_opened(app, opening_file_path) {
-        app.emit_to(
-            tauri::EventTarget::WebviewWindow {
-                label,
-            },
-            "bring_to_frong",
-            (),
-        )
-        .unwrap();
+    if is_file_opened(app, opening_file_path) {
         return;
     }
     let id = UUID.fetch_add(1, Relaxed);
     let config = &app.config().app.windows[1];
     let mut config = config.clone();
-    config.label = format!("{}-{:?}", config.label, id);
+    let label = format!("{}-{:?}", config.label, id);
+    config.label = label;
     let current_theme = app.state::<Mutex<CurrentTheme>>();
     let current_theme = current_theme.lock().unwrap();
     config.theme = if current_theme.is_dark {
@@ -199,6 +190,13 @@ pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<Strin
     } else {
         Some(tauri::Theme::Light)
     };
+    {
+        let mode = app.state::<Mutex<WindowMode>>();
+        let mode = mode.lock().unwrap();
+        if mode.tab_mode {
+            config.focus = false;
+        }
+    }
     tauri::WebviewWindowBuilder::from_config(app, &config).unwrap().build().unwrap();
 }
 
@@ -228,6 +226,31 @@ pub fn get_init_args(app: AppHandle) -> Result<InitArgs, String> {
     }
 
     Ok(init_args.clone())
+}
+
+pub fn update_title(app: &tauri::AppHandle, title: WindowTitle) {
+    let state = app.state::<Mutex<WindowLabels>>();
+    let mut state = state.lock().unwrap();
+    state.labels.insert(title.label.to_string(), title.clone());
+    tab::update(app, &title.label, &title.title, &title.path);
+}
+
+pub fn remove_window(app: &tauri::AppHandle, label: &str) {
+    let state = app.state::<Mutex<WindowLabels>>();
+    let mut state = state.lock().unwrap();
+    state.labels.remove(label);
+
+    /* Remove from Menu map too */
+    menu::remove(app, label);
+    /* Remove from tab  */
+    tab::remove(app, label);
+
+    if state.labels.is_empty() {
+        if let Some(main) = app.get_webview_window("Main") {
+            let _ = main.hide();
+            let _ = main.destroy();
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -290,36 +313,4 @@ pub fn write_to_file(info: WriteFileInfo) -> Result<(), String> {
 
 fn write_raw(info: WriteFileInfo) -> Result<(), String> {
     std::fs::write(info.fullPath, info.data.as_bytes()).map_err(|e| e.to_string())
-}
-
-pub fn get_webview_labels(app: tauri::AppHandle) -> OpenedWebview {
-    let state = app.state::<Mutex<OpenedWebview>>();
-    let state = state.lock().unwrap();
-    state.clone()
-}
-
-pub fn update_webview_label(app: &tauri::AppHandle, webview_title: WebviewTitle) {
-    let state = app.state::<Mutex<OpenedWebview>>();
-    let mut state = state.lock().unwrap();
-    let _ = state.webviews.insert(webview_title.label.clone(), webview_title);
-}
-
-pub fn remove_from_webview_label(app: &tauri::AppHandle, label: &str) {
-    let state = app.state::<Mutex<OpenedWebview>>();
-    let mut state = state.lock().unwrap();
-
-    if state.webviews.is_empty() {
-        return;
-    }
-
-    let _ = state.webviews.remove(label);
-    /* Remove from Menu map too */
-    menu::remove(app, label);
-
-    if state.webviews.is_empty() {
-        if let Some(main) = app.get_webview_window("Main") {
-            let _ = main.hide();
-            let _ = main.destroy();
-        }
-    }
 }
