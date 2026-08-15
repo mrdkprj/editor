@@ -162,19 +162,19 @@ pub fn select_tab(app: &tauri::AppHandle, label: String) {
     bring_to_front(app, &state.tabs, &mut mode, &label);
 }
 
-pub fn reorder_tab(window: &tauri::WebviewWindow, tabs: Vec<WebviewTitle>) {
+pub fn reorder_tab(window: &tauri::WebviewWindow, reordered_tabs: Vec<WebviewTitle>) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
-    let mut new = Vec::new();
-    let mp: HashMap<String, Tab> = state.tabs.iter().map(|t| (t.label.clone(), t.clone())).collect();
-    for tab in &tabs {
-        if let Some(a) = mp.get(&tab.label) {
-            new.push(a.clone());
+    let mut new_tabs = Vec::new();
+    let mp: HashMap<String, Tab> = state.tabs.iter().map(|tab| (tab.label.clone(), tab.clone())).collect();
+    for reordered in &reordered_tabs {
+        if let Some(tab) = mp.get(&reordered.label) {
+            new_tabs.push(tab.clone());
         }
     }
-    state.tabs = new;
-    emit(app, TabEvent::Reordered(tabs), Some(window.label()));
+    state.tabs = new_tabs;
+    emit(app, TabEvent::Reordered(reordered_tabs), Some(window.label()));
 }
 
 pub fn close_all(app: &tauri::AppHandle) {

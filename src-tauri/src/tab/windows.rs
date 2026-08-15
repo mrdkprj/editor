@@ -8,7 +8,7 @@ use windows::{
     core::{Free, PCWSTR},
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, POINT, POINTS, RECT, WPARAM},
-        Graphics::Gdi::{ClientToScreen, CreateRectRgn, GetWindowRgn, SetWindowRgn},
+        Graphics::Gdi::{ClientToScreen, CreateRectRgn, GetWindowRgn, SetWindowRgn, RGN_ERROR},
         UI::{
             Input::KeyboardAndMouse::{ReleaseCapture, SetFocus},
             Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
@@ -44,7 +44,7 @@ pub fn prepare(app: &tauri::AppHandle) {
     let mut start_child = HWND::default();
     while let Ok(child) = unsafe { FindWindowExW(Some(host.hwnd().unwrap()), Some(start_child), PCWSTR::null(), PCWSTR::null()) } {
         let mut region = unsafe { CreateRectRgn(0, 0, 0, 0) };
-        if unsafe { GetWindowRgn(child, region) } != windows::Win32::Graphics::Gdi::RGN_ERROR {
+        if unsafe { GetWindowRgn(child, region) } != RGN_ERROR {
             children.push(child.0 as isize);
         }
         unsafe { region.free() };
@@ -68,7 +68,7 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
 
     let changed = mode.tab_mode != tab_mode;
 
-    if mode.tab_mode != tab_mode {
+    if changed {
         mode.tab_mode = tab_mode;
         if tab_mode {
             let tab = new_tab(app, vtoi(window.hwnd().unwrap()), window.label());
@@ -85,10 +85,10 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
         state
             .tabs
             .iter()
-            .map(|a| WebviewTitle {
-                label: a.label.clone(),
-                title: a.title.clone(),
-                path: a.path.clone(),
+            .map(|tab| WebviewTitle {
+                label: tab.label.clone(),
+                title: tab.title.clone(),
+                path: tab.path.clone(),
             })
             .collect()
     } else {
@@ -204,19 +204,19 @@ pub fn select_tab(app: &tauri::AppHandle, label: String) {
     bring_to_front(app, &state.tabs, &mut mode, &label);
 }
 
-pub fn reorder_tab(window: &tauri::WebviewWindow, tabs: Vec<WebviewTitle>) {
+pub fn reorder_tab(window: &tauri::WebviewWindow, reordered_tabs: Vec<WebviewTitle>) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
-    let mut new = Vec::new();
-    let mp: HashMap<String, Tab> = state.tabs.iter().map(|t| (t.label.clone(), t.clone())).collect();
-    for tab in &tabs {
-        if let Some(a) = mp.get(&tab.label) {
-            new.push(a.clone());
+    let mut new_tabs = Vec::new();
+    let mp: HashMap<String, Tab> = state.tabs.iter().map(|tab| (tab.label.clone(), tab.clone())).collect();
+    for reordered in &reordered_tabs {
+        if let Some(tab) = mp.get(&reordered.label) {
+            new_tabs.push(tab.clone());
         }
     }
-    state.tabs = new;
-    emit(app, TabEvent::Reordered(tabs), Some(window.label()));
+    state.tabs = new_tabs;
+    emit(app, TabEvent::Reordered(reordered_tabs), Some(window.label()));
 }
 
 pub fn close_all(app: &tauri::AppHandle) {
