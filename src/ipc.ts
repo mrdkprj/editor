@@ -74,7 +74,7 @@ type TauriCommandMap = {
     change_encoding: TauriCommand<Mp.EncodeArg, string>;
     update_title: TauriCommand<Mp.WebviewTitle, null>;
     is_file_opened: TauriCommand<string, string | null>;
-    tab_request: TauriCommand<Mp.TabRequest, boolean>;
+    tab_request: TauriCommand<Tab.TabRequest, boolean>;
 };
 
 export class IPCBase {
