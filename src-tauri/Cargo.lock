@@ -1100,7 +1100,6 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-windows-file-drop",
  "wcpopup",
- "webview2-com",
  "windows",
  "zouni",
 ]
@@ -6619,6 +6618,8 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 [[package]]
 name = "zouni"
 version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "673c38f69041f00a58245308f0a9517767163aa24a51cde339496fedc3876a65"
 dependencies = [
  "bstr",
  "gio",
