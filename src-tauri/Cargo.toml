@@ -20,6 +20,8 @@ globset = "0.4.18"
 chardetng = "0.1.17"
 encoding_rs = "0.8.35"
 tauri-plugin-single-instance = "=2.3.0"
+tauri-plugin-windows-file-drop = {path = "../../tauri-plugin-windows-file-drop" }
+webview2-com = "^0.38"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = ["Win32_Foundation"] }
@@ -34,6 +36,7 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [patch.crates-io]
 #tauri-runtime-wry = { path = "./tauri-runtime-wry-2.11.2" }
+zouni = {path = "../../../zouni"}
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary

@@ -241,6 +241,7 @@ declare global {
 
         type FileDropEvent = {
             paths: string[];
+            position: Mp.Position;
         };
 
         type MessageResult = {

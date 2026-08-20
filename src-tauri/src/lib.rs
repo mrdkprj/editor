@@ -226,20 +226,21 @@ fn register_drop_target(window: WebviewWindow) -> Result<(), String> {
 fn listen_file_drop(window: WebviewWindow, app: AppHandle, payload: Option<String>) -> tauri::Result<()> {
     #[cfg(target_os = "windows")]
     {
-        let label = window.label().to_string();
-        window.with_webview(move |webview| {
-            zouni::webview2::register_file_drop(unsafe { &webview.controller().CoreWebView2().unwrap() }, payload, move |event| {
-                app.emit_to(
-                    tauri::EventTarget::WebviewWindow {
-                        label: label.clone(),
-                    },
-                    "tauri://drag-drop",
-                    event,
-                )
-                .unwrap();
-            })
-            .unwrap();
-        })
+        // let label = window.label().to_string();
+        // window.with_webview(move |webview| {
+        //     zouni::webview2::register_file_drop(unsafe { &webview.controller().CoreWebView2().unwrap() }, payload, move |event| {
+        //         app.emit_to(
+        //             tauri::EventTarget::WebviewWindow {
+        //                 label: label.clone(),
+        //             },
+        //             "tauri://drag-drop2",
+        //             event,
+        //         )
+        //         .unwrap();
+        //     })
+        //     .unwrap();
+        // })
+        Ok(())
     }
     #[cfg(target_os = "linux")]
     {
@@ -287,6 +288,7 @@ fn tab_request(window: WebviewWindow, payload: tab::TabRequest) -> bool {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app_handel, args, _| helper::handle_second_instance(app_handel, args)))
+        .plugin(tauri_plugin_windows_file_drop::init())
         .setup(|app| {
             let args: Vec<String> = env::args().collect();
             helper::start(app.app_handle());
@@ -329,7 +331,7 @@ pub fn run() {
             run_grep,
             abort_grep,
             change_encoding,
-            tab_request
+            tab_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
