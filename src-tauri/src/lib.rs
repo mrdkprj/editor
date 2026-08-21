@@ -175,6 +175,11 @@ async fn show_open_dialog(payload: DialogOptions) -> Option<OpenFileResult> {
 }
 
 #[tauri::command]
+async fn show_folder_dialog(payload: DialogOptions) -> Option<String> {
+    dialog::show_folder_dialog(payload).await
+}
+
+#[tauri::command]
 async fn show_save_dialog(payload: DialogOptions) -> Option<String> {
     dialog::show_save_dialog(payload).await
 }
@@ -321,6 +326,7 @@ pub fn run() {
             unwatch,
             message,
             show_open_dialog,
+            show_folder_dialog,
             show_save_dialog,
             get_args,
             register_drop_target,

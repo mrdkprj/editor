@@ -78,6 +78,17 @@ pub async fn show_file_dialog(option: DialogOptions) -> Option<String> {
     show_open_dialog(options).await
 }
 
+pub async fn show_folder_dialog(option: DialogOptions) -> Option<String> {
+    let options = OpenDialogOptions {
+        title: option.title,
+        default_path: option.default_path,
+        filters: None,
+        properties: Some(vec![OpenProperty::OpenDirectory]),
+    };
+
+    show_open_dialog(options).await
+}
+
 async fn show_open_dialog(options: OpenDialogOptions) -> Option<String> {
     let result = open(options).await;
 

@@ -220,7 +220,6 @@
                     return;
                 case "g":
                     e.preventDefault();
-                    startGrep();
                     return;
                 case "w":
                     e.preventDefault();

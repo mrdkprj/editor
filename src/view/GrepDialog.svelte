@@ -32,6 +32,13 @@
         node.focus();
     };
 
+    const selectFolder = async () => {
+        const result = await ipc.invoke("show_folder_dialog", { dialog_type: "ask", message: "" });
+        if (result) {
+            request.start_directory = result;
+        }
+    };
+
     const runGrep = async () => {
         if (!request.condition) {
             return await showErrorMessage("Condition is empty");
@@ -70,7 +77,7 @@
             </div>
             <div class="mp-dialog-item-block">
                 <div class="mp-dialog-title-block">Location</div>
-                <div class="mp-dialog-item"><input type="text" bind:value={request.start_directory} required /></div>
+                <div class="mp-dialog-item"><input type="text" bind:value={request.start_directory} required /><button class="select-folder-button" onclick={selectFolder}>...</button></div>
                 <div class="mp-dialog-item"><input type="checkbox" id="recursive" bind:checked={request.recursive} /><label for="recursive">Include sub directories</label></div>
             </div>
             <div class="mp-dialog-item-block">
@@ -85,3 +92,12 @@
         </div>
     </div>
 </div>
+
+<style>
+    .select-folder-button {
+        width: 22px;
+        vertical-align: bottom;
+        text-align: center;
+        line-height: 22px;
+    }
+</style>

@@ -144,6 +144,7 @@ type AppAction =
     | { type: "watchThisFile"; value: boolean }
     | { type: "suspendWatch"; value: boolean }
     | { type: "grepRequest"; value: Mp.GrepRequest }
+    | { type: "updateGrepCondition"; value: string }
     | { type: "grepProgress"; value: Mp.GrepProgress }
     | { type: "grepResult"; value: Mp.GrepResult[] }
     | { type: "columnSelection"; value: boolean }
@@ -197,6 +198,9 @@ const updater = (state: AppState, action: AppAction): AppState => {
 
         case "grepRequest":
             return { ...state, grepRequest: action.value };
+
+        case "updateGrepCondition":
+            return { ...state, grepRequest: { ...state.grepRequest, condition: action.value } };
 
         case "grepProgress":
             grepProgress.file = action.value.processing;

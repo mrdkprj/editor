@@ -99,6 +99,10 @@
                     }
                     return;
                 case "g":
+                    const value = model.getValueInRange(editor.getSelection()!);
+                    if (value) {
+                        dispatch({ type: "updateGrepCondition", value });
+                    }
                     startGrep();
                     return;
             }
