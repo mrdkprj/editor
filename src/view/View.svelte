@@ -325,8 +325,6 @@
     };
 
     const onFileDrop = async (e: Mp.FileDropEvent) => {
-        console.log(document.elementFromPoint(e.position.x, e.position.y));
-        console.log(e.paths);
         if (!e.paths.length) return;
         await openFile(e.paths.shift());
         e.paths.forEach((filePath) => openNewWindow(filePath));

@@ -2,8 +2,8 @@ use crate::watcher::{WatchTx, WatcherCommand};
 use dialog::DialogOptions;
 use serde::{Deserialize, Serialize};
 use std::{env, path::PathBuf};
-#[cfg(target_os = "windows")]
-use tauri::Emitter;
+// #[cfg(target_os = "windows")]
+// use tauri::Emitter;
 use tauri::{AppHandle, Manager, WebviewWindow};
 use zouni::*;
 mod dialog;
@@ -250,8 +250,8 @@ fn listen_file_drop(window: WebviewWindow, app: AppHandle, payload: Option<Strin
 
 #[tauri::command]
 fn unlisten_file_drop() {
-    #[cfg(target_os = "windows")]
-    zouni::webview2::clear();
+    // #[cfg(target_os = "windows")]
+    // zouni::webview2::clear();
 }
 
 #[tauri::command]
