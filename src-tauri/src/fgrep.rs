@@ -18,6 +18,7 @@ struct GrepProgress {
     processing: String,
     current: usize,
     total: usize,
+    matched: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -91,6 +92,7 @@ pub async fn run_grep(app: &AppHandle, label: &str, e: GrepRequest) -> Result<Ve
                     processing: file.full_path.clone(),
                     current: count + 1,
                     total,
+                    matched: results.len(),
                 },
             )
             .unwrap();

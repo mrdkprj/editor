@@ -33,7 +33,7 @@
     };
 
     const selectFolder = async () => {
-        const result = await ipc.invoke("show_folder_dialog", { dialog_type: "ask", message: "" });
+        const result = await ipc.invoke("show_folder_dialog", { dialog_type: "ask", message: "", default_path: request.start_directory });
         if (result) {
             request.start_directory = result;
         }

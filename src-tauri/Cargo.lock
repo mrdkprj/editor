@@ -4837,7 +4837,6 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "tauri",
- "thiserror 2.0.18",
  "webview2-com",
  "windows",
 ]

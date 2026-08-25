@@ -129,8 +129,9 @@ type GrepProgress = {
     file: string;
     total: number;
     current: number;
+    matched: number;
 };
-export const grepProgress = $state<GrepProgress>({ file: "", total: 0, current: 0 });
+export const grepProgress = $state<GrepProgress>({ file: "", total: 0, current: 0, matched: 0 });
 
 type AppAction =
     | { type: "mode"; value: Mp.Mode }

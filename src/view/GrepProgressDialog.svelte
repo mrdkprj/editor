@@ -42,6 +42,7 @@
                 <div class="mp-dialog-title-block">Processing...</div>
                 <div class="mp-dialog-item"><div class="mp-dialog-text">File: {grepProgress.file}</div></div>
                 <div class="mp-dialog-item">{`${grepProgress.current}/${grepProgress.total}`}</div>
+                <div class="mp-dialog-item">{`${grepProgress.matched} files found`}</div>
             </div>
             <div class="mp-dialog-separator"></div>
             <div class="mp-dialog-action">
