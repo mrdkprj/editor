@@ -267,6 +267,7 @@
         dispatch({ type: "grepResult", value: results });
         dispatch({ type: "toggleDialog", value: { type: "progress", open: false } });
         await ipc.sendTo(label, "grep_end", {});
+        await getCurrentWebviewWindow().setFocus();
         onSettingsChange();
     };
 

@@ -34,7 +34,7 @@ gtk = { version = "0.18.2" }
 custom-protocol = ["tauri/custom-protocol"]
 
 [patch.crates-io]
-#wry = { path = "./wry-0.55.1" }
+#tauri-runtime-wry = {path = "./tauri-runtime-wry-2.11.4"}
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
