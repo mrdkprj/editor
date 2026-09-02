@@ -15,12 +15,11 @@ smol = "2.0.2"
 notify-debouncer-full = "0.6.0"
 grep = "0.4.1"
 wcpopup = { version = "0.9.6", features = ["webview"] }
-zouni = { version = "0.2.2", features = ["webview2"] }
+zouni = { version = "0.2.3", features = ["webview2"] }
 globset = "0.4.18"
 chardetng = "0.1.17"
 encoding_rs = "0.8.35"
 tauri-plugin-single-instance = "=2.3.0"
-tauri-plugin-windows-file-drop = {path = "../../tauri-plugin-windows-file-drop" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = ["Win32_Foundation"] }

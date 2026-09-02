@@ -168,6 +168,7 @@
         z-index: 1300;
         width: 100%;
         overflow: hidden;
+        -webkit-app-region: no-drag;
     }
 
     .tablinks {

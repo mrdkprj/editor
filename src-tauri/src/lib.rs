@@ -2,8 +2,8 @@ use crate::watcher::{WatchTx, WatcherCommand};
 use dialog::DialogOptions;
 use serde::{Deserialize, Serialize};
 use std::{env, path::PathBuf};
-// #[cfg(target_os = "windows")]
-// use tauri::Emitter;
+#[cfg(target_os = "windows")]
+use tauri::Emitter;
 use tauri::{AppHandle, Manager, WebviewWindow};
 use zouni::*;
 mod dialog;
@@ -231,21 +231,20 @@ fn register_drop_target(window: WebviewWindow) -> Result<(), String> {
 fn listen_file_drop(window: WebviewWindow, app: AppHandle, payload: Option<String>) -> tauri::Result<()> {
     #[cfg(target_os = "windows")]
     {
-        // let label = window.label().to_string();
-        // window.with_webview(move |webview| {
-        //     zouni::webview2::register_file_drop(unsafe { &webview.controller().CoreWebView2().unwrap() }, payload, move |event| {
-        //         app.emit_to(
-        //             tauri::EventTarget::WebviewWindow {
-        //                 label: label.clone(),
-        //             },
-        //             "tauri://drag-drop2",
-        //             event,
-        //         )
-        //         .unwrap();
-        //     })
-        //     .unwrap();
-        // })
-        Ok(())
+        let label = window.label().to_string();
+        window.with_webview(move |webview| {
+            zouni::webview2::register_file_drop(unsafe { &webview.controller().CoreWebView2().unwrap() }, payload, move |event| {
+                app.emit_to(
+                    tauri::EventTarget::WebviewWindow {
+                        label: label.clone(),
+                    },
+                    "tauri://drag-drop2",
+                    event,
+                )
+                .unwrap();
+            })
+            .unwrap();
+        })
     }
     #[cfg(target_os = "linux")]
     {
@@ -255,8 +254,8 @@ fn listen_file_drop(window: WebviewWindow, app: AppHandle, payload: Option<Strin
 
 #[tauri::command]
 fn unlisten_file_drop() {
-    // #[cfg(target_os = "windows")]
-    // zouni::webview2::clear();
+    #[cfg(target_os = "windows")]
+    zouni::webview2::clear();
 }
 
 #[tauri::command]
@@ -293,7 +292,6 @@ fn tab_request(window: WebviewWindow, payload: tab::TabRequest) -> bool {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app_handel, args, _| helper::handle_second_instance(app_handel, args)))
-        .plugin(tauri_plugin_windows_file_drop::init())
         .setup(|app| {
             let args: Vec<String> = env::args().collect();
             helper::start(app.app_handle());

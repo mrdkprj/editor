@@ -1128,7 +1128,6 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-single-instance",
- "tauri-plugin-windows-file-drop",
  "wcpopup",
  "windows",
  "zouni",
@@ -4949,16 +4948,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tauri-plugin-windows-file-drop"
-version = "0.1.0"
-dependencies = [
- "serde",
- "tauri",
- "webview2-com",
- "windows",
-]
-
-[[package]]
 name = "tauri-runtime"
 version = "2.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6603,9 +6592,9 @@ checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
 
 [[package]]
 name = "zouni"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "673c38f69041f00a58245308f0a9517767163aa24a51cde339496fedc3876a65"
+checksum = "4ecce29646fa79d87786488f0e92fd99d52fa6c5dddd9298fa028dea1d2fddad"
 dependencies = [
  "bstr",
  "gio",
