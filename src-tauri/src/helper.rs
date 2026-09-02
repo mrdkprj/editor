@@ -314,19 +314,3 @@ pub fn write_to_file(info: WriteFileInfo) -> Result<(), String> {
 fn write_raw(info: WriteFileInfo) -> Result<(), String> {
     std::fs::write(info.fullPath, info.data.as_bytes()).map_err(|e| e.to_string())
 }
-
-// pub fn test_json(window: tauri::WebviewWindow, paylod: String, len:u32) {
-//     use  webview2_com::Microsoft::Web::WebView2::Win32::*;
-//     unsafe {
-//         window
-//             .with_webview(|web| {
-//                 // webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2ObjectCollectionView::from(value)
-//                 let env: webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Environment14 = web.environment().cast().unwrap();
-//                 let mut object_collection: Option<ICoreWebView2ObjectCollection> = None;
-//                 env.CreateObjectCollection(len, items, objectcollection)
-//                 let x: webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_23 = ::windows::core::Interface::cast(&web.controller().CoreWebView2().unwrap()).unwrap();
-//                 x.PostWebMessageAsJsonWithAdditionalObjects(::windows::core::w!("getPathForFiles"), additionalobjects).unwrap();
-//             })
-//             .unwrap();
-//     }
-// }
