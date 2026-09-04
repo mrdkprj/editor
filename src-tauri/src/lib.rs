@@ -238,7 +238,7 @@ fn listen_file_drop(window: WebviewWindow, app: AppHandle, payload: Option<Strin
                     tauri::EventTarget::WebviewWindow {
                         label: label.clone(),
                     },
-                    "tauri://drag-drop2",
+                    "tauri://drag-drop",
                     event,
                 )
                 .unwrap();
