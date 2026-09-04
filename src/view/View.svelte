@@ -480,7 +480,7 @@
 
         /* On Linux, must move webview back to its original parent window */
         if (settings.tabMode) {
-            await ipc.invoke("tab_request", { name: "detach" });
+            await ipc.invoke("tab_request", { name: "close" });
         }
 
         settingStore.data = $state.snapshot(settings);
@@ -643,7 +643,7 @@
         if (settings.tabMode) {
             const toggled = await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
             if (!toggled) {
-                await ipc.invoke("tab_request", { name: "add" });
+                await ipc.invoke("tab_request", { name: "add", data: e.parent });
             }
         } else {
             await thisWindow.show();
@@ -668,9 +668,15 @@
             ipc.release();
         };
     });
+
+    const onit = (e: DragEvent) => {
+        if (e.relatedTarget === null) {
+            console.log(e);
+        }
+    };
 </script>
 
-<svelte:window oncontextmenu={openContextMenu} />
+<svelte:window oncontextmenu={openContextMenu} ondragenter={onit} />
 <svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} />
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>

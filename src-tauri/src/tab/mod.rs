@@ -31,8 +31,9 @@ pub enum TabRequest {
     CloseAll,
     Cancel,
     Update(WebviewTitle),
-    Add,
+    Add(String),
     ToggleTabMode(bool),
+    Close,
     Detach,
     ToggleMaximize,
     Minimize,
@@ -86,6 +87,7 @@ struct Bounds {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub(crate) struct Tab {
+    host: String,
     window_handle: isize,
     pub label: String,
     pub title: String,
@@ -116,9 +118,9 @@ struct WindowInset {
 
 pub(crate) static HOST: OnceLock<String> = OnceLock::new();
 
-pub fn init(app: &tauri::AppHandle, host: &str) {
-    let _ = HOST.set(host.to_string());
-    let host = app.get_webview_window(host).unwrap();
+pub fn init(app: &tauri::AppHandle, host_name: &str) {
+    let _ = HOST.set(host_name.to_string());
+    let host = app.get_webview_window(host_name).unwrap();
 
     app.manage(Mutex::new(TabState::default()));
     app.manage(Mutex::new(WindowMode::default()));
@@ -147,6 +149,24 @@ pub fn remove(app: &tauri::AppHandle, label: &str) {
     platform_impl::remove(app, label);
 }
 
+pub fn find_host(app: &tauri::AppHandle, label: Option<&str>) -> String {
+    if let Some(label) = label {
+        let state = app.state::<Mutex<TabState>>();
+        let state = state.lock().unwrap();
+        if let Some(tab) = state.tabs.iter().find(|tab| tab.label == label) {
+            tab.host.clone()
+        } else {
+            HOST.get().unwrap().to_string()
+        }
+    } else {
+        if let Some(front) = app.webview_windows().iter().find(|(_, window)| window.is_visible().unwrap() && window.is_focused().unwrap()) {
+            front.0.to_string()
+        } else {
+            HOST.get().unwrap().to_string()
+        }
+    }
+}
+
 fn emit(app: &tauri::AppHandle, event: TabEvent, except: Option<&str>) {
     if let Some(except) = except {
         let _ = app.emit_filter("tab_event", event, |t| match t {
@@ -172,13 +192,14 @@ fn emit_to(app: &tauri::AppHandle, event: TabEvent, target: &str) {
 
 pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
     match req {
-        TabRequest::Add => platform_impl::add(window),
+        TabRequest::Add(parent) => platform_impl::add(window, parent),
+        TabRequest::Detach => {}
         TabRequest::Cancel => platform_impl::cancel(window.app_handle()),
         TabRequest::Select(label) => platform_impl::select_tab(window.app_handle(), label),
         TabRequest::Reorder(tabs) => platform_impl::reorder_tab(window, tabs),
         TabRequest::CloseAll => platform_impl::close_all(window.app_handle()),
         TabRequest::Update(webview_title) => platform_impl::update(window.app_handle(), &webview_title.label, &webview_title.title, &webview_title.path),
-        TabRequest::Detach => platform_impl::detach(window.app_handle(), window.label()),
+        TabRequest::Close => platform_impl::close(window.app_handle(), window.label()),
         TabRequest::ToggleMaximize => platform_impl::toggle_maximize(window.app_handle()),
         TabRequest::Minimize => platform_impl::minimize(window.app_handle()),
         TabRequest::StartDrag => platform_impl::start_drag(window),

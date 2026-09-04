@@ -37,6 +37,7 @@ type InitArgs = {
     locales: string[];
     restore_position: boolean;
     app_data_dir: string;
+    parent: string;
 };
 
 type ReadResult = {

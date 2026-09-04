@@ -2,7 +2,11 @@ use crate::{
     helper::WindowLabels,
     tab::{emit, emit_to, Bounds, ModeChangedArg, Tab, TabEvent, TabState, Title, WebviewTitle, WindowInset, WindowMode, HOST},
 };
-use std::{collections::HashMap, sync::Mutex, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Mutex,
+    time::Duration,
+};
 use tauri::{Manager, WebviewWindow};
 use windows::{
     core::{Free, PCWSTR},
@@ -71,13 +75,14 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     if changed {
         mode.tab_mode = tab_mode;
         if tab_mode {
-            let tab = new_tab(app, vtoi(window.hwnd().unwrap()), window.label());
+            let tab = new_tab(app, None, vtoi(window.hwnd().unwrap()), window.label());
             if !state.tabs.contains(&tab) {
                 state.tabs.push(tab);
             }
-            enter_tab_mode(app, state.tabs.as_mut_slice(), &mut mode, window.label());
+            enter_tab_mode(app, &mut state.tabs, &mut mode, window.label());
         } else {
             exit_tab_mode(app, &state.tabs, &mut mode);
+            state.tabs.clear();
         };
     }
 
@@ -107,7 +112,7 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     changed
 }
 
-pub fn add(window: &tauri::WebviewWindow) {
+pub fn add(window: &tauri::WebviewWindow, host_name: String) {
     let app = window.app_handle();
     let label = window.label();
     let state = app.state::<Mutex<TabState>>();
@@ -116,12 +121,12 @@ pub fn add(window: &tauri::WebviewWindow) {
     let tab = if let Some(tab) = state.tabs.iter_mut().find(|tab| tab.label == label) {
         tab
     } else {
-        let tab = new_tab(app, vtoi(window.hwnd().unwrap()), window.label());
+        let tab = new_tab(app, None, vtoi(window.hwnd().unwrap()), window.label());
         state.tabs.push(tab);
         state.tabs.last_mut().unwrap()
     };
     tab.bounds = get_bounds(&app.get_webview_window(label).unwrap());
-    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
+    let host = app.get_webview_window(&host_name).unwrap();
     let size = host.inner_size().unwrap();
 
     before_attach(window);
@@ -162,7 +167,7 @@ pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
     }
 }
 
-pub fn detach(app: &tauri::AppHandle, label: &str) {
+pub fn close(app: &tauri::AppHandle, label: &str) {
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
 
@@ -292,15 +297,28 @@ fn enter_tab_mode(app: &tauri::AppHandle, tabs: &mut [Tab], mode: &mut WindowMod
 }
 
 fn exit_tab_mode(app: &tauri::AppHandle, tabs: &[Tab], mode: &mut WindowMode) {
-    let host = app.get_webview_window(HOST.get().unwrap()).unwrap();
-    uninstall_subclass(host.hwnd().unwrap(), mode.undecorated_resize);
-
     mode.active_tab_label = String::new();
 
-    let _ = host.hide();
+    let mut hosts = HashSet::new();
+    for tab in tabs {
+        hosts.replace(&tab.host);
+    }
 
-    for tab in tabs.iter() {
+    for host_name in hosts.iter() {
+        let host = app.get_webview_window(host_name).unwrap();
+        uninstall_subclass(host.hwnd().unwrap(), mode.undecorated_resize);
+        let _ = host.hide();
+    }
+
+    for tab in tabs {
         detach_from_tab(tab, true);
+    }
+
+    for host_name in hosts.iter() {
+        if host_name != &HOST.get().unwrap() {
+            let host = app.get_webview_window(host_name).unwrap();
+            let _ = host.destroy();
+        }
     }
 }
 
@@ -612,7 +630,7 @@ fn get_bounds(window: &tauri::WebviewWindow) -> Bounds {
     }
 }
 
-fn new_tab(app: &tauri::AppHandle, window_handle: isize, label: &str) -> Tab {
+fn new_tab(app: &tauri::AppHandle, host_name: Option<&str>, window_handle: isize, label: &str) -> Tab {
     let state = app.state::<Mutex<WindowLabels>>();
     let state = state.lock().unwrap();
 
@@ -637,6 +655,7 @@ fn new_tab(app: &tauri::AppHandle, window_handle: isize, label: &str) -> Tab {
     };
 
     Tab {
+        host: host_name.unwrap_or(HOST.get().unwrap()).to_string(),
         window_handle,
         label: label.to_string(),
         title,

@@ -45,8 +45,8 @@ declare global {
             | { name: "closeAll"; data?: never }
             | { name: "cancel"; data?: never }
             | { name: "update"; data: WebviewTitle }
-            | { name: "add"; data?: never }
-            | { name: "detach"; data?: never }
+            | { name: "add"; data: string }
+            | { name: "close"; data?: never }
             | { name: "minimize"; data?: never }
             | { name: "toggleMaximize"; data?: never }
             | { name: "startDrag"; data?: never }
@@ -233,6 +233,7 @@ declare global {
             encoding?: string;
             restorePosition: boolean;
             appDataDir: string;
+            parent: string;
         };
 
         type ClipboardData = {

@@ -14,7 +14,7 @@ use std::{
         Mutex, OnceLock,
     },
 };
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WebviewWindow};
 
 static UUID: AtomicU16 = AtomicU16::new(0);
 static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
@@ -45,6 +45,7 @@ pub struct InitArgs {
     locales: Vec<String>,
     app_data_dir: String,
     restore_position: bool,
+    parent: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -60,7 +61,13 @@ pub struct WindowTitle {
 }
 
 pub fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>) {
-    let opening_file_path = setup(app, argv);
+    let opening_file_path = setup(app, argv, None);
+    create_new_window(app, opening_file_path);
+}
+
+pub fn new_window(window: &WebviewWindow, argv: Vec<String>) {
+    let app = window.app_handle();
+    let opening_file_path = setup(app, argv, Some(window.label()));
     create_new_window(app, opening_file_path);
 }
 
@@ -86,7 +93,7 @@ fn update_init_arg(app: &tauri::AppHandle, args: Option<InitArgs>) {
     }
 }
 
-pub fn setup(app: &tauri::AppHandle, args: Vec<String>) -> Option<String> {
+pub fn setup(app: &tauri::AppHandle, args: Vec<String>, opener: Option<&str>) -> Option<String> {
     /* Reset first */
     update_init_arg(app, None);
 
@@ -101,6 +108,7 @@ pub fn setup(app: &tauri::AppHandle, args: Vec<String>) -> Option<String> {
         locales: vec![locale],
         restore_position,
         app_data_dir: app.path().app_data_dir().unwrap_or_default().to_string_lossy().to_string(),
+        parent: tab::find_host(app, opener),
         ..Default::default()
     };
 

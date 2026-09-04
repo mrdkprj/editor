@@ -190,22 +190,22 @@ async fn show_save_dialog(payload: DialogOptions) -> Option<String> {
 */
 #[cfg(target_os = "windows")]
 #[tauri::command]
-async fn new_window(app: AppHandle, payload: Vec<String>) {
+async fn new_window(window: WebviewWindow, payload: Vec<String>) {
     let mut args = vec!["thisapp".to_string()];
     if !payload.is_empty() {
         args.extend(payload);
     }
-    helper::handle_second_instance(&app, args);
+    helper::new_window(&window, args);
 }
 
 #[cfg(target_os = "linux")]
 #[tauri::command]
-fn new_window(app: AppHandle, payload: Vec<String>) {
+fn new_window(window: WebviewWindow, payload: Vec<String>) {
     let mut args = vec!["thisapp".to_string()];
     if !payload.is_empty() {
         args.extend(payload);
     }
-    helper::handle_second_instance(&app, args);
+    helper::new_window(&window, args);
 }
 
 #[tauri::command]
@@ -295,7 +295,7 @@ pub fn run() {
         .setup(|app| {
             let args: Vec<String> = env::args().collect();
             helper::start(app.app_handle());
-            helper::setup(app.app_handle(), args);
+            helper::setup(app.app_handle(), args, None);
 
             Ok(())
         })
