@@ -45,7 +45,7 @@ pub struct InitArgs {
     locales: Vec<String>,
     app_data_dir: String,
     restore_position: bool,
-    parent: String,
+    opener: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -108,7 +108,7 @@ pub fn setup(app: &tauri::AppHandle, args: Vec<String>, opener: Option<&str>) ->
         locales: vec![locale],
         restore_position,
         app_data_dir: app.path().app_data_dir().unwrap_or_default().to_string_lossy().to_string(),
-        parent: tab::find_host(app, opener),
+        opener: opener.unwrap_or_default().to_string(),
         ..Default::default()
     };
 
@@ -164,7 +164,7 @@ pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>)
     let tab_mode = {
         let mode = app.state::<Mutex<WindowMode>>();
         let mode = mode.lock().unwrap();
-        mode.tab_mode
+        mode.is_tab_mode()
     };
 
     if tab_mode {
@@ -201,11 +201,28 @@ pub fn create_new_window(app: &tauri::AppHandle, opening_file_path: Option<Strin
     {
         let mode = app.state::<Mutex<WindowMode>>();
         let mode = mode.lock().unwrap();
-        if mode.tab_mode {
+        if mode.is_tab_mode() {
             config.focus = false;
         }
     }
     tauri::WebviewWindowBuilder::from_config(app, &config).unwrap().build().unwrap();
+}
+
+pub fn create_new_host_window(app: &tauri::AppHandle) -> String {
+    let id = UUID.fetch_add(1, Relaxed);
+    let config = &app.config().app.windows[0];
+    let mut config = config.clone();
+    let label = format!("{}-{:?}", config.label, id);
+    config.label = label.clone();
+    let current_theme = app.state::<Mutex<CurrentTheme>>();
+    let current_theme = current_theme.lock().unwrap();
+    config.theme = if current_theme.is_dark {
+        Some(tauri::Theme::Dark)
+    } else {
+        Some(tauri::Theme::Light)
+    };
+    tauri::WebviewWindowBuilder::from_config(app, &config).unwrap().build().unwrap();
+    label
 }
 
 pub fn get_init_args(app: AppHandle) -> Result<InitArgs, String> {
@@ -254,9 +271,9 @@ pub fn remove_window(app: &tauri::AppHandle, label: &str) {
     tab::remove(app, label);
 
     if state.labels.is_empty() {
-        if let Some(main) = app.get_webview_window("Main") {
-            let _ = main.hide();
-            let _ = main.destroy();
+        for (_, host) in app.webview_windows() {
+            let _ = host.hide();
+            let _ = host.destroy();
         }
     }
 }

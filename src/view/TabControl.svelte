@@ -3,12 +3,14 @@
     import { tabState, tabs } from "./appStateReducer.svelte";
     import util from "../util";
     import { IPC } from "../ipc";
+    import { onMount } from "svelte";
 
     let { label }: { label: string } = $props();
 
     // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
     let tab: HTMLDivElement;
+    let needsDetach = false;
 
     $effect(() => {
         tab.scrollLeft = tabs.scrollLeft;
@@ -20,6 +22,7 @@
     };
 
     const closeTab = async (e: MouseEvent, label: string) => {
+        console.log("close");
         e.preventDefault();
         e.stopPropagation();
         await ipc.sendTo(label, "tab_event", { name: "close" });
@@ -46,7 +49,16 @@
             e.preventDefault();
         }
 
+        if (tabs.webviews.length <= 1) {
+            e.preventDefault();
+            return;
+        }
+
         if (!e.target || !(e.target instanceof HTMLElement)) return;
+        // e.dataTransfer?.setData("text/plain", `xtab:e.target.id`);
+        needsDetach = true;
+        ev = null;
+        await ipc.sendOthers("startDrag", { initiator: label, target: e.target.id });
         tabState.dragging = true;
         tabState.startLabel = e.target.id;
         tabState.lastX = e.pageX;
@@ -99,6 +111,7 @@
     };
 
     const onDrop = () => {
+        console.log("drop");
         tabState.willStartDrag = false;
         endDrag();
     };
@@ -109,10 +122,38 @@
     };
 
     const endDrag = () => {
+        if (ev) {
+            ipc.sendTo(ev.initiator, "dropHandled", null);
+            ipc.invoke("tab_request", { name: "attach", data: { from: ev.target, to: label } });
+            ev = null;
+            return;
+        }
         if (!tabState.dragging) return;
-        ipc.sendTo(label, "dragEnd", {});
+        ipc.sendTo(label, "restoreFocus", {});
         tabState.dragging = false;
         ipc.invoke("tab_request", { name: "reorder", data: tabs.webviews });
+    };
+
+    const onDragEnd = (e: DragEvent) => {
+        let effect = e.dataTransfer?.dropEffect;
+        console.log("onDragEnd");
+        console.log(effect);
+        const isOutside = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight;
+        if (effect == "none" && isOutside) {
+            ipc.invoke("tab_request", { name: "detach", data: { label, offset_x: e.screenX, offset_y: e.screenY } });
+        }
+        if (effect == "copy" && isOutside) {
+            setTimeout(() => {
+                if (needsDetach) {
+                    console.log("needsdetatch");
+                    ipc.invoke("tab_request", { name: "detach", data: { label, offset_x: e.screenX, offset_y: e.screenY } });
+                } else {
+                    console.log("handled");
+                }
+            }, 50);
+        }
+        ipc.sendOthers("endDrag", null);
+        tabState.dragging = false;
     };
 
     const onMouseDown = () => {
@@ -127,9 +168,27 @@
         const shouldAppend = targetIndex >= sourceIndex;
         tabs.webviews.splice(shouldAppend ? targetIndex + 1 : targetIndex, 0, source);
     };
+
+    let ev: Tab.StartDragEvent | null = null;
+    const prepareAttach = (e: Tab.StartDragEvent) => {
+        ev = e;
+    };
+
+    const onDropToTabBar = () => {
+        console.log("drop2");
+    };
+
+    onMount(() => {
+        ipc.receive("dropHandled", () => (needsDetach = false));
+        ipc.receive("startDrag", prepareAttach);
+        ipc.receive("endDrag", () => (ev = null));
+        return () => {
+            ipc.release();
+        };
+    });
 </script>
 
-<div class="tab no-print" bind:this={tab} onwheel={onmousewheel}>
+<div class="tab no-print" bind:this={tab} onwheel={onmousewheel} ondrop={onDropToTabBar} role="button" tabindex="-1">
     {#each tabs.webviews as tab (tab.label)}
         <div
             id={tab.label}
@@ -144,12 +203,14 @@
             onmousemove={onMouseMove}
             onmouseup={onMouseUp}
             onmousedown={onMouseDown}
+            ondragend={onDragEnd}
             ondrop={onDrop}
             role="button"
             tabindex="-1"
             animate:flip={{ duration: tabState.dragging ? 400 : 0 }}
         >
-            <div class="tab-title" title={tab.title}>{tab.title}</div>
+            <!-- <div class="tab-title" title={tab.title}>{tab.title}</div> -->
+            <div class="tab-title" title={tab.title}>{tab.label}</div>
             <div class="tab-close-btn" onclick={(e) => closeTab(e, tab.label)} onmousedown={onCloseButtonMousedown} onkeydown={() => {}} role="button" tabindex="-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x" viewBox="0 0 16 16">
                     <path

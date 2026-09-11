@@ -22,21 +22,38 @@ declare global {
         reloadSettings: Mp.AnyEvent;
         closeTab: Mp.AnyEvent;
         scrollTab: number;
-        dragEnd: Mp.AnyEvent;
+        restoreFocus: Mp.AnyEvent;
         tab_event: Mp.TabEvent;
+        startDrag: Tab.StartDragEvent;
+        endDrag: null;
+        dropHandled: null;
     };
 
     namespace Tab {
+        type StartDragEvent = {
+            initiator: string;
+            target: string;
+        };
+        type AttachRequest = {
+            from: string;
+            to: string;
+        };
+        type DetachRequest = {
+            label: string;
+            offset_x: number;
+            offset_y: number;
+        };
         type TabEvent =
             | { name: "maximized"; data?: never }
             | { name: "unmaximized"; data?: never }
             | { name: "titleChanged"; data: WebviewTitle }
             | { name: "reordered"; data: Mp.WebviewTitle[] }
             | { name: "closed"; data: string }
-            | { name: "modeChanged"; data: { tab_mode: boolean; tabs: WebviewTitle[] } }
+            | { name: "modeChanged"; data: { tab_mode: boolean; webviews: WebviewTitle[] } }
             | { name: "close"; data?: never }
             | { name: "scrolled"; data: number }
             | { name: "activated"; data?: never }
+            | { name: "attached"; data: WebviewTitle[] }
             | { name: "added"; data: WebviewTitle };
 
         type TabRequest =
@@ -46,6 +63,8 @@ declare global {
             | { name: "cancel"; data?: never }
             | { name: "update"; data: WebviewTitle }
             | { name: "add"; data: string }
+            | { name: "attach"; data: AttachRequest }
+            | { name: "detach"; data: DetachRequest }
             | { name: "close"; data?: never }
             | { name: "minimize"; data?: never }
             | { name: "toggleMaximize"; data?: never }
@@ -233,7 +252,7 @@ declare global {
             encoding?: string;
             restorePosition: boolean;
             appDataDir: string;
-            parent: string;
+            opener: string;
         };
 
         type ClipboardData = {

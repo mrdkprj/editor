@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, tick, untrack } from "svelte";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-    import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
+    import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu, tabState } from "./appStateReducer.svelte";
     import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
@@ -528,6 +528,7 @@
     };
 
     const onTabEvent = async (e: Tab.TabEvent) => {
+        console.log(e.name);
         switch (e.name) {
             case "activated": {
                 getCurrentWebview().setFocus();
@@ -556,16 +557,23 @@
             case "closed": {
                 let index = tabs.webviews.findIndex((tab) => tab.label == e.data);
                 tabs.webviews.splice(index, 1);
+                console.log($state.snapshot(tabs.webviews));
                 break;
             }
             case "modeChanged": {
                 dispatch({ type: "toggleTabMode", value: e.data.tab_mode });
-                if (e.data.tabs.length) {
-                    tabs.webviews = e.data.tabs;
+                if (e.data.webviews.length) {
+                    tabs.webviews = e.data.webviews;
                 }
                 break;
             }
+            case "attached": {
+                console.log(e.data);
+                tabs.webviews = e.data;
+                break;
+            }
             case "added": {
+                console.log(e.data);
                 tabs.webviews.push(e.data);
                 break;
             }
@@ -643,7 +651,7 @@
         if (settings.tabMode) {
             const toggled = await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
             if (!toggled) {
-                await ipc.invoke("tab_request", { name: "add", data: e.parent });
+                await ipc.invoke("tab_request", { name: "add", data: e.opener });
             }
         } else {
             await thisWindow.show();
@@ -669,15 +677,18 @@
         };
     });
 
-    const onit = (e: DragEvent) => {
-        if (e.relatedTarget === null) {
-            console.log(e);
+    const trackMousemove = (event: MouseEvent) => {
+        if (!tabState.dragging) return;
+
+        if (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight) {
+            // ipc.invoke("tab_request", { name: "detach", data: { label, offset_x: event.screenX, offset_y: event.screenY } });
+            // console.log("trackMousemove");
         }
     };
 </script>
 
-<svelte:window oncontextmenu={openContextMenu} ondragenter={onit} />
-<svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} />
+<svelte:window oncontextmenu={openContextMenu} />
+<svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} ondragleave={trackMousemove} />
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
     {#if util.isLinux()}
