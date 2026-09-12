@@ -49,11 +49,6 @@
             e.preventDefault();
         }
 
-        if (tabs.webviews.length <= 1) {
-            e.preventDefault();
-            return;
-        }
-
         if (!e.target || !(e.target instanceof HTMLElement)) return;
         // e.dataTransfer?.setData("text/plain", `xtab:e.target.id`);
         needsDetach = true;
@@ -135,18 +130,22 @@
     };
 
     const onDragEnd = (e: DragEvent) => {
+        if (!e.target || !(e.target instanceof HTMLElement)) return;
+
         let effect = e.dataTransfer?.dropEffect;
         console.log("onDragEnd");
-        console.log(effect);
+        console.log(e.target.id);
+
         const isOutside = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight;
         if (effect == "none" && isOutside) {
-            ipc.invoke("tab_request", { name: "detach", data: { label, offset_x: e.screenX, offset_y: e.screenY } });
+            ipc.invoke("tab_request", { name: "detach", data: { label: tabState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
         }
         if (effect == "copy" && isOutside) {
             setTimeout(() => {
                 if (needsDetach) {
                     console.log("needsdetatch");
-                    ipc.invoke("tab_request", { name: "detach", data: { label, offset_x: e.screenX, offset_y: e.screenY } });
+
+                    ipc.invoke("tab_request", { name: "detach", data: { label: tabState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
                 } else {
                     console.log("handled");
                 }

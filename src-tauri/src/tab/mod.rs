@@ -133,7 +133,11 @@ pub fn init(app: &tauri::AppHandle, host_name: &str) {
     app.manage(Mutex::new(WindowMode::default()));
 
     #[cfg(windows)]
-    platform_impl::prepare(app, host_name.to_string());
+    {
+        let mode = app.state::<Mutex<WindowMode>>();
+        let mut mode = mode.lock().unwrap();
+        platform_impl::prepare(app, &mut mode, host_name.to_string());
+    }
 }
 
 pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
@@ -178,6 +182,11 @@ impl WindowMode {
     }
 }
 
+pub struct ReparentResult {
+    previous_host_name: String,
+    tab: Tab,
+}
+
 impl TabState {
     pub fn all(&self) -> &HashMap<String, Vec<Tab>> {
         &self.tab_map
@@ -187,7 +196,7 @@ impl TabState {
         self.tab_map.get(key)
     }
 
-    pub fn insert(&mut self, key: &str, tabs: Vec<Tab>) {
+    pub fn update(&mut self, key: &str, tabs: Vec<Tab>) {
         self.tab_map.insert(key.to_string(), tabs);
     }
 
@@ -195,7 +204,7 @@ impl TabState {
         if let Some(tabs) = self.tab_map.get_mut(key) {
             tabs.push(tab);
         } else {
-            self.insert(key, vec![tab]);
+            self.update(key, vec![tab]);
         }
     }
 
@@ -205,6 +214,14 @@ impl TabState {
 
     pub fn clear(&mut self) {
         self.tab_map.clear();
+    }
+
+    pub fn can_detach(&self, label: &str) -> bool {
+        if let Some(tab) = self.find(label) {
+            self.tab_map.get(&tab.host).unwrap_or(&Vec::new()).len() > 1
+        } else {
+            false
+        }
     }
 
     pub fn find(&self, label: &str) -> Option<Tab> {
@@ -235,10 +252,10 @@ impl TabState {
         None
     }
 
-    pub fn enumerate(&self, label: &str) -> Option<(usize, &Tab)> {
+    pub fn position(&self, label: &str) -> Option<usize> {
         for tabs in self.tab_map.values() {
-            if let Some((index, tab)) = tabs.iter().enumerate().find(|(_, tab)| tab.label == label) {
-                return Some((index, tab));
+            if let Some(index) = tabs.iter().position(|tab| tab.label == label) {
+                return Some(index);
             }
         }
         None
@@ -248,7 +265,11 @@ impl TabState {
         self.tab_map.get(key).unwrap().get(index)
     }
 
-    pub fn remove_by_label(&mut self, label: &str) -> Option<Tab> {
+    pub fn remove(&mut self, key: &str) {
+        self.tab_map.remove(key);
+    }
+
+    pub fn remove_tab(&mut self, label: &str) -> Option<Tab> {
         for tabs in self.tab_map.values_mut() {
             if let Some(index) = tabs.iter().position(|tab| tab.label == label) {
                 let removed = tabs.remove(index);
@@ -296,14 +317,17 @@ impl TabState {
         self.closing.clear();
     }
 
-    pub fn reparent(&mut self, label: &str, new_host: &str) -> (String, Tab) {
+    pub fn reparent(&mut self, label: &str, new_host: &str) -> ReparentResult {
         let old = self.get_host(label);
         let old_tabs = self.tab_map.get_mut(&old).unwrap();
         let index = old_tabs.iter().position(|tab| tab.label == label).unwrap();
         let mut tab = old_tabs.remove(index);
         tab.host = new_host.to_string();
         self.add(new_host, tab.clone());
-        (old, tab)
+        ReparentResult {
+            previous_host_name: old,
+            tab,
+        }
     }
 }
 
