@@ -1,6 +1,6 @@
 <script lang="ts">
     import { flip } from "svelte/animate";
-    import { tabState, tabs } from "./appStateReducer.svelte";
+    import { tabState } from "./appStateReducer.svelte";
     import util from "../util";
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
@@ -9,11 +9,19 @@
 
     // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
+
+    type DragState = {
+        startLabel: string;
+        lastX: number;
+        needsDetach: boolean;
+        dragEvent: Tab.StartDragEvent | null;
+    };
+    const dragState: DragState = { startLabel: "", lastX: 0, needsDetach: true, dragEvent: null };
+
     let tab: HTMLDivElement;
-    let needsDetach = false;
 
     $effect(() => {
-        tab.scrollLeft = tabs.scrollLeft;
+        tab.scrollLeft = tabState.scrollLeft;
     });
 
     const onCloseButtonMousedown = (e: MouseEvent) => {
@@ -22,7 +30,6 @@
     };
 
     const closeTab = async (e: MouseEvent, label: string) => {
-        console.log("close");
         e.preventDefault();
         e.stopPropagation();
         await ipc.sendTo(label, "tab_event", { name: "close" });
@@ -50,13 +57,13 @@
         }
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
-        // e.dataTransfer?.setData("text/plain", `xtab:e.target.id`);
-        needsDetach = true;
-        ev = null;
+
+        dragState.needsDetach = true;
+        dragState.dragEvent = null;
+        dragState.startLabel = e.target.id;
+        dragState.lastX = e.pageX;
         await ipc.sendOthers("startDrag", { initiator: label, target: e.target.id });
         tabState.dragging = true;
-        tabState.startLabel = e.target.id;
-        tabState.lastX = e.pageX;
     };
 
     const onDragOver = (e: DragEvent) => {
@@ -74,9 +81,9 @@
     const drag = (e: MouseEvent | DragEvent) => {
         if (!tabState.dragging) return;
 
-        if (e.pageX == tabState.lastX) return;
-        const dargToRight = e.pageX > tabState.lastX;
-        tabState.lastX = e.pageX;
+        if (e.pageX == dragState.lastX) return;
+        const dargToRight = e.pageX > dragState.lastX;
+        dragState.lastX = e.pageX;
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
 
@@ -84,14 +91,14 @@
 
         if (!id) return;
 
-        if (id == tabState.startLabel) return;
+        if (id == dragState.startLabel) return;
 
         if (!dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 < e.pageX) {
-            replace(tabState.startLabel, id);
+            replace(dragState.startLabel, id);
         }
 
         if (dargToRight && e.target.offsetLeft + e.target.clientWidth / 2 > e.pageX) {
-            replace(tabState.startLabel, id);
+            replace(dragState.startLabel, id);
         }
 
         if (tab.scrollWidth > tab.clientWidth) {
@@ -105,52 +112,68 @@
         }
     };
 
-    const onDrop = () => {
-        console.log("drop");
+    const onDrop = (e: DragEvent) => {
         tabState.willStartDrag = false;
-        endDrag();
+        endDrag(e);
     };
 
-    const onMouseUp = () => {
+    const onMouseUp = (e: MouseEvent) => {
         tabState.willStartDrag = false;
-        endDrag();
+        endDrag(e);
     };
 
-    const endDrag = () => {
-        if (ev) {
-            ipc.sendTo(ev.initiator, "dropHandled", null);
-            ipc.invoke("tab_request", { name: "attach", data: { from: ev.target, to: label } });
-            ev = null;
-            return;
+    const endDrag = (e: MouseEvent | DragEvent) => {
+        if (dragState.dragEvent) {
+            return attachTab(e);
         }
+
         if (!tabState.dragging) return;
-        ipc.sendTo(label, "restoreFocus", {});
+
+        ipc.sendTo(label, "restoreFocus", null);
         tabState.dragging = false;
-        ipc.invoke("tab_request", { name: "reorder", data: tabs.webviews });
+        ipc.invoke("tab_request", { name: "reorder", data: tabState.tabs });
+    };
+
+    const attachTab = (e: MouseEvent | DragEvent) => {
+        /* Send only to the initiator for speed */
+        ipc.sendTo(dragState.dragEvent!.initiator, "dropHandled", null);
+
+        const element = document.elementFromPoint(e.clientX, e.clientY);
+        const target = element?.classList.contains("tab-title") ? element.parentElement : element;
+
+        let attach_target = null;
+        let attach_before = false;
+        if (target && target.hasAttribute("data-drag-id")) {
+            const rect = target.getBoundingClientRect();
+            const mid = rect.left + rect.width / 2;
+            attach_before = e.clientX <= mid;
+            attach_target = target.id;
+        }
+        ipc.invoke("tab_request", { name: "attach", data: { from: dragState.dragEvent!.target, to: label, attach_target, attach_before } });
+        dragState.dragEvent = null;
     };
 
     const onDragEnd = (e: DragEvent) => {
-        if (!e.target || !(e.target instanceof HTMLElement)) return;
-
         let effect = e.dataTransfer?.dropEffect;
-        console.log("onDragEnd");
-        console.log(e.target.id);
 
         const isOutside = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight;
-        if (effect == "none" && isOutside) {
-            ipc.invoke("tab_request", { name: "detach", data: { label: tabState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
-        }
-        if (effect == "copy" && isOutside) {
-            setTimeout(() => {
-                if (needsDetach) {
-                    console.log("needsdetatch");
 
-                    ipc.invoke("tab_request", { name: "detach", data: { label: tabState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
-                } else {
-                    console.log("handled");
-                }
-            }, 50);
+        if (isOutside) {
+            switch (effect) {
+                case "none":
+                    ipc.invoke("tab_request", { name: "detach", data: { label: dragState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
+                    break;
+
+                case "copy":
+                    setTimeout(() => {
+                        if (dragState.needsDetach) {
+                            ipc.invoke("tab_request", { name: "detach", data: { label: dragState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
+                        }
+                    }, 50);
+                    break;
+            }
         }
+
         ipc.sendOthers("endDrag", null);
         tabState.dragging = false;
     };
@@ -160,35 +183,26 @@
     };
 
     const replace = (sourceId: string, targetId: string) => {
-        const sourceIndex = tabs.webviews.findIndex((label) => label.label == sourceId);
-        const source = tabs.webviews.splice(sourceIndex, 1)[0];
+        const sourceIndex = tabState.tabs.findIndex((label) => label.label == sourceId);
+        const source = tabState.tabs.splice(sourceIndex, 1)[0];
 
-        const targetIndex = tabs.webviews.findIndex((label) => label.label == targetId);
+        const targetIndex = tabState.tabs.findIndex((tab) => tab.label == targetId);
         const shouldAppend = targetIndex >= sourceIndex;
-        tabs.webviews.splice(shouldAppend ? targetIndex + 1 : targetIndex, 0, source);
-    };
-
-    let ev: Tab.StartDragEvent | null = null;
-    const prepareAttach = (e: Tab.StartDragEvent) => {
-        ev = e;
-    };
-
-    const onDropToTabBar = () => {
-        console.log("drop2");
+        tabState.tabs.splice(shouldAppend ? targetIndex + 1 : targetIndex, 0, source);
     };
 
     onMount(() => {
-        ipc.receive("dropHandled", () => (needsDetach = false));
-        ipc.receive("startDrag", prepareAttach);
-        ipc.receive("endDrag", () => (ev = null));
+        ipc.receive("dropHandled", () => (dragState.needsDetach = false));
+        ipc.receive("startDrag", (e: Tab.StartDragEvent) => (dragState.dragEvent = e));
+        ipc.receive("endDrag", () => (dragState.dragEvent = null));
         return () => {
             ipc.release();
         };
     });
 </script>
 
-<div class="tab no-print" bind:this={tab} onwheel={onmousewheel} ondrop={onDropToTabBar} role="button" tabindex="-1">
-    {#each tabs.webviews as tab (tab.label)}
+<div class="tab no-print" bind:this={tab} onwheel={onmousewheel} ondrop={onDrop} role="button" tabindex="-1">
+    {#each tabState.tabs as tab (tab.label)}
         <div
             id={tab.label}
             draggable="true"
@@ -208,10 +222,9 @@
             tabindex="-1"
             animate:flip={{ duration: tabState.dragging ? 400 : 0 }}
         >
-            <!-- <div class="tab-title" title={tab.title}>{tab.title}</div> -->
-            <div class="tab-title" title={tab.title}>{tab.label}</div>
+            <div class="tab-title" title={tab.title}>{tab.title}</div>
             <div class="tab-close-btn" onclick={(e) => closeTab(e, tab.label)} onmousedown={onCloseButtonMousedown} onkeydown={() => {}} role="button" tabindex="-1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x" viewBox="0 0 16 16">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                     <path
                         d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"
                     />

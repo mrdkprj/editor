@@ -76,6 +76,8 @@ pub struct WebviewTitle {
 pub struct AttachRequest {
     pub from: String,
     pub to: String,
+    pub attach_target: Option<String>,
+    pub attach_before: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -164,6 +166,11 @@ impl WindowMode {
     pub fn exit(&mut self) {
         self.is_tab_mode = false;
         self.active_tab_labels.clear();
+    }
+
+    pub fn remove(&mut self, host_name: &str) {
+        self.active_tab_labels.remove(host_name);
+        self.undecorated_resize.remove(host_name);
     }
 
     pub fn get_undecorated_resize(&self, host_name: &str) -> isize {
@@ -324,6 +331,33 @@ impl TabState {
         let mut tab = old_tabs.remove(index);
         tab.host = new_host.to_string();
         self.add(new_host, tab.clone());
+        ReparentResult {
+            previous_host_name: old,
+            tab,
+        }
+    }
+
+    pub fn reparent_with_position(&mut self, label: &str, new_host: &str, target: Option<String>, attach_before: bool) -> ReparentResult {
+        let old = self.get_host(label);
+        let old_tabs = self.tab_map.get_mut(&old).unwrap();
+        let index = old_tabs.iter().position(|tab| tab.label == label).unwrap();
+        let mut tab = old_tabs.remove(index);
+        tab.host = new_host.to_string();
+
+        let tabs = self.tab_map.get_mut(new_host).unwrap();
+        if let Some(target) = target {
+            let mut index = tabs.iter().position(|tab| tab.label == target).unwrap();
+            if !attach_before && index != tabs.len() - 1 {
+                index += 1;
+            }
+            tabs.insert(index, tab.clone());
+        } else {
+            if attach_before {
+                tabs.insert(0, tab.clone());
+            } else {
+                tabs.push(tab.clone());
+            }
+        }
         ReparentResult {
             previous_host_name: old,
             tab,

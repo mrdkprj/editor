@@ -1,4 +1,3 @@
-#![allow(unused_imports)]
 use crate::{
     helper::WindowLabels,
     tab::{
@@ -7,14 +6,7 @@ use crate::{
         TabState, WebviewTitle, WindowInset, WindowMode, HOST,
     },
 };
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicU16, Ordering::Relaxed},
-        Mutex,
-    },
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Mutex, time::Duration};
 use tauri::{Manager, PhysicalSize, WebviewWindow};
 use windows::{
     core::{Free, PCWSTR},
@@ -22,7 +14,7 @@ use windows::{
         Foundation::{HWND, LPARAM, LRESULT, POINT, POINTS, RECT, WPARAM},
         Graphics::Gdi::{ClientToScreen, CreateRectRgn, GetWindowRgn, SetWindowRgn, RGN_ERROR},
         UI::{
-            Input::KeyboardAndMouse::{ReleaseCapture, SendInput, SetFocus, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_ESCAPE},
+            Input::KeyboardAndMouse::{ReleaseCapture, SetFocus},
             Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
             WindowsAndMessaging::*,
         },
@@ -34,8 +26,6 @@ const TOP_RESIZE_BORDER_SIZE: i32 = 1;
 const PARENT_SUBCLASS_ID: usize = WM_USER as usize + 1;
 const RESIZE_SUBCLASS_ID: usize = WM_USER as usize + 2;
 const CHILD_SUBCLASS_ID: usize = WM_USER as usize + 3;
-
-// static SUBCLASS_ID: AtomicU16 = AtomicU16::new(0);
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum WindowType {
@@ -125,7 +115,7 @@ pub fn add(window: &tauri::WebviewWindow, activator: String) {
     before_attach(window);
     attach_to_tab(&host, &tab, size.width as _, size.height as _);
     /* Delay switching for smooth rendering */
-    bring_to_front_async(app, tab);
+    bring_to_front_async(app, tab, true);
 
     /* Unminimize */
     let app = app.clone();
@@ -165,14 +155,20 @@ pub fn attach(app: &tauri::AppHandle, req: AttachRequest) {
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
+    let old_tab = state.find(&req.from).unwrap();
+    /* Change active tab of the detached tabs */
+    shift_active_tab(app, &state, &mut mode, &old_tab.host, &old_tab.label);
+
     let new_host_name = state.get_host(&req.to);
-    let result = state.reparent(&req.from, &new_host_name);
+    let result = state.reparent_with_position(&req.from, &new_host_name, req.attach_target, req.attach_before);
 
     let detached_tabs = state.tabs(&result.previous_host_name).unwrap();
     if detached_tabs.is_empty() {
         state.remove(&result.previous_host_name);
         /* If no tabs remain, destroy the host except default one */
         if hide_host(app, &result.previous_host_name, &mode) {
+            state.remove(&result.previous_host_name);
+            mode.remove(&result.previous_host_name);
             let old_host = app.get_webview_window(&result.previous_host_name).unwrap();
             let _ = old_host.destroy();
         }
@@ -206,39 +202,7 @@ pub fn attach(app: &tauri::AppHandle, req: AttachRequest) {
     let size = host.inner_size().unwrap();
     let child_hwnd = app.get_webview_window(&tab.label).unwrap().hwnd().unwrap();
     reparent(child_hwnd, host_hwnd, &tab, size);
-    bring_to_front(app, &state, &mut mode, &tab.label);
-}
-
-#[allow(dead_code)]
-unsafe fn cancel_drag() {
-    /* Create the Key Down event */
-    let press = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VK_ESCAPE,
-                wScan: 0,
-                dwFlags: Default::default(),
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-
-    /* Create the Key Up event */
-    let release = INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: VK_ESCAPE,
-                wScan: 0,
-                dwFlags: KEYEVENTF_KEYUP,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
-    SendInput(&[press, release], size_of::<INPUT>() as i32);
+    bring_to_front_async(app, tab, false);
 }
 
 pub fn detach(app: &tauri::AppHandle, req: DetachRequest) {
@@ -457,13 +421,10 @@ fn shift_active_tab(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowM
     if let Some(index) = state.position(label) {
         if mode.get_active_tab_label(host_name) == label {
             let tabs = state.tabs(host_name).unwrap();
-            let is_last = index == tabs.len() - 1;
-            let tab = if is_last {
-                state.get(host_name, index - 1).unwrap()
-            } else {
-                state.get(host_name, index).unwrap()
-            };
-            bring_to_front(app, state, mode, &tab.label);
+            if tabs.len() > 1 {
+                let tab = state.get(host_name, index - 1).unwrap();
+                bring_to_front(app, state, mode, &tab.label);
+            }
         }
     }
 }
@@ -597,7 +558,7 @@ fn bring_to_front(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowMod
     }
 }
 
-fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab) {
+fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab, emit: bool) {
     let app = app.clone();
     smol::spawn(async move {
         smol::Timer::after(Duration::from_millis(50)).await;
@@ -606,16 +567,18 @@ fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab) {
             let mode = app.state::<Mutex<WindowMode>>();
             if let Ok(mut mode) = mode.try_lock() {
                 bring_to_front(&app, &state, &mut mode, &tab.label);
-                let tabs = state.tabs(&tab.host).unwrap();
-                emit_filter(
-                    &app,
-                    TabEvent::Added(WebviewTitle {
-                        label: tab.label.clone(),
-                        title: tab.title.clone(),
-                        path: tab.path.clone(),
-                    }),
-                    tabs,
-                );
+                if emit {
+                    let tabs = state.tabs(&tab.host).unwrap();
+                    emit_filter(
+                        &app,
+                        TabEvent::Added(WebviewTitle {
+                            label: tab.label.clone(),
+                            title: tab.title.clone(),
+                            path: tab.path.clone(),
+                        }),
+                        tabs,
+                    );
+                }
             };
         };
     })

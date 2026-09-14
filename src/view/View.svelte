@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, tick, untrack } from "svelte";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-    import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu, tabState } from "./appStateReducer.svelte";
+    import { appState, dispatch, tabState, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
     import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
@@ -164,7 +164,7 @@
                 showPreference();
                 break;
 
-            case "tab":
+            case "tabMode":
                 toggleTabMode();
                 break;
         }
@@ -266,7 +266,7 @@
         const results = await helper.grep(request);
         dispatch({ type: "grepResult", value: results });
         dispatch({ type: "toggleDialog", value: { type: "progress", open: false } });
-        await ipc.sendTo(label, "grep_end", {});
+        await ipc.sendTo(label, "grep_end", null);
         await getCurrentWebviewWindow().setFocus();
         onSettingsChange();
     };
@@ -411,7 +411,7 @@
             const content = await helper.changeEncoding(contentState.fullPath, encoding);
             textState.encoding = encoding;
             dispatch({ type: "content", value: content });
-            ipc.sendTo(label, "encoding_changed", {});
+            ipc.sendTo(label, "encoding_changed", null);
         } catch (ex: any) {
             helper.showErrorMessage(ex);
         }
@@ -502,14 +502,14 @@
     const onSettingsChange = async () => {
         settingStore.data = $state.snapshot(settings);
         await settingStore.save();
-        await ipc.sendOthers("reloadSettings", {});
+        await ipc.sendOthers("reloadSettings", null);
     };
 
     const onReloadSettings = async () => {
         const theme = settings.theme;
         await settingStore.reload();
         updatePreferences(settingStore.data);
-        await ipc.sendTo(label, "refelect_settings", {});
+        await ipc.sendTo(label, "refelect_settings", null);
         if (theme != settings.theme) {
             await helper.changeTheme(settings.theme);
         }
@@ -528,7 +528,6 @@
     };
 
     const onTabEvent = async (e: Tab.TabEvent) => {
-        console.log(e.name);
         switch (e.name) {
             case "activated": {
                 getCurrentWebview().setFocus();
@@ -551,30 +550,27 @@
                 break;
             }
             case "reordered": {
-                tabs.webviews = e.data;
+                tabState.tabs = e.data;
                 break;
             }
             case "closed": {
-                let index = tabs.webviews.findIndex((tab) => tab.label == e.data);
-                tabs.webviews.splice(index, 1);
-                console.log($state.snapshot(tabs.webviews));
+                let index = tabState.tabs.findIndex((tab) => tab.label == e.data);
+                tabState.tabs.splice(index, 1);
                 break;
             }
             case "modeChanged": {
                 dispatch({ type: "toggleTabMode", value: e.data.tab_mode });
                 if (e.data.webviews.length) {
-                    tabs.webviews = e.data.webviews;
+                    tabState.tabs = e.data.webviews;
                 }
                 break;
             }
             case "attached": {
-                console.log(e.data);
-                tabs.webviews = e.data;
+                tabState.tabs = e.data;
                 break;
             }
             case "added": {
-                console.log(e.data);
-                tabs.webviews.push(e.data);
+                tabState.tabs.push(e.data);
                 break;
             }
             case "close": {
@@ -582,18 +578,18 @@
                 break;
             }
             case "scrolled": {
-                tabs.scrollLeft = e.data;
+                tabState.scrollLeft = e.data;
                 break;
             }
         }
     };
 
     const scrollTab = (scrollLeft: number) => {
-        tabs.scrollLeft = scrollLeft;
+        tabState.scrollLeft = scrollLeft;
     };
 
-    const updateTabTitle = (e: Mp.WebviewTitle) => {
-        tabs.webviews
+    const updateTabTitle = (e: Tab.WebviewTitle) => {
+        tabState.tabs
             .filter((tab) => tab.label == e.label)
             .forEach((tab) => {
                 tab.title = e.title;
@@ -676,19 +672,10 @@
             ipc.release();
         };
     });
-
-    const trackMousemove = (event: MouseEvent) => {
-        if (!tabState.dragging) return;
-
-        if (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight) {
-            // ipc.invoke("tab_request", { name: "detach", data: { label, offset_x: event.screenX, offset_y: event.screenY } });
-            // console.log("trackMousemove");
-        }
-    };
 </script>
 
 <svelte:window oncontextmenu={openContextMenu} />
-<svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} ondragleave={trackMousemove} />
+<svelte:document {onkeydown} {onkeyup} {onclick} {onmouseup} ondragover={(e) => e.preventDefault()} />
 
 <div class="viewport" class:full-screen={$appState.isFullScreen}>
     {#if util.isLinux()}
