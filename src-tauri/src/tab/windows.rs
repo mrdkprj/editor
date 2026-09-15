@@ -288,10 +288,12 @@ pub fn close(app: &tauri::AppHandle, label: &str) {
     let state = state.lock().unwrap();
 
     if let Some(tab) = state.find(label) {
-        let position = app.get_webview_window(&tab.host).unwrap().outer_position().unwrap();
+        let host = app.get_webview_window(&tab.host).unwrap();
+        let position = host.outer_position().unwrap();
+        let size = host.inner_size().unwrap();
         /* Hide first with host's position */
         let _ = unsafe { SetWindowPos(to_hwnd(tab.window_handle), Some(HWND_BOTTOM), position.x, position.y, tab.bounds.width as _, tab.bounds.height as _, SWP_HIDEWINDOW) };
-        detach_from_tab(&tab, false);
+        detach_from_tab(&tab, Some(size));
 
         let mode = app.state::<Mutex<WindowMode>>();
         let mut mode = mode.lock().unwrap();
@@ -510,7 +512,7 @@ fn exit_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut Window
         let _ = host.hide();
 
         for tab in tabs.iter() {
-            detach_from_tab(tab, true);
+            detach_from_tab(tab, None);
         }
 
         /* Destroy the host other than the default host */
@@ -654,9 +656,9 @@ fn drag_resize_window(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) {
     let _ = unsafe { PostMessageW(Some(hwnd), WM_NCLBUTTONDOWN, wparam, lparam) };
 }
 
-fn detach_from_tab(removed: &Tab, show: bool) {
+fn detach_from_tab(removed: &Tab, size: Option<PhysicalSize<u32>>) {
     /* Restore style only when showing window. Otherwise, closing tabs causes flicker */
-    if show {
+    if size.is_none() {
         unsafe { SetWindowLongPtrW(to_hwnd(removed.window_handle), GWL_STYLE, removed.style) };
     }
 
@@ -670,7 +672,9 @@ fn detach_from_tab(removed: &Tab, show: bool) {
         unsafe { SetWindowLongPtrW(to_hwnd(removed.window_handle), GWLP_HWNDPARENT, owner) };
     }
 
-    if show {
+    if let Some(size) = size {
+        let _ = unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, 0, 0, size.width as _, size.height as _, SWP_FRAMECHANGED | SWP_NOMOVE) };
+    } else {
         let _ =
             unsafe { SetWindowPos(to_hwnd(removed.window_handle), None, removed.bounds.x, removed.bounds.y, removed.bounds.width as _, removed.bounds.height as _, SWP_FRAMECHANGED | SWP_SHOWWINDOW) };
     }

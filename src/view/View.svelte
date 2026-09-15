@@ -478,10 +478,7 @@
     const destroy = async () => {
         const thisWindow = getCurrentWebviewWindow();
 
-        /* On Linux, must move webview back to its original parent window */
-        if (settings.tabMode) {
-            await ipc.invoke("tab_request", { name: "close" });
-        }
+        await ipc.invoke("tab_request", { name: "close" });
 
         settingStore.data = $state.snapshot(settings);
 
