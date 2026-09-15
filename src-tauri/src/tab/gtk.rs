@@ -333,7 +333,7 @@ fn shift_active_tab(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowM
             let tabs = state.tabs(host_name).unwrap();
             if tabs.len() > 1 {
                 let tab = if index == 0 {
-                    state.get(host_name, index).unwrap()
+                    state.get(host_name, index + 1).unwrap()
                 } else {
                     state.get(host_name, index - 1).unwrap()
                 };

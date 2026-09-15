@@ -153,8 +153,6 @@
     const onDragEnd = (e: DragEvent) => {
         let effect = e.dataTransfer?.dropEffect;
 
-        // const isOutside = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight;
-
         if (!dragState.insideWindow) {
             switch (effect) {
                 case "none":
@@ -164,7 +162,6 @@
                 case "move":
                 case "copy":
                     setTimeout(() => {
-                        console.log(dragState.needsDetach);
                         if (dragState.needsDetach) {
                             ipc.invoke("tab_request", { name: "detach", data: { label: dragState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
                         }

@@ -422,7 +422,11 @@ fn shift_active_tab(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowM
         if mode.get_active_tab_label(host_name) == label {
             let tabs = state.tabs(host_name).unwrap();
             if tabs.len() > 1 {
-                let tab = state.get(host_name, index - 1).unwrap();
+                let tab = if index == 0 {
+                    state.get(host_name, index + 1).unwrap()
+                } else {
+                    state.get(host_name, index - 1).unwrap()
+                };
                 bring_to_front(app, state, mode, &tab.label);
             }
         }
