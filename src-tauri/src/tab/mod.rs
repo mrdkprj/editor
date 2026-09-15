@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
-#[cfg(windows)]
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::{
+    collections::HashMap,
+    sync::{Mutex, OnceLock},
+};
 use tauri::{Emitter, EventTarget, Manager};
 
 #[cfg(target_os = "linux")]
@@ -170,12 +171,16 @@ impl WindowMode {
 
     pub fn remove(&mut self, host_name: &str) {
         self.active_tab_labels.remove(host_name);
+        #[cfg(windows)]
         self.undecorated_resize.remove(host_name);
     }
 
+    #[cfg(windows)]
     pub fn get_undecorated_resize(&self, host_name: &str) -> isize {
         *self.undecorated_resize.get(host_name).unwrap()
     }
+
+    #[cfg(windows)]
     pub fn update_undecorated_resize(&mut self, host_name: &str, window_handle: isize) {
         self.undecorated_resize.insert(host_name.to_string(), window_handle);
     }

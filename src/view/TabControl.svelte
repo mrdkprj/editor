@@ -15,8 +15,10 @@
         lastX: number;
         needsDetach: boolean;
         dragEvent: Tab.StartDragEvent | null;
+        insideWindow: boolean;
+        dragCounter: number;
     };
-    const dragState: DragState = { startLabel: "", lastX: 0, needsDetach: true, dragEvent: null };
+    const dragState: DragState = { startLabel: "", lastX: 0, needsDetach: true, dragEvent: null, insideWindow: true, dragCounter: 0 };
 
     let tab: HTMLDivElement;
 
@@ -53,13 +55,15 @@
 
     const startDrag = async (e: DragEvent) => {
         if (util.isLinux()) {
-            e.preventDefault();
+            e.dataTransfer?.setData("text/plain", "dummy");
         }
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
 
         dragState.needsDetach = true;
         dragState.dragEvent = null;
+        dragState.dragCounter = 0;
+        dragState.insideWindow = true;
         dragState.startLabel = e.target.id;
         dragState.lastX = e.pageX;
         await ipc.sendOthers("startDrag", { initiator: label, target: e.target.id });
@@ -68,13 +72,6 @@
 
     const onDragOver = (e: DragEvent) => {
         e.preventDefault();
-        if (util.isLinux()) return;
-        drag(e);
-    };
-
-    /* On Linux, dragover never fires */
-    const onMouseMove = (e: MouseEvent) => {
-        if (util.isWin()) return;
         drag(e);
     };
 
@@ -156,16 +153,18 @@
     const onDragEnd = (e: DragEvent) => {
         let effect = e.dataTransfer?.dropEffect;
 
-        const isOutside = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight;
+        // const isOutside = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight;
 
-        if (isOutside) {
+        if (!dragState.insideWindow) {
             switch (effect) {
                 case "none":
                     ipc.invoke("tab_request", { name: "detach", data: { label: dragState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
                     break;
 
+                case "move":
                 case "copy":
                     setTimeout(() => {
+                        console.log(dragState.needsDetach);
                         if (dragState.needsDetach) {
                             ipc.invoke("tab_request", { name: "detach", data: { label: dragState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
                         }
@@ -176,6 +175,20 @@
 
         ipc.sendOthers("endDrag", null);
         tabState.dragging = false;
+        dragState.dragCounter = 0;
+        dragState.insideWindow = true;
+    };
+
+    const onDragEnter = () => {
+        dragState.dragCounter++;
+        dragState.insideWindow = true;
+    };
+
+    const onDragLeave = () => {
+        dragState.dragCounter--;
+        if (dragState.dragCounter == 0) {
+            dragState.insideWindow = false;
+        }
     };
 
     const onMouseDown = () => {
@@ -201,6 +214,7 @@
     });
 </script>
 
+<svelte:window ondragenter={onDragEnter} ondragleave={onDragLeave} />
 <div class="tab no-print" bind:this={tab} onwheel={onmousewheel} ondrop={onDrop} role="button" tabindex="-1">
     {#each tabState.tabs as tab (tab.label)}
         <div
@@ -213,7 +227,6 @@
             onkeydown={() => {}}
             ondragstart={startDrag}
             ondragover={onDragOver}
-            onmousemove={onMouseMove}
             onmouseup={onMouseUp}
             onmousedown={onMouseDown}
             ondragend={onDragEnd}
