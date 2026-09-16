@@ -43,6 +43,23 @@ declare global {
             path: string;
         };
 
+        type ToggleTabModeRequest = {
+            tab_mode: bool;
+            bounds?: Tab.Bounds;
+        };
+
+        type AddTabRequest = {
+            opener: string;
+            bounds: Tab.Bounds;
+        };
+
+        type Bounds = {
+            width: number;
+            height: number;
+            x: number;
+            y: number;
+        };
+
         type StartDragEvent = {
             initiator: string;
             target: string;
@@ -80,7 +97,7 @@ declare global {
             | { name: "closeAll"; data?: never }
             | { name: "cancel"; data?: never }
             | { name: "update"; data: WebviewTitle }
-            | { name: "add"; data: string }
+            | { name: "add"; data: AddTabRequest }
             | { name: "attach"; data: AttachRequest }
             | { name: "detach"; data: DetachRequest }
             | { name: "close"; data?: never }
@@ -88,7 +105,7 @@ declare global {
             | { name: "toggleMaximize"; data?: never }
             | { name: "startDrag"; data?: never }
             | { name: "startResizeDrag"; data: ResizeDirection }
-            | { name: "toggleTabMode"; data: boolean };
+            | { name: "toggleTabMode"; data: ToggleTabModeRequest };
     }
 
     namespace Mp {

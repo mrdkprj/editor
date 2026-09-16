@@ -1,6 +1,6 @@
 use crate::{
     helper::WindowLabels,
-    tab::{emit, emit_filter, emit_to, AttachRequest, Bounds, DetachRequest, ModeChangedArg, Tab, TabEvent, TabState, WebviewTitle, WindowMode, HOST},
+    tab::{emit, emit_filter, emit_to, AddTabRequest, AttachRequest, Bounds, DetachRequest, ModeChangedArg, Tab, TabEvent, TabState, ToggleTabModeRequest, WebviewTitle, WindowMode, HOST},
 };
 use gtk::{
     ffi::GtkWidget,
@@ -15,19 +15,19 @@ use gtk::{
     traits::{BinExt, BoxExt, ContainerExt, GtkWindowExt, OverlayExt, WidgetExt},
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
-use tauri::{Manager, WebviewWindow};
+use tauri::{Manager, PhysicalSize, WebviewWindow};
 
-pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
+pub fn toggle_tab_mode(window: &tauri::WebviewWindow, request: ToggleTabModeRequest) -> bool {
     let app = window.app_handle();
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
-    let changed = mode.can_toggle_mode(tab_mode);
+    let changed = mode.can_toggle_mode(request.tab_mode);
     if changed {
-        if tab_mode {
-            enter_tab_mode(app, &mut state, &mut mode, window.label());
+        if request.tab_mode {
+            enter_tab_mode(app, &mut state, &mut mode, window.label(), request);
         } else {
             exit_tab_mode(app, &mut state, &mut mode);
         };
@@ -60,14 +60,14 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     changed
 }
 
-pub fn add(window: &tauri::WebviewWindow, activator: String) {
+pub fn add(window: &tauri::WebviewWindow, request: AddTabRequest) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
     let label = window.label();
 
-    let host_name = state.find_host(app, &activator);
+    let host_name = state.find_host(app, &request.opener);
     /* Before attach and show this tab, send current tab data to the window */
     let tabs = state.tabs(&host_name).unwrap();
     let titles: Vec<WebviewTitle> = tabs
@@ -81,8 +81,7 @@ pub fn add(window: &tauri::WebviewWindow, activator: String) {
     emit_to(app, TabEvent::Attached(titles), label);
 
     let mut tab = new_tab(app, window, Some(&host_name));
-    tab.bounds = get_bounds(&app.get_webview_window(label).unwrap());
-
+    tab.bounds = request.bounds;
     state.add(&host_name, tab.clone());
 
     let host = app.get_webview_window(&host_name).unwrap();
@@ -182,7 +181,7 @@ pub fn detach(app: &tauri::AppHandle, req: DetachRequest) {
 
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
-    println!("{:?}", state.all());
+
     if !state.can_detach(&req.label) {
         return;
     }
@@ -226,14 +225,8 @@ pub fn detach(app: &tauri::AppHandle, req: DetachRequest) {
         tabs,
     );
 
-    let activator_window = app.get_webview_window(&req.label).unwrap();
-    let size = activator_window.outer_size().unwrap();
-    let pos = activator_window.outer_position().unwrap();
-
     reparent(&old_host, &new_host, &tab);
-
-    new_host.set_size(size).unwrap();
-    new_host.set_position(pos).unwrap();
+    new_host.set_size(PhysicalSize::new(tab.bounds.width, tab.bounds.height)).unwrap();
     new_host.show().unwrap();
 
     bring_to_front(&app, &state, &mut mode, &tab.label);
@@ -349,7 +342,7 @@ fn hide_host(app: &tauri::AppHandle, host_name: &str) -> bool {
     host_name != HOST.get().unwrap()
 }
 
-fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut WindowMode, activator: &str) {
+fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut WindowMode, activator: &str, request: ToggleTabModeRequest) {
     mode.enter();
 
     let host_name = HOST.get().unwrap();
@@ -363,7 +356,15 @@ fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut Windo
         if &label == host_name {
             continue;
         }
-        let tab = new_tab(app, &window, Some(host_name));
+        let mut tab = new_tab(app, &window, Some(host_name));
+        let bounds = if window.is_visible().unwrap_or_default() {
+            get_bounds(&window)
+        } else if let Some(bounds) = &request.bounds {
+            bounds.clone()
+        } else {
+            Bounds::default()
+        };
+        tab.bounds = bounds;
         attach_to_tab(&host, &tab);
         tabs.push(tab);
     }
@@ -373,7 +374,17 @@ fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut Windo
 
     bring_to_front(app, state, mode, activator);
 
-    let _ = host.show();
+    /* On Wayland, can't get size of the hidden window */
+    let size = if let Some(bounds) = request.bounds {
+        PhysicalSize::new(bounds.width, bounds.height)
+    } else {
+        let activator_window = app.get_webview_window(activator).unwrap();
+        activator_window.outer_size().unwrap()
+    };
+
+    host.set_size(size).unwrap();
+    host.unmaximize().unwrap();
+    host.show().unwrap();
 }
 
 fn change_to_overlay(host: &tauri::WebviewWindow) {
@@ -381,7 +392,7 @@ fn change_to_overlay(host: &tauri::WebviewWindow) {
         Change Window's child from Box to Overlay
         Tauri expects this hierarchy
         Window > gtk Container > Webview
-        So add webivew instead of Box directly to Overlay
+        So add webivew directly to Overlay instead of Box
     */
     let host_window = host.gtk_window().unwrap();
     let host_box: gtk::Box = host_window.child().unwrap().dynamic_cast().unwrap();
@@ -580,15 +591,28 @@ fn detach_from_tab(app: &tauri::AppHandle, removed: &Tab, show: bool) {
             overlay.remove(&webview);
             window.default_vbox().unwrap().pack_start(&webview, true, true, 0);
 
-            if show {
-                window.gtk_window().unwrap().hide();
-                window.gtk_window().unwrap().set_transient_for(None::<&gtk::Window>);
-                let child = app.clone();
-                let label = removed.label.clone();
-                gtk::glib::idle_add_local_once(move || {
-                    let _ = child.get_webview_window(&label).unwrap().show();
-                });
-            }
+            window.gtk_window().unwrap().hide();
+            window.gtk_window().unwrap().set_transient_for(None::<&gtk::Window>);
+            let app = app.clone();
+            let label = removed.label.clone();
+            let size = if show {
+                PhysicalSize::new(removed.bounds.width, removed.bounds.height)
+            } else {
+                host.outer_size().unwrap_or_default()
+            };
+
+            gtk::glib::idle_add_local_once(move || {
+                let window = app.get_webview_window(&label).unwrap();
+                if !show {
+                    /*
+                        Can't set size of the hidden window.
+                        So make the window transparent and show it before setting size.
+                    */
+                    window.gtk_window().unwrap().set_opacity(0.0);
+                }
+                let _ = window.show();
+                window.set_size(size).unwrap();
+            });
         }
     }
 }

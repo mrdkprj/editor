@@ -35,8 +35,8 @@ pub enum TabRequest {
     CloseAll,
     Cancel,
     Update(WebviewTitle),
-    Add(String),
-    ToggleTabMode(bool),
+    Add(AddTabRequest),
+    ToggleTabMode(ToggleTabModeRequest),
     Close,
     Attach(AttachRequest),
     Detach(DetachRequest),
@@ -71,6 +71,18 @@ pub struct WebviewTitle {
     pub label: String,
     pub title: String,
     pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToggleTabModeRequest {
+    tab_mode: bool,
+    bounds: Option<Bounds>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AddTabRequest {
+    opener: String,
+    bounds: Bounds,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -407,7 +419,7 @@ fn emit_filter(app: &tauri::AppHandle, event: TabEvent, tabs: &[Tab]) {
 
 pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
     match req {
-        TabRequest::Add(activator) => platform_impl::add(window, activator),
+        TabRequest::Add(request) => platform_impl::add(window, request),
         TabRequest::Attach(request) => platform_impl::attach(window.app_handle(), request),
         TabRequest::Detach(request) => platform_impl::detach(window.app_handle(), request),
         TabRequest::Cancel => platform_impl::cancel(window.app_handle()),
@@ -420,7 +432,7 @@ pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
         TabRequest::Minimize => platform_impl::minimize(window),
         TabRequest::StartDrag => platform_impl::start_drag(window),
         TabRequest::StartResizeDrag(direction) => platform_impl::start_resize_dragging(window, direction),
-        TabRequest::ToggleTabMode(tab_mode) => return platform_impl::toggle_tab_mode(window, tab_mode),
+        TabRequest::ToggleTabMode(request) => return platform_impl::toggle_tab_mode(window, request),
     }
     true
 }

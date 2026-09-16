@@ -523,6 +523,7 @@
             links: !isPlainText,
             renderLineHighlight: preference.lineHighlight ? "line" : "none",
             find: { seedSearchStringFromSelection: "selection", addExtraSpaceOnTop: true, loop: true },
+            dropIntoEditor: { enabled: false },
         });
 
         if (startLine) {

@@ -521,7 +521,7 @@
 
     const toggleTabMode = async () => {
         await saveTabMode();
-        await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
+        await ipc.invoke("tab_request", { name: "toggleTabMode", data: { tab_mode: settings.tabMode } });
     };
 
     const onTabEvent = async (e: Tab.TabEvent) => {
@@ -642,9 +642,9 @@
         }
 
         if (settings.tabMode) {
-            const toggled = await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
+            const toggled = await ipc.invoke("tab_request", { name: "toggleTabMode", data: { tab_mode: settings.tabMode, bounds: settings.bounds } });
             if (!toggled) {
-                await ipc.invoke("tab_request", { name: "add", data: e.opener });
+                await ipc.invoke("tab_request", { name: "add", data: { opener: e.opener, bounds: settings.bounds } });
             }
         } else {
             await thisWindow.show();
