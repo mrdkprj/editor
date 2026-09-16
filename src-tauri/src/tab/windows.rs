@@ -1,9 +1,9 @@
 use crate::{
     helper::WindowLabels,
     tab::{
-        emit, emit_filter, emit_to, AttachRequest, Bounds, DetachRequest, ModeChangedArg, Tab,
+        emit, emit_filter, emit_to, AddTabRequest, AttachRequest, Bounds, DetachRequest, ModeChangedArg, Tab,
         TabEvent::{self},
-        TabState, WebviewTitle, WindowInset, WindowMode, HOST,
+        TabState, ToggleTabModeRequest, WebviewTitle, WindowInset, WindowMode, HOST,
     },
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
@@ -39,7 +39,7 @@ struct ResizeData {
     host_name: String,
 }
 
-pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
+pub fn toggle_tab_mode(window: &tauri::WebviewWindow, request: ToggleTabModeRequest) -> bool {
     let app = window.app_handle();
 
     let mode = app.state::<Mutex<WindowMode>>();
@@ -47,9 +47,9 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
-    let changed = mode.can_toggle_mode(tab_mode);
+    let changed = mode.can_toggle_mode(request.tab_mode);
     if changed {
-        if tab_mode {
+        if request.tab_mode {
             enter_tab_mode(app, &mut state, &mut mode, window.label());
         } else {
             exit_tab_mode(app, &mut state, &mut mode);
@@ -83,7 +83,7 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, tab_mode: bool) -> bool {
     changed
 }
 
-pub fn add(window: &tauri::WebviewWindow, activator: String) {
+pub fn add(window: &tauri::WebviewWindow, request: AddTabRequest) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
@@ -91,7 +91,7 @@ pub fn add(window: &tauri::WebviewWindow, activator: String) {
     let label = window.label();
     let hwnd = window.hwnd().unwrap();
 
-    let host_name = state.find_host(app, &activator);
+    let host_name = state.find_host(app, &request.opener);
     /* Before attach and show this tab, send current tab data to the window */
     let tabs = state.tabs(&host_name).unwrap();
     let titles: Vec<WebviewTitle> = tabs
@@ -149,18 +149,18 @@ pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
     }
 }
 
-pub fn attach(app: &tauri::AppHandle, req: AttachRequest) {
+pub fn attach(app: &tauri::AppHandle, request: AttachRequest) {
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
-    let old_tab = state.find(&req.from).unwrap();
+    let old_tab = state.find(&request.from).unwrap();
     /* Change active tab of the detached tabs */
     shift_active_tab(app, &state, &mut mode, &old_tab.host, &old_tab.label);
 
-    let new_host_name = state.get_host(&req.to);
-    let result = state.reparent_with_position(&req.from, &new_host_name, req.attach_target, req.attach_before);
+    let new_host_name = state.get_host(&request.to);
+    let result = state.reparent_with_position(&request.from, &new_host_name, request.attach_target, request.attach_before);
 
     let detached_tabs = state.tabs(&result.previous_host_name).unwrap();
     if detached_tabs.is_empty() {
@@ -205,7 +205,7 @@ pub fn attach(app: &tauri::AppHandle, req: AttachRequest) {
     bring_to_front_async(app, tab, false);
 }
 
-pub fn detach(app: &tauri::AppHandle, req: DetachRequest) {
+pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
     let app = app.clone();
 
     /* On Windows, window creation must be on a different thread and on the main thread */
@@ -215,19 +215,19 @@ pub fn detach(app: &tauri::AppHandle, req: DetachRequest) {
             .run_on_main_thread(move || {
                 let state = app.state::<Mutex<TabState>>();
                 let mut state = state.lock().unwrap();
-                if !state.can_detach(&req.label) {
+                if !state.can_detach(&request.label) {
                     return;
                 }
 
                 let mode = app.state::<Mutex<WindowMode>>();
                 let mut mode = mode.lock().unwrap();
 
-                let old_tab = state.find(&req.label).unwrap();
+                let old_tab = state.find(&request.label).unwrap();
                 /* Change active tab of the detached tabs */
                 shift_active_tab(&app, &state, &mut mode, &old_tab.host, &old_tab.label);
 
                 let new_host_name = crate::helper::create_new_host_window(&app);
-                let result = state.reparent(&req.label, &new_host_name);
+                let result = state.reparent(&request.label, &new_host_name);
                 let old_host = app.get_webview_window(&result.previous_host_name).unwrap();
                 /* Make the old host top-most */
                 old_host.set_focus().unwrap();
@@ -261,7 +261,7 @@ pub fn detach(app: &tauri::AppHandle, req: DetachRequest) {
                 let undecorated_resize = prepare(&app, &mut mode, new_host_name.clone());
                 install_subclass(&app, new_host_hwnd, &new_host_name, undecorated_resize);
 
-                let activator_window = app.get_webview_window(&req.label).unwrap();
+                let activator_window = app.get_webview_window(&request.label).unwrap();
                 let size = activator_window.outer_size().unwrap();
                 let mut pos = activator_window.outer_position().unwrap();
 

@@ -121,18 +121,18 @@ pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
     }
 }
 
-pub fn attach(app: &tauri::AppHandle, req: AttachRequest) {
+pub fn attach(app: &tauri::AppHandle, request: AttachRequest) {
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
-    let old_tab = state.find(&req.from).unwrap();
+    let old_tab = state.find(&request.from).unwrap();
     /* Change active tab of the detached tabs */
     shift_active_tab(app, &state, &mut mode, &old_tab.host, &old_tab.label);
 
-    let new_host_name = state.get_host(&req.to);
-    let result = state.reparent_with_position(&req.from, &new_host_name, req.attach_target, req.attach_before);
+    let new_host_name = state.get_host(&request.to);
+    let result = state.reparent_with_position(&request.from, &new_host_name, request.attach_target, request.attach_before);
 
     let detached_tabs = state.tabs(&result.previous_host_name).unwrap();
     if detached_tabs.is_empty() {
@@ -176,20 +176,20 @@ pub fn attach(app: &tauri::AppHandle, req: AttachRequest) {
     bring_to_front_async(app, tab, false);
 }
 
-pub fn detach(app: &tauri::AppHandle, req: DetachRequest) {
+pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
     let app = app.clone();
 
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
-    if !state.can_detach(&req.label) {
+    if !state.can_detach(&request.label) {
         return;
     }
 
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
 
-    let old_tab = state.find(&req.label).unwrap();
+    let old_tab = state.find(&request.label).unwrap();
     /* Change active tab of the detached tabs */
     shift_active_tab(&app, &state, &mut mode, &old_tab.host, &old_tab.label);
 
@@ -197,7 +197,7 @@ pub fn detach(app: &tauri::AppHandle, req: DetachRequest) {
     let new_host = app.get_webview_window(&new_host_name).unwrap();
     change_to_overlay(&new_host);
 
-    let result = state.reparent(&req.label, &new_host_name);
+    let result = state.reparent(&request.label, &new_host_name);
     let old_host = app.get_webview_window(&result.previous_host_name).unwrap();
     /* Make the old host top-most */
     old_host.set_focus().unwrap();
