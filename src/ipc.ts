@@ -37,6 +37,7 @@ type InitArgs = {
     locales: string[];
     restore_position: boolean;
     app_data_dir: string;
+    opener: string;
 };
 
 type ReadResult = {
@@ -73,7 +74,7 @@ type TauriCommandMap = {
     abort_grep: TauriCommand<undefined, undefined>;
     is_file: TauriCommand<string, boolean>;
     change_encoding: TauriCommand<Mp.EncodeArg, string>;
-    update_title: TauriCommand<Mp.WebviewTitle, null>;
+    update_title: TauriCommand<Mp.WindowTitle, null>;
     is_file_opened: TauriCommand<string, string | null>;
     tab_request: TauriCommand<Tab.TabRequest, boolean>;
 };

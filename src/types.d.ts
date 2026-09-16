@@ -7,36 +7,88 @@ declare global {
 
     type RendererChannelEventMap = {
         load: boolean;
-        minimize: Mp.AnyEvent;
-        toggleMaximize: Mp.AnyEvent;
+        minimize: null;
+        toggleMaximize: null;
         tabWindowSizeChange: boolean;
         contextmenu_event: Mp.ContextMenuEvent;
         watch_event: Mp.WatchEvent;
         watch_confirm_event: Mp.WatchConfirmEvent;
         grep_progress: Mp.GrepProgress;
-        grep_end: Mp.AnyEvent;
+        grep_end: null;
         dialog: boolean;
-        encoding_changed: Mp.AnyEvent;
-        refelect_settings: Mp.AnyEvent;
+        encoding_changed: null;
+        refelect_settings: null;
         settingChanged: Mp.SettingChangeType;
-        reloadSettings: Mp.AnyEvent;
-        closeTab: Mp.AnyEvent;
+        reloadSettings: null;
+        closeTab: null;
         scrollTab: number;
-        dragEnd: Mp.AnyEvent;
+        restoreFocus: null;
         tab_event: Mp.TabEvent;
+        startDrag: Tab.StartDragEvent;
+        endDrag: null;
+        dropHandled: null;
     };
 
     namespace Tab {
+        type TabState = {
+            tabs: WebviewTitle[];
+            scrollLeft: number;
+            willStartDrag: boolean;
+            dragging: boolean;
+        };
+
+        type WebviewTitle = {
+            label: string;
+            title: string;
+            path: string;
+        };
+
+        type ToggleTabModeRequest = {
+            tab_mode: bool;
+            bounds?: Tab.Bounds;
+        };
+
+        type AddTabRequest = {
+            opener: string;
+            bounds: Tab.Bounds;
+        };
+
+        type Bounds = {
+            width: number;
+            height: number;
+            x: number;
+            y: number;
+        };
+
+        type StartDragEvent = {
+            initiator: string;
+            target: string;
+        };
+
+        type AttachRequest = {
+            from: string;
+            to: string;
+            attach_target: string | null;
+            attach_before: boolean;
+        };
+
+        type DetachRequest = {
+            label: string;
+            offset_x: number;
+            offset_y: number;
+        };
+
         type TabEvent =
             | { name: "maximized"; data?: never }
             | { name: "unmaximized"; data?: never }
             | { name: "titleChanged"; data: WebviewTitle }
-            | { name: "reordered"; data: Mp.WebviewTitle[] }
+            | { name: "reordered"; data: WebviewTitle[] }
             | { name: "closed"; data: string }
-            | { name: "modeChanged"; data: { tab_mode: boolean; tabs: WebviewTitle[] } }
+            | { name: "modeChanged"; data: { tab_mode: boolean; webviews: WebviewTitle[] } }
             | { name: "close"; data?: never }
             | { name: "scrolled"; data: number }
             | { name: "activated"; data?: never }
+            | { name: "attached"; data: WebviewTitle[] }
             | { name: "added"; data: WebviewTitle };
 
         type TabRequest =
@@ -45,13 +97,15 @@ declare global {
             | { name: "closeAll"; data?: never }
             | { name: "cancel"; data?: never }
             | { name: "update"; data: WebviewTitle }
-            | { name: "add"; data?: never }
-            | { name: "detach"; data?: never }
+            | { name: "add"; data: AddTabRequest }
+            | { name: "attach"; data: AttachRequest }
+            | { name: "detach"; data: DetachRequest }
+            | { name: "close"; data?: never }
             | { name: "minimize"; data?: never }
             | { name: "toggleMaximize"; data?: never }
             | { name: "startDrag"; data?: never }
             | { name: "startResizeDrag"; data: ResizeDirection }
-            | { name: "toggleTabMode"; data: boolean };
+            | { name: "toggleTabMode"; data: ToggleTabModeRequest };
     }
 
     namespace Mp {
@@ -81,14 +135,10 @@ declare global {
 
         type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
 
-        type WebviewTitle = {
+        type WindowTitle = {
             label: string;
             title: string;
             path: string;
-        };
-
-        type OpenedWebview = {
-            webviews: { [key: string]: WebviewTitle };
         };
 
         type TextState = {
@@ -148,7 +198,7 @@ declare global {
             renderWhitespace: null;
             lineHighlight: null;
             preference: null;
-            tab: null;
+            tabMode: null;
         };
 
         type Bounds = {
@@ -168,19 +218,6 @@ declare global {
             left: number;
             right: number;
             bottom: number;
-        };
-
-        type WebviewTab = {
-            label: string;
-            title: string;
-            path: string;
-            bounds: Mp.Bounds;
-            isMaximized: boolean;
-        };
-
-        type UpdateTabsEvent = {
-            webviewTitle?: Mp.WebviewTitle;
-            tabs?: Mp.WebviewTab[];
         };
 
         type TypedPreference = { [key in TextType]: Preference };
@@ -233,6 +270,7 @@ declare global {
             encoding?: string;
             restorePosition: boolean;
             appDataDir: string;
+            opener: string;
         };
 
         type ClipboardData = {
@@ -298,10 +336,6 @@ declare global {
             content?: string;
             file_path?: string;
             encoding: string;
-        };
-
-        type AnyEvent = {
-            args?: any;
         };
     }
 }

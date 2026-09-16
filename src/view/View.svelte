@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, tick, untrack } from "svelte";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-    import { appState, dispatch, tabs, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
+    import { appState, dispatch, tabState, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
     import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
@@ -164,7 +164,7 @@
                 showPreference();
                 break;
 
-            case "tab":
+            case "tabMode":
                 toggleTabMode();
                 break;
         }
@@ -266,7 +266,7 @@
         const results = await helper.grep(request);
         dispatch({ type: "grepResult", value: results });
         dispatch({ type: "toggleDialog", value: { type: "progress", open: false } });
-        await ipc.sendTo(label, "grep_end", {});
+        await ipc.sendTo(label, "grep_end", null);
         await getCurrentWebviewWindow().setFocus();
         onSettingsChange();
     };
@@ -411,7 +411,7 @@
             const content = await helper.changeEncoding(contentState.fullPath, encoding);
             textState.encoding = encoding;
             dispatch({ type: "content", value: content });
-            ipc.sendTo(label, "encoding_changed", {});
+            ipc.sendTo(label, "encoding_changed", null);
         } catch (ex: any) {
             helper.showErrorMessage(ex);
         }
@@ -478,10 +478,7 @@
     const destroy = async () => {
         const thisWindow = getCurrentWebviewWindow();
 
-        /* On Linux, must move webview back to its original parent window */
-        if (settings.tabMode) {
-            await ipc.invoke("tab_request", { name: "detach" });
-        }
+        await ipc.invoke("tab_request", { name: "close" });
 
         settingStore.data = $state.snapshot(settings);
 
@@ -502,14 +499,14 @@
     const onSettingsChange = async () => {
         settingStore.data = $state.snapshot(settings);
         await settingStore.save();
-        await ipc.sendOthers("reloadSettings", {});
+        await ipc.sendOthers("reloadSettings", null);
     };
 
     const onReloadSettings = async () => {
         const theme = settings.theme;
         await settingStore.reload();
         updatePreferences(settingStore.data);
-        await ipc.sendTo(label, "refelect_settings", {});
+        await ipc.sendTo(label, "refelect_settings", null);
         if (theme != settings.theme) {
             await helper.changeTheme(settings.theme);
         }
@@ -524,7 +521,7 @@
 
     const toggleTabMode = async () => {
         await saveTabMode();
-        await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
+        await ipc.invoke("tab_request", { name: "toggleTabMode", data: { tab_mode: settings.tabMode } });
     };
 
     const onTabEvent = async (e: Tab.TabEvent) => {
@@ -550,23 +547,27 @@
                 break;
             }
             case "reordered": {
-                tabs.webviews = e.data;
+                tabState.tabs = e.data;
                 break;
             }
             case "closed": {
-                let index = tabs.webviews.findIndex((tab) => tab.label == e.data);
-                tabs.webviews.splice(index, 1);
+                let index = tabState.tabs.findIndex((tab) => tab.label == e.data);
+                tabState.tabs.splice(index, 1);
                 break;
             }
             case "modeChanged": {
                 dispatch({ type: "toggleTabMode", value: e.data.tab_mode });
-                if (e.data.tabs.length) {
-                    tabs.webviews = e.data.tabs;
+                if (e.data.webviews.length) {
+                    tabState.tabs = e.data.webviews;
                 }
                 break;
             }
+            case "attached": {
+                tabState.tabs = e.data;
+                break;
+            }
             case "added": {
-                tabs.webviews.push(e.data);
+                tabState.tabs.push(e.data);
                 break;
             }
             case "close": {
@@ -574,18 +575,18 @@
                 break;
             }
             case "scrolled": {
-                tabs.scrollLeft = e.data;
+                tabState.scrollLeft = e.data;
                 break;
             }
         }
     };
 
     const scrollTab = (scrollLeft: number) => {
-        tabs.scrollLeft = scrollLeft;
+        tabState.scrollLeft = scrollLeft;
     };
 
-    const updateTabTitle = (e: Mp.WebviewTitle) => {
-        tabs.webviews
+    const updateTabTitle = (e: Tab.WebviewTitle) => {
+        tabState.tabs
             .filter((tab) => tab.label == e.label)
             .forEach((tab) => {
                 tab.title = e.title;
@@ -641,9 +642,9 @@
         }
 
         if (settings.tabMode) {
-            const toggled = await ipc.invoke("tab_request", { name: "toggleTabMode", data: settings.tabMode });
+            const toggled = await ipc.invoke("tab_request", { name: "toggleTabMode", data: { tab_mode: settings.tabMode, bounds: settings.bounds } });
             if (!toggled) {
-                await ipc.invoke("tab_request", { name: "add" });
+                await ipc.invoke("tab_request", { name: "add", data: { opener: e.opener, bounds: settings.bounds } });
             }
         } else {
             await thisWindow.show();

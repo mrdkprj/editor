@@ -108,21 +108,9 @@ type SelectedPreferenceTab = {
 };
 export const selectedPreference: SelectedPreferenceTab = $state({ tab: "appearance" });
 
-/* Webview Tabs */
-type Tabs = {
-    webviews: Mp.WebviewTitle[];
-    scrollLeft: number;
-};
-export const tabs: Tabs = $state({ webviews: [], scrollLeft: 0 });
+/* Tabs */
 
-/* Tab Drag State */
-type TabState = {
-    startLabel: string;
-    willStartDrag: boolean;
-    dragging: boolean;
-    lastX: number;
-};
-export const tabState = $state<TabState>({ startLabel: "", willStartDrag: false, dragging: false, lastX: 0 });
+export const tabState: Tab.TabState = $state({ tabs: [], scrollLeft: 0, willStartDrag: false, dragging: false });
 
 /* Grep Progress */
 type GrepProgress = {

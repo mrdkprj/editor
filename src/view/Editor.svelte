@@ -523,6 +523,7 @@
             links: !isPlainText,
             renderLineHighlight: preference.lineHighlight ? "line" : "none",
             find: { seedSearchStringFromSelection: "selection", addExtraSpaceOnTop: true, loop: true },
+            dropIntoEditor: { enabled: false },
         });
 
         if (startLine) {
@@ -639,7 +640,7 @@
         ipc.receive("settingChanged", reflectSettings);
         ipc.receive("refelect_settings", () => updateModel(true));
         ipc.receive("tab_event", onTabEvent);
-        ipc.receive("dragEnd", restoreFocus);
+        ipc.receive("restoreFocus", restoreFocus);
 
         return () => {
             ipc.release();

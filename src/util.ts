@@ -219,7 +219,7 @@ class Util {
                 type: "separator",
             },
             {
-                id: "tab",
+                id: "tabMode",
                 type: "check",
                 checked: tabMode,
                 label: "Tab Mode",
