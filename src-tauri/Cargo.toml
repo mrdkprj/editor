@@ -20,6 +20,7 @@ globset = "0.4.18"
 chardetng = "0.1.17"
 encoding_rs = "0.8.35"
 tauri-plugin-single-instance = "=2.3.0"
+clap = {version = "4.6.7", features = ["derive"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = ["Win32_Foundation"] }

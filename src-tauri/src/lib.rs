@@ -184,21 +184,6 @@ async fn show_save_dialog(payload: DialogOptions) -> Option<String> {
     dialog::show_save_dialog(payload).await
 }
 
-/*
-   Must be async for tauri::WebviewWindowBuilder::from_config.
-   On Windows, this function deadlocks when used in a synchronous command or event handlers, see the Webview2 issue. You should use async commands and separate threads when creating windows.
-*/
-#[cfg(target_os = "windows")]
-#[tauri::command]
-async fn new_window(window: WebviewWindow, payload: Vec<String>) {
-    let mut args = vec!["thisapp".to_string()];
-    if !payload.is_empty() {
-        args.extend(payload);
-    }
-    helper::new_window(&window, args);
-}
-
-#[cfg(target_os = "linux")]
 #[tauri::command]
 fn new_window(window: WebviewWindow, payload: Vec<String>) {
     let mut args = vec!["thisapp".to_string()];
@@ -209,8 +194,8 @@ fn new_window(window: WebviewWindow, payload: Vec<String>) {
 }
 
 #[tauri::command]
-fn get_args(app: AppHandle) -> Result<helper::InitArgs, String> {
-    helper::get_init_args(app)
+fn get_args(window: WebviewWindow) -> helper::InitArg {
+    helper::get_init_args(&window)
 }
 
 #[allow(unused_variables)]
@@ -295,7 +280,8 @@ pub fn run() {
         .setup(|app| {
             let args: Vec<String> = env::args().collect();
             helper::start(app.app_handle());
-            helper::setup(app.app_handle(), args, None);
+            let labels = helper::setup(app.app_handle(), args, false, None);
+            helper::on_setup(app.app_handle(), labels);
 
             Ok(())
         })
