@@ -68,7 +68,9 @@ pub struct WindowTitle {
     pub path: String,
 }
 
+/* ignore_errors is required to ignore args Tauri appends */
 #[derive(Parser, Debug, Default)]
+#[command(ignore_errors = true)]
 pub struct Args {
     #[arg(short = 'g', num_args = 3, value_names = ["condition", "start_directory", "file_type"])]
     pub grep: Option<Vec<String>>,
@@ -140,6 +142,7 @@ fn new_init_arg(app: &AppHandle, opener: Option<&str>, grep: Option<GrepRequest>
 
 pub fn setup(app: &AppHandle, argv: Vec<String>, create_window: bool, opener: Option<&str>) -> HashMap<String, Option<String>> {
     let args = Args::try_parse_from(argv).unwrap_or_default();
+
     let state = app.state::<Mutex<InitArgs>>();
     let mut state = state.lock().unwrap();
 
@@ -169,12 +172,11 @@ pub fn setup(app: &AppHandle, argv: Vec<String>, create_window: bool, opener: Op
         for (i, file) in files.iter().enumerate() {
             let file_arg = FileArg {
                 file_path: Some(file.path.clone()),
-                content: None,
-                encoding: None,
                 start_line: file.column.map(|column| Selection {
                     column,
                     row: file.row.unwrap(),
                 }),
+                ..Default::default()
             };
             let init_args = new_init_arg(app, opener, None, Some(file_arg));
             let label = if i == 0 {
