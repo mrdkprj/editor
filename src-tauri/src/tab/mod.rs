@@ -31,6 +31,8 @@ enum TabEvent {
 #[serde(tag = "name", content = "data", rename_all = "camelCase")]
 pub enum TabRequest {
     Select(String),
+    SelectNext,
+    SelectPrevious,
     Reorder(Vec<WebviewTitle>),
     CloseAll,
     Cancel,
@@ -285,6 +287,16 @@ impl TabState {
         None
     }
 
+    pub fn position_with(&self, label: &str) -> Option<(usize, Vec<Tab>)> {
+        for tabs in self.tab_map.values() {
+            let cloned = tabs.clone();
+            if let Some(index) = tabs.iter().position(|tab| tab.label == label) {
+                return Some((index, cloned));
+            }
+        }
+        None
+    }
+
     pub fn get(&self, key: &str, index: usize) -> Option<&Tab> {
         self.tab_map.get(key).unwrap().get(index)
     }
@@ -424,6 +436,8 @@ pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
         TabRequest::Detach(request) => platform_impl::detach(window.app_handle(), request),
         TabRequest::Cancel => platform_impl::cancel(window.app_handle()),
         TabRequest::Select(label) => platform_impl::select_tab(window.app_handle(), label),
+        TabRequest::SelectNext => platform_impl::select(window, true),
+        TabRequest::SelectPrevious => platform_impl::select(window, false),
         TabRequest::Reorder(tabs) => platform_impl::reorder_tab(window, tabs),
         TabRequest::CloseAll => platform_impl::close_all(window),
         TabRequest::Update(webview_title) => platform_impl::update(window.app_handle(), &webview_title.label, &webview_title.title, &webview_title.path),

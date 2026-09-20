@@ -93,6 +93,8 @@ declare global {
 
         type TabRequest =
             | { name: "select"; data: string }
+            | { name: "selectNext"; data?: never }
+            | { name: "selectPrevious"; data?: never }
             | { name: "reorder"; data: WebviewTitle[] }
             | { name: "closeAll"; data?: never }
             | { name: "cancel"; data?: never }

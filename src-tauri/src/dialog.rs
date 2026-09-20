@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use zouni::dialog::{message, open, save, MessageDialogKind, MessageDialogOptions, MessageResult, OpenDialogOptions, OpenProperty, SaveDialogOptions};
+use zouni::dialog::{message, open, save, FileFilter, MessageDialogKind, MessageDialogOptions, MessageResult, OpenDialogOptions, OpenProperty, SaveDialogOptions};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DialogOptions {
@@ -10,6 +10,7 @@ pub struct DialogOptions {
     cancel_label: Option<String>,
     message: String,
     default_path: Option<String>,
+    filters: Option<Vec<FileFilter>>,
 }
 
 pub async fn show(info: DialogOptions) -> MessageResult {
@@ -71,7 +72,7 @@ pub async fn show_file_dialog(option: DialogOptions) -> Option<String> {
     let options = OpenDialogOptions {
         title: option.title,
         default_path: option.default_path,
-        filters: None,
+        filters: option.filters,
         properties: Some(vec![OpenProperty::OpenFile]),
     };
 
@@ -103,7 +104,7 @@ pub async fn show_save_dialog(option: DialogOptions) -> Option<String> {
     let options = SaveDialogOptions {
         title: option.title,
         default_path: option.default_path,
-        filters: None,
+        filters: option.filters,
     };
     let result = save(options).await;
     if result.canceled {

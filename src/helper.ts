@@ -1,5 +1,5 @@
 import util from "./util";
-import { IPCBase } from "./ipc";
+import { FileFilter, IPCBase } from "./ipc";
 
 const ipc = new IPCBase();
 
@@ -117,8 +117,8 @@ class Helper {
         await ipc.invoke("change_theme", theme);
     };
 
-    showSaveDialog = async (title: string, defaultPath: string): Promise<string | null> => {
-        return await ipc.invoke("show_save_dialog", { title, default_path: defaultPath, dialog_type: "ask", message: "" });
+    showSaveDialog = async (title: string, defaultPath: string, filters: FileFilter[]): Promise<string | null> => {
+        return await ipc.invoke("show_save_dialog", { title, default_path: defaultPath, dialog_type: "ask", message: "", filters });
     };
 
     getUrlsFromClipboard = async (): Promise<Mp.PasteData> => {

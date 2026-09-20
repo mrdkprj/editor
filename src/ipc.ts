@@ -13,6 +13,10 @@ type WriteFileInfo = {
     encoding?: string;
 };
 
+export type FileFilter = {
+    name: string;
+    extensions: string[];
+};
 type DialogOptions = {
     dialog_type: "message" | "confirm" | "ask";
     title?: string;
@@ -21,6 +25,7 @@ type DialogOptions = {
     cancel_label?: string;
     message: string;
     default_path?: string;
+    filters?: FileFilter[];
 };
 
 type InitArgs = {

@@ -206,6 +206,13 @@
 
         if (e.ctrlKey) {
             switch (e.key) {
+                case "Tab":
+                    if (e.shiftKey) {
+                        ipc.invoke("tab_request", { name: "selectPrevious" });
+                    } else {
+                        ipc.invoke("tab_request", { name: "selectNext" });
+                    }
+                    break;
                 case "f":
                     e.preventDefault();
                     return;
@@ -355,7 +362,10 @@
     const trySaveFile = async () => {
         let target: string | null = contentState.fullPath;
         if (!target) {
-            target = await helper.showSaveDialog("", `${getNewFileName()}.txt`);
+            target = await helper.showSaveDialog("", `${getNewFileName()}.txt`, [
+                { name: "Text File", extensions: ["txt"] },
+                { name: "All Files", extensions: ["*"] },
+            ]);
         }
         if (!target) {
             return false;
@@ -372,7 +382,10 @@
 
     const trySaveAs = async () => {
         const fileName = contentState.fullPath ? path.basename(contentState.fullPath) : `${getNewFileName()}.txt`;
-        const target = await helper.showSaveDialog("", fileName);
+        const target = await helper.showSaveDialog("", fileName, [
+            { name: "Text File", extensions: [".txt"] },
+            { name: "All Files", extensions: ["*"] },
+        ]);
 
         if (!target) {
             return false;

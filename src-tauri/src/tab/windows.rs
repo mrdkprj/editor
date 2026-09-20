@@ -326,6 +326,34 @@ pub fn select_tab(app: &tauri::AppHandle, label: String) {
     bring_to_front(app, &state, &mut mode, &label);
 }
 
+pub fn select(window: &tauri::WebviewWindow, next: bool) {
+    let app = window.app_handle();
+    let state = app.state::<Mutex<TabState>>();
+    let state = state.lock().unwrap();
+    let mode = app.state::<Mutex<WindowMode>>();
+    let mut mode = mode.lock().unwrap();
+
+    if let Some((index, tabs)) = state.position_with(window.label()) {
+        if tabs.len() <= 1 {
+            return;
+        }
+
+        if next {
+            if index == tabs.len() - 1 {
+                bring_to_front(app, &state, &mut mode, &tabs[0].label);
+            } else {
+                bring_to_front(app, &state, &mut mode, &tabs[index + 1].label);
+            }
+        } else {
+            if index == 0 {
+                bring_to_front(app, &state, &mut mode, &tabs[tabs.len() - 1].label);
+            } else {
+                bring_to_front(app, &state, &mut mode, &tabs[index - 1].label);
+            }
+        }
+    }
+}
+
 pub fn reorder_tab(window: &tauri::WebviewWindow, reordered_tabs: Vec<WebviewTitle>) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
