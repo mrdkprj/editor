@@ -1,10 +1,10 @@
 <script lang="ts">
     import { handleKeyEvent } from "../constants";
-    import { dispatch, grepProgress } from "./appStateReducer.svelte";
+    import { grepProgress } from "./appStateReducer.svelte";
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
 
-    let { label, abortGrep }: { label: string; abortGrep: () => Promise<void> } = $props();
+    let { label, abortGrep, closeDialog }: { label: string; abortGrep: () => Promise<void>; closeDialog: (type: Mp.DialogType) => void } = $props();
 
     // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
@@ -23,7 +23,7 @@
 
     const close = async () => {
         await abortGrep();
-        dispatch({ type: "toggleDialog", value: { type: "progress", open: false } });
+        closeDialog("progress");
         ipc.sendTo(label, "dialog", false);
     };
 

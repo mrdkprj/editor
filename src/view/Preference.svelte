@@ -1,11 +1,11 @@
 <script lang="ts">
     import { handleKeyEvent } from "../constants";
-    import { dispatch, settings, textState, temporal, selectedPreference } from "./appStateReducer.svelte";
+    import { settings, textState, temporal, selectedPreference } from "./appStateReducer.svelte";
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
     import { Colors, ColorTokens, dark_colors, lihgt_colors } from "../theme";
 
-    let { label }: { label: string } = $props();
+    let { label, closeDialog }: { label: string; closeDialog: (type: Mp.DialogType) => void } = $props();
 
     // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
@@ -52,7 +52,7 @@
     };
 
     const close = () => {
-        dispatch({ type: "toggleDialog", value: { type: "preference", open: false } });
+        closeDialog("preference");
         ipc.sendTo(label, "dialog", false);
     };
 

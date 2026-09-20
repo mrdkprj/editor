@@ -2,9 +2,8 @@
     import { onMount } from "svelte";
     import { handleKeyEvent } from "../constants";
     import { IPC } from "../ipc";
-    import { dispatch } from "./appStateReducer.svelte";
 
-    let { label }: { label: string } = $props();
+    let { label, closeDialog }: { label: string; closeDialog: (type: Mp.DialogType) => void } = $props();
 
     // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
@@ -22,7 +21,7 @@
 
     const close = (applyChange: boolean) => {
         ipc.sendTo(label, "watch_confirm_event", { applyChange, doNotNotify });
-        dispatch({ type: "toggleDialog", value: { type: "watch", open: false } });
+        closeDialog("watch");
         ipc.sendTo(label, "dialog", false);
     };
 

@@ -23,7 +23,7 @@
         getClipboardUrls,
         getClipboardText,
         unwatch,
-        startGrep,
+        openDialog,
     }: {
         label: string;
         startLine?: Mp.Position;
@@ -32,7 +32,7 @@
         save: (saveAs: boolean) => Promise<boolean>;
         openNewWindow: (filePath: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position) => Promise<void>;
         unwatch: () => void;
-        startGrep: () => void;
+        openDialog: (type: Mp.DialogType) => void;
     } = $props();
 
     // svelte-ignore state_referenced_locally
@@ -103,7 +103,7 @@
                     if (value) {
                         dispatch({ type: "updateGrepCondition", value });
                     }
-                    startGrep();
+                    openDialog("grep");
                     return;
             }
         }
@@ -143,7 +143,7 @@
         }
 
         if (contentState.fullPath == e.file_path) {
-            dispatch({ type: "toggleDialog", value: { type: "watch", open: true } });
+            openDialog("watch");
 
             watchDialogPromise = new Deferred();
             const result = await watchDialogPromise.promise;
@@ -231,7 +231,7 @@
                 editor.getAction("editor.action.startFindReplaceAction")?.run();
                 break;
             case "Grep":
-                startGrep();
+                openDialog("grep");
                 break;
 
             case "ToggleLineComment":

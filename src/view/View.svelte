@@ -138,7 +138,7 @@
             }
 
             case "Grep":
-                startGrep();
+                openGrepDialog();
                 break;
 
             case "encoding": {
@@ -170,8 +170,7 @@
         }
     };
 
-    const onclick = (e: MouseEvent) => {
-        e.preventDefault();
+    const onclick = () => {
         if ($appState.openingMenu) {
             dispatch({ type: "openingMenu", value: false });
             return;
@@ -242,11 +241,20 @@
 
     const showPreference = () => {
         if (contentState.mode == "grep") return;
-        dispatch({ type: "toggleDialog", value: { type: "preference", open: true } });
+        openDialog("preference");
     };
 
-    const startGrep = () => {
-        dispatch({ type: "toggleDialog", value: { type: "grep", open: true } });
+    const openGrepDialog = () => {
+        openDialog("grep");
+    };
+
+    const openDialog = (type: Mp.DialogType) => {
+        closeMenu();
+        dispatch({ type: "toggleDialog", value: { type, open: true } });
+    };
+
+    const closeDialog = (type: Mp.DialogType) => {
+        dispatch({ type: "toggleDialog", value: { type, open: false } });
     };
 
     const executeGrep = async (request: Mp.GrepRequest) => {
@@ -262,10 +270,10 @@
         }
 
         dispatch({ type: "mode", value: "grep" });
-        dispatch({ type: "toggleDialog", value: { type: "progress", open: true } });
+        openDialog("progress");
         const results = await helper.grep(request);
         dispatch({ type: "grepResult", value: results });
-        dispatch({ type: "toggleDialog", value: { type: "progress", open: false } });
+        closeDialog("progress");
         await ipc.sendTo(label, "grep_end", null);
         await getCurrentWebviewWindow().setFocus();
         onSettingsChange();
@@ -681,16 +689,16 @@
     {#if ready}
         <Bar {label} {openNewWindow} close={tryClose} {toggleMaximize} {minimize} />
         {#if $appState.showWatchDialog}
-            <WatchDialog {label} />
+            <WatchDialog {label} {closeDialog} />
         {/if}
         {#if $appState.showGrepDialog}
             <GrepDialog {label} {executeGrep} showErrorMessage={(msg) => helper.showErrorMessage(msg)} />
         {/if}
         {#if $appState.showGrepProgress}
-            <GrepProgress {label} {abortGrep} />
+            <GrepProgress {label} {abortGrep} {closeDialog} />
         {/if}
         {#if $appState.showPreference}
-            <Preference {label} />
+            <Preference {label} {closeDialog} />
         {/if}
         {#if settings.tabMode}
             <TabControl {label} />
@@ -704,7 +712,7 @@
                 {save}
                 {openNewWindow}
                 {unwatch}
-                {startGrep}
+                {openDialog}
             />
         </div>
         <Statusbar />
