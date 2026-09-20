@@ -17,11 +17,6 @@ use std::{
 };
 use tauri::{AppHandle, Manager, WebviewWindow};
 
-static UUID: AtomicU16 = AtomicU16::new(0);
-static LOCALE: OnceLock<String> = OnceLock::new();
-static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
-const DEFAULT_WINDOW_LABEL: &str = "View";
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct CurrentTheme {
     is_dark: bool,
@@ -89,7 +84,7 @@ pub struct Args {
 
     /// Optional filepaths
     #[arg(num_args = 0..)]
-    pub files: Vec<String>,
+    pub file: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -99,11 +94,20 @@ pub struct File {
     row: Option<u64>,
 }
 
+struct PendingArgs {
+    args: Vec<Vec<String>>,
+}
+
+static UUID: AtomicU16 = AtomicU16::new(0);
+static STARTED: OnceLock<bool> = OnceLock::new();
+static LOCALE: OnceLock<String> = OnceLock::new();
+static RESTORE_POSITION: OnceLock<bool> = OnceLock::new();
+const DEFAULT_WINDOW_LABEL: &str = "View";
+
 pub fn start(app: &tauri::AppHandle) {
     let (tx_cmd, rx_cmd) = smol::channel::unbounded();
     app.manage(WatchTx(tx_cmd));
     watcher::spwan_watcher(app.app_handle(), rx_cmd).unwrap();
-
     app.manage(Mutex::new(InitArgs::default()));
     app.manage(Mutex::new(CurrentTheme::default()));
     app.manage(Mutex::new(WindowLabels::default()));
@@ -111,15 +115,53 @@ pub fn start(app: &tauri::AppHandle) {
     tab::init(app, "Main");
 }
 
-pub fn handle_second_instance(app: &tauri::AppHandle, argv: Vec<String>) {
-    let labels = setup(app, argv, true, None);
-    on_setup(app, labels);
+pub fn handle_second_instance(app: &AppHandle, argv: Vec<String>) {
+    if procced(app, &argv) {
+        let label = get_new_window_label();
+        let opening_file_path = setup(app, argv, &label, None);
+        create_new_window(app, label, opening_file_path);
+    }
+}
+
+pub fn start_setup(app: &AppHandle, argv: Vec<String>) {
+    setup(app, argv, DEFAULT_WINDOW_LABEL, None);
+    STARTED.get_or_init(|| true);
+
+    if let Some(state) = app.try_state::<Mutex<PendingArgs>>() {
+        let mut state = state.lock().unwrap();
+        for argv in state.args.clone() {
+            let label = get_new_window_label();
+            let opening_file_path = setup(app, argv, &label, None);
+            create_new_window(app, label, opening_file_path);
+        }
+        state.args.clear();
+    }
+}
+
+fn procced(app: &AppHandle, argv: &[String]) -> bool {
+    let started = STARTED.get().unwrap_or(&false);
+
+    if *started {
+        true
+    } else {
+        if let Some(state) = app.try_state::<Mutex<PendingArgs>>() {
+            let mut state = state.lock().unwrap();
+            state.args.push(argv.to_vec());
+        } else {
+            app.manage(Mutex::new(PendingArgs {
+                args: vec![argv.to_vec()],
+            }));
+        }
+
+        false
+    }
 }
 
 pub fn new_window(window: &WebviewWindow, argv: Vec<String>) {
     let app = window.app_handle();
-    let labels = setup(app, argv, true, None);
-    on_setup(app, labels);
+    let label = get_new_window_label();
+    let opening_file_path = setup(app, argv, &label, Some(window.label()));
+    create_new_window(app, label, opening_file_path);
 }
 
 fn new_init_arg(app: &AppHandle, opener: Option<&str>, grep: Option<GrepRequest>, file: Option<FileArg>) -> InitArg {
@@ -140,13 +182,13 @@ fn new_init_arg(app: &AppHandle, opener: Option<&str>, grep: Option<GrepRequest>
     }
 }
 
-pub fn setup(app: &AppHandle, argv: Vec<String>, create_window: bool, opener: Option<&str>) -> HashMap<String, Option<String>> {
+pub fn setup(app: &AppHandle, argv: Vec<String>, label: &str, opener: Option<&str>) -> Option<String> {
     let args = Args::try_parse_from(argv).unwrap_or_default();
 
     let state = app.state::<Mutex<InitArgs>>();
     let mut state = state.lock().unwrap();
 
-    let mut pairs = HashMap::new();
+    let mut opening_file_path = None;
 
     if let Some(grep) = args.grep {
         let grep_request = fgrep::GrepRequest {
@@ -159,46 +201,34 @@ pub fn setup(app: &AppHandle, argv: Vec<String>, create_window: bool, opener: Op
             recursive: args.recursive.unwrap_or_default(),
         };
         let init_args = new_init_arg(app, opener, Some(grep_request), None);
-        let label = get_new_window_label(create_window);
-        state.args.insert(label.clone(), init_args);
-        pairs.insert(label, None);
-    } else if args.files.is_empty() {
-        let label = get_new_window_label(create_window);
+
+        state.args.insert(label.to_string(), init_args);
+    } else if args.file.is_empty() {
         let init_args = new_init_arg(app, opener, None, None);
-        state.args.insert(label.clone(), init_args);
-        pairs.insert(label, None);
+        state.args.insert(label.to_string(), init_args);
     } else {
-        let files = parse_files(&args.files);
-        for (i, file) in files.iter().enumerate() {
-            let file_arg = FileArg {
-                file_path: Some(file.path.clone()),
-                start_line: file.column.map(|column| Selection {
-                    column,
-                    row: file.row.unwrap(),
-                }),
-                ..Default::default()
-            };
-            let init_args = new_init_arg(app, opener, None, Some(file_arg));
-            let label = if i == 0 {
-                get_new_window_label(create_window)
-            } else {
-                get_new_window_label(true)
-            };
-            state.args.insert(label.clone(), init_args);
-            pairs.insert(label, Some(file.path.clone()));
-        }
+        let file = parse_files(&args.file);
+        let file_arg = FileArg {
+            file_path: Some(file.path.clone()),
+            start_line: file.column.map(|column| Selection {
+                column,
+                row: file.row.unwrap(),
+            }),
+            ..Default::default()
+        };
+        let init_args = new_init_arg(app, opener, None, Some(file_arg));
+        state.args.insert(label.to_string(), init_args);
+        opening_file_path = Some(file.path);
     }
 
-    pairs.remove(DEFAULT_WINDOW_LABEL);
-    pairs
+    opening_file_path
 }
 
-pub fn parse_files(raw: &[String]) -> Vec<File> {
-    let mut locations = Vec::new();
+pub fn parse_files(raw: &[String]) -> File {
     let mut iter = raw.iter().peekable();
 
     /* Loop as long as there are tokens left to process as filepaths */
-    while let Some(path) = iter.next() {
+    if let Some(path) = iter.next() {
         let mut column = None;
         let mut row = None;
 
@@ -218,23 +248,36 @@ pub fn parse_files(raw: &[String]) -> Vec<File> {
             }
         }
 
-        locations.push(File {
+        File {
             path: path.to_string(),
             column,
             row,
-        });
+        }
+    } else {
+        File::default()
     }
-
-    locations
 }
 
 /* Check if the file is already opened. If any, bring the windwo to front */
-pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>) -> bool {
-    let opening_file_path = opening_file_path.unwrap_or_default();
+pub fn is_file_opened(app: &tauri::AppHandle, label: &str, opening_file_path: Option<String>) -> bool {
+    if opening_file_path.is_none() {
+        return false;
+    }
+
+    let opening_file_path = opening_file_path.unwrap();
     let state = app.state::<Mutex<WindowLabels>>();
-    let state = state.lock().unwrap();
+    let mut state = state.lock().unwrap();
     let already_opened = state.labels.iter().filter(|(_, title)| !title.path.is_empty() && title.path == opening_file_path).map(|(label, _)| label).collect::<Vec<&String>>();
+    /* If not opened, insert immediately for possible consecutive window creation */
     if already_opened.is_empty() {
+        state.labels.insert(
+            label.to_string(),
+            WindowTitle {
+                label: label.to_string(),
+                title: String::new(),
+                path: opening_file_path,
+            },
+        );
         return false;
     }
 
@@ -255,23 +298,13 @@ pub fn is_file_opened(app: &tauri::AppHandle, opening_file_path: Option<String>)
     true
 }
 
-fn get_new_window_label(new_window: bool) -> String {
-    if new_window {
-        let id = UUID.fetch_add(1, Relaxed);
-        format!("{}-{:?}", DEFAULT_WINDOW_LABEL, id)
-    } else {
-        DEFAULT_WINDOW_LABEL.to_string()
-    }
-}
-
-pub fn on_setup(app: &AppHandle, labels: HashMap<String, Option<String>>) {
-    for (label, opening_file_path) in labels {
-        create_new_window(app, label, opening_file_path);
-    }
+fn get_new_window_label() -> String {
+    let id = UUID.fetch_add(1, Relaxed);
+    format!("{}-{:?}", DEFAULT_WINDOW_LABEL, id)
 }
 
 pub fn create_new_window(app: &tauri::AppHandle, label: String, opening_file_path: Option<String>) {
-    if is_file_opened(app, opening_file_path) {
+    if is_file_opened(app, &label, opening_file_path) {
         return;
     }
     let config = &app.config().app.windows[1];

@@ -19,7 +19,7 @@ zouni = { version = "0.2.3", features = ["webview2"] }
 globset = "0.4.18"
 chardetng = "0.1.17"
 encoding_rs = "0.8.35"
-tauri-plugin-single-instance = "=2.3.0"
+tauri-plugin-single-instance = "=2.4.4"
 clap = {version = "4.6.7", features = ["derive"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]

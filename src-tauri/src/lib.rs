@@ -264,8 +264,8 @@ fn update_title(app: AppHandle, payload: helper::WindowTitle) {
 }
 
 #[tauri::command]
-fn is_file_opened(app: tauri::AppHandle, payload: String) -> bool {
-    helper::is_file_opened(&app, Some(payload))
+fn is_file_opened(window: WebviewWindow, payload: String) -> bool {
+    helper::is_file_opened(window.app_handle(), window.label(), Some(payload))
 }
 
 #[tauri::command]
@@ -279,10 +279,8 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app_handel, args, _| helper::handle_second_instance(app_handel, args)))
         .setup(|app| {
             let args: Vec<String> = env::args().collect();
-            helper::start(app.app_handle());
-            let labels = helper::setup(app.app_handle(), args, false, None);
-            helper::on_setup(app.app_handle(), labels);
-
+            helper::start(app.handle());
+            helper::start_setup(app.handle(), args);
             Ok(())
         })
         .on_window_event(|window, event| {
