@@ -65,6 +65,15 @@ pub fn add(window: &tauri::WebviewWindow, request: AddTabRequest) {
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
+    /*
+        If this is called immediately after enter_tab_mode, the window is already tabbed.
+        In this case, just bring the tab to front without emitting added event.
+    */
+    if let Some(tab) = state.find(window.label()) {
+        bring_to_front_async(app, tab, None);
+        return;
+    }
+
     let label = window.label();
 
     let host_name = state.find_host(app, &request.opener);
@@ -87,7 +96,7 @@ pub fn add(window: &tauri::WebviewWindow, request: AddTabRequest) {
     let host = app.get_webview_window(&host_name).unwrap();
     attach_to_tab(&host, &tab);
     /* Delay switching for smooth rendering */
-    bring_to_front_async(app, tab, true);
+    bring_to_front_async(app, tab, Some(state.tabs(&host_name).unwrap().clone()));
 
     /* Unminimize */
     let app = app.clone();
@@ -173,7 +182,7 @@ pub fn attach(app: &tauri::AppHandle, request: AttachRequest) {
     let new_host = app.get_webview_window(&tab.host).unwrap();
     reparent(&old_host, &new_host, &tab);
 
-    bring_to_front_async(app, tab, false);
+    bring_to_front_async(app, tab, None);
 }
 
 pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
@@ -481,10 +490,9 @@ fn bring_to_front(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowMod
     }
 }
 
-fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab, emit: bool) {
+fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab, emit_targets: Option<Vec<Tab>>) {
     let app = app.clone();
     smol::spawn(async move {
-        /* Send TabEvent::Added to others in delay to decrease flicker*/
         smol::Timer::after(Duration::from_millis(50)).await;
         let state = app.state::<Mutex<TabState>>();
         if let Ok(state) = state.try_lock() {
@@ -493,8 +501,7 @@ fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab, emit: bool) {
                 bring_to_front(&app, &state, &mut mode, &tab.label);
             };
 
-            if emit {
-                let tabs = state.tabs(&tab.host).unwrap();
+            if let Some(tabs) = emit_targets {
                 emit_filter(
                     &app,
                     TabEvent::Added(WebviewTitle {
@@ -502,7 +509,7 @@ fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab, emit: bool) {
                         title: tab.title.clone(),
                         path: tab.path.clone(),
                     }),
-                    tabs,
+                    &tabs,
                 );
             }
         };
