@@ -6,11 +6,11 @@ use gtk::{
     ffi::GtkWidget,
     gdk::{
         traits::{DeviceExt, SeatExt},
-        WindowEdge,
+        WindowEdge, WindowState,
     },
     glib::{
-        translate::{FromGlibPtrNone, ToGlibPtr},
-        Cast,
+        translate::{FromGlib, FromGlibPtrNone, ToGlibPtr},
+        Cast, ObjectExt, SignalHandlerId,
     },
     traits::{BinExt, BoxExt, ContainerExt, GtkWindowExt, OverlayExt, WidgetExt},
 };
@@ -204,7 +204,7 @@ pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
 
     let new_host_name = crate::helper::create_new_host_window(&app);
     let new_host = app.get_webview_window(&new_host_name).unwrap();
-    change_to_overlay(&new_host);
+    change_to_overlay(&new_host, &mut mode);
 
     let result = state.reparent(&request.label, &new_host_name);
     let old_host = app.get_webview_window(&result.previous_host_name).unwrap();
@@ -332,18 +332,18 @@ pub fn cancel(app: &tauri::AppHandle) {
 }
 
 pub fn toggle_maximize(window: &tauri::WebviewWindow) {
-    let app = window.app_handle();
-    let state = app.state::<Mutex<TabState>>();
-    let state = state.lock().unwrap();
-    if let Some((tab, tabs)) = state.find_with(window.label()) {
-        let host = window.get_webview_window(&tab.host).unwrap();
-        if host.is_maximized().unwrap_or_default() {
-            let _ = host.unmaximize();
-            emit_filter(app, TabEvent::Unmaximized, tabs);
-        } else {
-            let _ = host.maximize();
-            emit_filter(app, TabEvent::Maximized, tabs);
-        }
+    /* Prevent state lock blocking */
+    let host_name = {
+        let app = window.app_handle();
+        let state = app.state::<Mutex<TabState>>();
+        let state = state.lock().unwrap();
+        state.find_host(app, window.label())
+    };
+    let host = window.get_webview_window(&host_name).unwrap();
+    if host.is_maximized().unwrap_or_default() {
+        let _ = host.unmaximize();
+    } else {
+        let _ = host.maximize();
     }
 }
 
@@ -385,7 +385,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut Windo
     let host_name = HOST.get().unwrap();
     let host = app.get_webview_window(host_name).unwrap();
 
-    change_to_overlay(&host);
+    change_to_overlay(&host, mode);
 
     let mut tabs: Vec<Tab> = Vec::new();
 
@@ -424,7 +424,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut Windo
     host.show().unwrap();
 }
 
-fn change_to_overlay(host: &tauri::WebviewWindow) {
+fn change_to_overlay(host: &tauri::WebviewWindow, mode: &mut WindowMode) {
     /*
         Change Window's child from Box to Overlay
         Tauri expects this hierarchy
@@ -441,6 +441,26 @@ fn change_to_overlay(host: &tauri::WebviewWindow) {
     overlay.reorder_overlay(webview, 0);
     host_window.remove(&host_box);
     host_window.add(&overlay);
+    let app = host.app_handle().clone();
+    let host_name = host.label().to_string();
+    let signal = host_window.connect_window_state_event(move |_, e| {
+        let state = app.state::<Mutex<TabState>>();
+        if let Ok(state) = state.try_lock() {
+            if let Some(tabs) = state.tabs(&host_name) {
+                if e.new_window_state().contains(WindowState::MAXIMIZED) {
+                    emit_filter(&app, TabEvent::Maximized, tabs);
+                }
+
+                if e.changed_mask().contains(WindowState::MAXIMIZED) && !e.new_window_state().contains(WindowState::MAXIMIZED) {
+                    emit_filter(&app, TabEvent::Unmaximized, tabs);
+                }
+            }
+        };
+        gtk::glib::Propagation::Proceed
+    });
+    if let Some(old) = mode.host_signals.insert(host.label().to_string(), unsafe { signal.as_raw() }) {
+        host_window.disconnect(unsafe { SignalHandlerId::from_glib(old) });
+    }
 }
 
 fn restore_box(host: &tauri::WebviewWindow) {

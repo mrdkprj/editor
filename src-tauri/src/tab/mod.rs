@@ -54,6 +54,8 @@ pub struct WindowMode {
     active_tab_labels: HashMap<String, String>,
     #[cfg(windows)]
     undecorated_resize: HashMap<String, isize>,
+    #[cfg(not(windows))]
+    host_signals: HashMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -254,15 +256,6 @@ impl TabState {
         for tabs in self.tab_map.values() {
             if let Some(tab) = tabs.iter().find(|tab| tab.label == label) {
                 return Some(tab.clone());
-            }
-        }
-        None
-    }
-
-    pub fn find_with(&self, label: &str) -> Option<(&Tab, &Vec<Tab>)> {
-        for tabs in self.tab_map.values() {
-            if let Some(tab) = tabs.iter().find(|tab| tab.label == label) {
-                return Some((tab, tabs));
             }
         }
         None

@@ -5,6 +5,9 @@
     import Menubar from "./Menubar.svelte";
     import icon from "../asset/icon.png";
     import { IPCBase } from "../ipc";
+    import util from "../util";
+
+    const ipc = new IPCBase();
 
     let {
         label,
@@ -21,35 +24,64 @@
     } = $props();
 
     let disabled = $derived($appState.anyDialogOpened);
+    let mayDragWindow = false;
 
-    const ipc = new IPCBase();
+    const onIconClick = (e: MouseEvent) => {
+        if (e.detail > 1) return;
+        openNewWindow("");
+    };
 
     const onmousedown = async (e: MouseEvent) => {
         if (disabled) {
             e.preventDefault();
         }
-    };
-
-    const dragWindow = (e: MouseEvent) => {
-        e.preventDefault();
-        if ($appState.visibleMenubarItem) return;
 
         if (!e.target || !(e.target instanceof HTMLElement)) return;
+        if (e.target.classList.contains("drag-region")) {
+            mayDragWindow = true;
+        }
+    };
 
-        if (e.target.classList.contains("title-bar") || e.target.classList.contains("title")) {
+    const dragWindow = (e: DragEvent) => {
+        e.preventDefault();
+        if (mayDragWindow) {
             ipc.invoke("tab_request", { name: "startDrag" });
+            mayDragWindow = false;
+        }
+    };
+
+    const onmouseup = () => {
+        mayDragWindow = false;
+    };
+
+    const onDblClick = (e: MouseEvent) => {
+        if (!e.target || !(e.target instanceof HTMLElement)) return;
+        if (e.target.classList.contains("drag-region")) {
+            toggleMaximize();
         }
     };
 </script>
 
-<div class="title-bar no-print" class:bar-disabled={disabled} onmousedown={dragWindow} onkeydown={handleKeyEvent} role="button" tabindex="-1">
-    <div class="icon-area" {onmousedown} onclick={() => openNewWindow("")} onkeydown={handleKeyEvent} role="button" tabindex="-1">
+<div
+    class="title-bar no-print"
+    class:bar-disabled={disabled}
+    class:drag-region={util.isLinux()}
+    draggable="true"
+    {onmousedown}
+    {onmouseup}
+    ondblclick={onDblClick}
+    ondragstart={dragWindow}
+    onkeydown={handleKeyEvent}
+    role="button"
+    tabindex="-1"
+>
+    <div class="icon-area" {onmousedown} {onmouseup} onclick={onIconClick} onkeydown={handleKeyEvent} role="button" tabindex="-1">
         <img src={icon} alt="" width="20" height="20" />
     </div>
-    <div class="menu-bar-area" {onmousedown} role="button" tabindex="-1">
+    <div class="menu-bar-area" {onmousedown} {onmouseup} role="button" tabindex="-1">
         <Menubar {label} />
     </div>
-    <div class="title" title={contentState.fullPath} onmousedown={dragWindow} role="button" tabindex="-1">
+    <div class="title" class:drag-region={util.isLinux()} title={contentState.fullPath} {onmousedown} {onmouseup} ondragstart={dragWindow} draggable="true" role="button" tabindex="-1">
         {contentState.fullPath ? path.basename(contentState.fullPath) : contentState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
     </div>
     <div class="window-area">
