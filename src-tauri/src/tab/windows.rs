@@ -23,8 +23,8 @@ use windows::{
 
 const OFF_SCREEN: i32 = -30000;
 const TOP_RESIZE_BORDER_SIZE: i32 = 1;
-const PARENT_SUBCLASS_ID: usize = WM_USER as usize + 1;
-const RESIZE_SUBCLASS_ID: usize = WM_USER as usize + 2;
+// const PARENT_SUBCLASS_ID: usize = WM_USER as usize + 1;
+// const RESIZE_SUBCLASS_ID: usize = WM_USER as usize + 2;
 const CHILD_SUBCLASS_ID: usize = WM_USER as usize + 3;
 
 #[derive(Debug, PartialEq)]
@@ -37,6 +37,7 @@ pub(crate) enum WindowType {
 struct ResizeData {
     app: tauri::AppHandle,
     host_name: String,
+    maximized: bool,
 }
 
 pub fn toggle_tab_mode(window: &tauri::WebviewWindow, request: ToggleTabModeRequest) -> bool {
@@ -268,7 +269,7 @@ pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
                 let new_host_hwnd = new_host.hwnd().unwrap();
 
                 let undecorated_resize = prepare(&app, &mut mode, new_host_name.clone());
-                install_subclass(&app, new_host_hwnd, &new_host_name, undecorated_resize);
+                install_subclass(&app, new_host_hwnd, &new_host_name, undecorated_resize, false);
 
                 let activator_window = app.get_webview_window(&request.label).unwrap();
                 let size = activator_window.outer_size().unwrap();
@@ -388,18 +389,18 @@ pub fn cancel(app: &tauri::AppHandle) {
 }
 
 pub fn toggle_maximize(window: &tauri::WebviewWindow) {
-    let app = window.app_handle();
-    let state = app.state::<Mutex<TabState>>();
-    let state = state.lock().unwrap();
-    if let Some((tab, tabs)) = state.find_with(window.label()) {
-        let host = window.get_webview_window(&tab.host).unwrap();
-        if host.is_maximized().unwrap_or_default() {
-            let _ = host.unmaximize();
-            emit_filter(app, TabEvent::Unmaximized, tabs);
-        } else {
-            let _ = host.maximize();
-            emit_filter(app, TabEvent::Maximized, tabs);
-        }
+    /* Prevent state lock blocking */
+    let host_name = {
+        let app = window.app_handle();
+        let state = app.state::<Mutex<TabState>>();
+        let state = state.lock().unwrap();
+        state.find_host(app, window.label())
+    };
+    let host = window.get_webview_window(&host_name).unwrap();
+    if host.is_maximized().unwrap_or_default() {
+        let _ = host.unmaximize();
+    } else {
+        let _ = host.maximize();
     }
 }
 
@@ -480,7 +481,7 @@ fn hide_host(app: &tauri::AppHandle, host_name: &str, mode: &WindowMode) -> bool
     host_name != HOST.get().unwrap()
 }
 
-fn install_subclass(app: &tauri::AppHandle, host: HWND, host_name: &str, undecorated_resize: isize) {
+fn install_subclass(app: &tauri::AppHandle, host: HWND, host_name: &str, undecorated_resize: isize, maximized: bool) {
     unsafe {
         let current_style = GetWindowLongPtrW(host, GWL_STYLE) as u32;
         if (current_style & WS_CLIPCHILDREN.0) == 0 {
@@ -491,14 +492,15 @@ fn install_subclass(app: &tauri::AppHandle, host: HWND, host_name: &str, undecor
     let resize_data = ResizeData {
         app: app.clone(),
         host_name: host_name.to_string(),
+        maximized,
     };
-    let _ = unsafe { SetWindowSubclass(host, Some(subclass_parent), PARENT_SUBCLASS_ID, Box::into_raw(Box::new(resize_data)) as _) };
-    let _ = unsafe { SetWindowSubclass(to_hwnd(undecorated_resize), Some(resize_subclass), RESIZE_SUBCLASS_ID, host.0 as _) };
+    let _ = unsafe { SetWindowSubclass(host, Some(subclass_parent), vtoi(host) as usize, Box::into_raw(Box::new(resize_data)) as _) };
+    let _ = unsafe { SetWindowSubclass(to_hwnd(undecorated_resize), Some(resize_subclass), undecorated_resize as usize, host.0 as _) };
 }
 
 fn uninstall_subclass(host: HWND, undecorated_resize: isize) {
-    let _ = unsafe { RemoveWindowSubclass(to_hwnd(undecorated_resize), Some(resize_subclass), RESIZE_SUBCLASS_ID) };
-    let _ = unsafe { RemoveWindowSubclass(host, Some(subclass_parent), PARENT_SUBCLASS_ID) };
+    let _ = unsafe { RemoveWindowSubclass(to_hwnd(undecorated_resize), Some(resize_subclass), vtoi(host) as usize) };
+    let _ = unsafe { RemoveWindowSubclass(host, Some(subclass_parent), undecorated_resize as usize) };
 }
 
 fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut WindowMode, activator: &str) {
@@ -507,7 +509,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut Windo
     let host_name = HOST.get().unwrap();
     let host = app.get_webview_window(host_name).unwrap();
     let undecorated_resize = mode.get_undecorated_resize(host_name);
-    install_subclass(app, host.hwnd().unwrap(), host_name, undecorated_resize);
+    install_subclass(app, host.hwnd().unwrap(), host_name, undecorated_resize, host.is_maximized().unwrap_or_default());
 
     let activator_window = app.get_webview_window(activator).unwrap();
     let size = activator_window.outer_size().unwrap();
@@ -718,11 +720,11 @@ fn detach_from_tab(removed: &Tab, size: Option<PhysicalSize<u32>>) {
     let _ = unsafe { RemoveWindowSubclass(to_hwnd(removed.window_handle), Some(child_proc), CHILD_SUBCLASS_ID) };
 }
 
-unsafe extern "system" fn subclass_parent(child: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
+unsafe extern "system" fn subclass_parent(hwnd: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
     if umsg == WM_WINDOWPOSCHANGED {
         let mut rect = RECT::default();
 
-        if GetClientRect(child, &mut rect).is_ok() {
+        if GetClientRect(hwnd, &mut rect).is_ok() {
             let width = rect.right - rect.left;
             let height = rect.bottom - rect.top;
             let item_data_ptr = dwrefdata as *const ResizeData;
@@ -736,7 +738,44 @@ unsafe extern "system" fn subclass_parent(child: HWND, umsg: u32, wparam: WPARAM
         }
     }
 
-    DefSubclassProc(child, umsg, wparam, lparam)
+    if umsg == WM_SIZE {
+        let flag = wparam.0 as u32;
+        let item_data_ptr = dwrefdata as *mut ResizeData;
+        let data = &mut *item_data_ptr;
+        let maximized = flag == SIZE_MAXIMIZED;
+        let should_handle = maximized || (flag == SIZE_RESTORED && data.maximized);
+        if should_handle {
+            data.maximized = maximized;
+            let state = data.app.state::<Mutex<TabState>>();
+            if let Ok(state) = state.try_lock() {
+                if let Some(tabs) = state.tabs(&data.host_name) {
+                    if maximized {
+                        emit_filter(&data.app, TabEvent::Maximized, tabs);
+                    } else {
+                        emit_filter(&data.app, TabEvent::Unmaximized, tabs);
+                    }
+                }
+            };
+        }
+    }
+
+    DefSubclassProc(hwnd, umsg, wparam, lparam)
+}
+
+fn on_resized(tabs: &[Tab], width: i32, height: i32) {
+    for tab in tabs {
+        let _ = unsafe {
+            SetWindowPos(
+                to_hwnd(tab.window_handle),
+                None,
+                0,
+                0,
+                width + tab.inset.x * 2,
+                height + TOP_RESIZE_BORDER_SIZE + tab.inset.y * 2,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_ASYNCWINDOWPOS,
+            )
+        };
+    }
 }
 
 unsafe extern "system" fn resize_subclass(child: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
@@ -792,22 +831,6 @@ unsafe extern "system" fn child_proc(hwnd: HWND, umsg: u32, wparam: WPARAM, lpar
     }
 
     DefSubclassProc(hwnd, umsg, wparam, lparam)
-}
-
-fn on_resized(tabs: &[Tab], width: i32, height: i32) {
-    for tab in tabs {
-        let _ = unsafe {
-            SetWindowPos(
-                to_hwnd(tab.window_handle),
-                None,
-                0,
-                0,
-                width + tab.inset.x * 2,
-                height + TOP_RESIZE_BORDER_SIZE + tab.inset.y * 2,
-                SWP_NOMOVE | SWP_NOZORDER | SWP_NOCOPYBITS | SWP_NOACTIVATE | SWP_NOSENDCHANGING | SWP_ASYNCWINDOWPOS,
-            )
-        };
-    }
 }
 
 fn to_hwnd(ptr: isize) -> HWND {
