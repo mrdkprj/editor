@@ -1,11 +1,12 @@
 <script lang="ts">
     import { flip } from "svelte/animate";
+    import { slide } from "svelte/transition";
     import { tabState } from "./appStateReducer.svelte";
     import util from "../util";
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
 
-    let { label }: { label: string } = $props();
+    let { label, addTab }: { label: string; addTab: () => void } = $props();
 
     // svelte-ignore state_referenced_locally
     const ipc = new IPC(label);
@@ -201,6 +202,18 @@
         tabState.tabs.splice(shouldAppend ? targetIndex + 1 : targetIndex, 0, source);
     };
 
+    const smartSlide = (node: Element, isNew: boolean) => {
+        // If not new, return a zero-duration transition that does nothing
+        if (!isNew) {
+            return {
+                duration: 0,
+                css: () => "",
+            };
+        }
+
+        return slide(node, { duration: 100, axis: "x" });
+    };
+
     onMount(() => {
         ipc.receive("dropHandled", () => (dragState.needsDetach = false));
         ipc.receive("startDrag", (e: Tab.StartDragEvent) => (dragState.dragEvent = e));
@@ -213,7 +226,7 @@
 
 <svelte:window ondragenter={onDragEnter} ondragleave={onDragLeave} />
 <div class="tab no-print" bind:this={tab} onwheel={onmousewheel} ondrop={onDrop} role="button" tabindex="-1">
-    {#each tabState.tabs as tab (tab.label)}
+    {#each tabState.tabs as tab, index (tab.label)}
         <div
             id={tab.label}
             draggable="true"
@@ -231,6 +244,7 @@
             role="button"
             tabindex="-1"
             animate:flip={{ duration: tabState.dragging ? 400 : 0 }}
+            transition:smartSlide={index == tabState.tabs.length - 1 && tabState.added}
         >
             <div class="tab-title" title={tab.title}>{tab.title}</div>
             <div class="tab-close-btn" onclick={(e) => closeTab(e, tab.label)} onmousedown={onCloseButtonMousedown} onkeydown={() => {}} role="button" tabindex="-1">
@@ -242,6 +256,7 @@
             </div>
         </div>
     {/each}
+    <div class="add-tab"><button class="add-tab-button" onclick={addTab}>+</button></div>
 </div>
 
 <style>
@@ -299,11 +314,12 @@
         width: 20px;
         height: 20px;
         margin-left: 5px;
-        border-radius: 8px;
+        border-radius: 50px;
         flex-shrink: 0;
     }
 
-    .tab-close-btn:hover {
+    .tab-close-btn:hover,
+    .add-tab-button:hover {
         background-color: var(--tab-close-btn-hover-bg-color);
         color: var(--tab-close-btn-hover-color);
     }
@@ -314,5 +330,23 @@
 
     .tablinks-active {
         background-color: var(--tab-active-bg-color);
+    }
+
+    .add-tab {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 0px 5px;
+    }
+
+    .add-tab-button {
+        background-color: transparent;
+        border: none;
+        color: var(--tab-color);
+        border-radius: 50%;
+        height: 25px;
+        width: 25px;
+        font-size: 16px;
+        line-height: 16px;
     }
 </style>

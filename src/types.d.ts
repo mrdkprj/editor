@@ -35,6 +35,7 @@ declare global {
             scrollLeft: number;
             willStartDrag: boolean;
             dragging: boolean;
+            added: boolean;
         };
 
         type WebviewTitle = {

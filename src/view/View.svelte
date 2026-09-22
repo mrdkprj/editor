@@ -588,7 +588,10 @@
                 break;
             }
             case "added": {
+                tabState.added = true;
                 tabState.tabs.push(e.data);
+                await tick();
+                tabState.added = false;
                 break;
             }
             case "close": {
@@ -700,7 +703,7 @@
         <GtkResize />
     {/if}
     {#if ready}
-        <Bar {label} {openNewWindow} close={tryClose} {toggleMaximize} {minimize} />
+        <Bar {label} close={tryClose} {toggleMaximize} {minimize} />
         {#if $appState.showWatchDialog}
             <WatchDialog {label} {closeDialog} />
         {/if}
@@ -714,7 +717,7 @@
             <Preference {label} {closeDialog} />
         {/if}
         {#if settings.tabMode}
-            <TabControl {label} />
+            <TabControl {label} addTab={() => openNewWindow("")} />
         {/if}
         <div class="editor">
             <Editor

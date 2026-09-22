@@ -11,13 +11,11 @@
 
     let {
         label,
-        openNewWindow,
         close,
         toggleMaximize,
         minimize,
     }: {
         label: string;
-        openNewWindow: (filePath: string, grepRequest?: Mp.GrepRequest, position?: Mp.Position) => Promise<void>;
         close: () => void;
         toggleMaximize: () => void;
         minimize: () => void;
@@ -25,11 +23,6 @@
 
     let disabled = $derived($appState.anyDialogOpened);
     let mayDragWindow = false;
-
-    const onIconClick = (e: MouseEvent) => {
-        if (e.detail > 1) return;
-        openNewWindow("");
-    };
 
     const onmousedown = async (e: MouseEvent) => {
         if (disabled) {
@@ -75,7 +68,7 @@
     role="button"
     tabindex="-1"
 >
-    <div class="icon-area" {onmousedown} {onmouseup} onclick={onIconClick} onkeydown={handleKeyEvent} role="button" tabindex="-1">
+    <div class="icon-area" class:drag-region={util.isLinux()} {onmousedown} {onmouseup} onkeydown={handleKeyEvent} role="button" tabindex="-1">
         <img src={icon} alt="" width="20" height="20" />
     </div>
     <div class="menu-bar-area" {onmousedown} {onmouseup} role="button" tabindex="-1">

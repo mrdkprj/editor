@@ -23,8 +23,6 @@ use windows::{
 
 const OFF_SCREEN: i32 = -30000;
 const TOP_RESIZE_BORDER_SIZE: i32 = 1;
-// const PARENT_SUBCLASS_ID: usize = WM_USER as usize + 1;
-// const RESIZE_SUBCLASS_ID: usize = WM_USER as usize + 2;
 const CHILD_SUBCLASS_ID: usize = WM_USER as usize + 3;
 
 #[derive(Debug, PartialEq)]

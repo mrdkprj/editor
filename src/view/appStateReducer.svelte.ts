@@ -110,7 +110,7 @@ export const selectedPreference: SelectedPreferenceTab = $state({ tab: "appearan
 
 /* Tabs */
 
-export const tabState: Tab.TabState = $state({ tabs: [], scrollLeft: 0, willStartDrag: false, dragging: false });
+export const tabState: Tab.TabState = $state({ tabs: [], scrollLeft: 0, willStartDrag: false, dragging: false, added: false });
 
 /* Grep Progress */
 type GrepProgress = {
