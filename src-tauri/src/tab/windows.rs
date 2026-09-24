@@ -7,7 +7,7 @@ use crate::{
     },
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
-use tauri::{Manager, PhysicalSize, WebviewWindow};
+use tauri::{Manager, PhysicalSize, WebviewWindow, WindowEvent};
 use windows::{
     core::{Free, PCWSTR},
     Win32::{
@@ -492,6 +492,21 @@ fn install_subclass(app: &tauri::AppHandle, host: HWND, host_name: &str, undecor
         host_name: host_name.to_string(),
         maximized,
     };
+
+    let app = app.clone();
+    let host_name = host_name.to_string();
+    app.clone().get_webview_window(&host_name).unwrap().on_window_event(move |e| {
+        if let WindowEvent::Focused(focused) = e {
+            if *focused {
+                let mode = app.state::<Mutex<WindowMode>>();
+                if let Ok(mode) = mode.try_lock() {
+                    let tab = mode.get_active_tab_label(&host_name);
+                    let _ = app.get_webview_window(tab).unwrap().set_focus();
+                    emit_to(&app, TabEvent::Activated, tab);
+                };
+            }
+        }
+    });
     let _ = unsafe { SetWindowSubclass(host, Some(subclass_parent), vtoi(host) as usize, Box::into_raw(Box::new(resize_data)) as _) };
     let _ = unsafe { SetWindowSubclass(to_hwnd(undecorated_resize), Some(resize_subclass), undecorated_resize as usize, host.0 as _) };
 }
