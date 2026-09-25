@@ -41,6 +41,8 @@ export const DEFAULT_PREFERENCE: Mp.Preference = {
     lineHighlight: true,
 };
 
+export const MAX_HISTORY_COUNT = 100;
+
 export const EDIT_MENU_ITEMS: Mp.MenuItem[] = [
     {
         id: "Undo",

@@ -457,7 +457,7 @@ fn reparent(child: HWND, parent: HWND, tab: &Tab, size: PhysicalSize<u32>) {
 
 fn shift_active_tab(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowMode, host_name: &str, label: &str) {
     if let Some(index) = state.position(label) {
-        if mode.get_active_tab_label(host_name) == label {
+        if mode.get_active_tab_label(host_name).unwrap_or_default() == label {
             let tabs = state.tabs(host_name).unwrap();
             if tabs.len() > 1 {
                 let tab = if index == 0 {
@@ -500,9 +500,10 @@ fn install_subclass(app: &tauri::AppHandle, host: HWND, host_name: &str, undecor
             if *focused {
                 let mode = app.state::<Mutex<WindowMode>>();
                 if let Ok(mode) = mode.try_lock() {
-                    let tab = mode.get_active_tab_label(&host_name);
-                    let _ = app.get_webview_window(tab).unwrap().set_focus();
-                    emit_to(&app, TabEvent::Activated, tab);
+                    if let Some(label) = mode.get_active_tab_label(&host_name) {
+                        let _ = app.get_webview_window(label).unwrap().set_focus();
+                        emit_to(&app, TabEvent::Activated, label);
+                    }
                 };
             }
         }
@@ -604,7 +605,7 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
 
 fn bring_to_front(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowMode, label: &str) {
     if let Some(tab) = state.find(label) {
-        if mode.get_active_tab_label(&tab.host) == label {
+        if mode.get_active_tab_label(&tab.host).unwrap_or_default() == label {
             return;
         }
 

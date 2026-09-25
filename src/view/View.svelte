@@ -2,7 +2,7 @@
     import { onMount, tick, untrack } from "svelte";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { appState, dispatch, tabState, contentState, initSettings, settings, temporal, textState, updatePreferences, awaitContextMenu, resolveContextMenu } from "./appStateReducer.svelte";
-    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
+    import { BROWSER_SHORTCUT_KEYS, DEFAULT_ENCODING, GREP, MAX_HISTORY_COUNT, SINGLE_BROWSER_SHORTCUT_KEYS, UNTITLED } from "../constants";
     import { IPC } from "../ipc";
     import helper from "../helper";
     import util from "../util";
@@ -443,7 +443,7 @@
             return;
         }
 
-        if (settings.history.length == 100) {
+        if (settings.history.length == MAX_HISTORY_COUNT) {
             settings.history.splice(0, 1);
         }
 

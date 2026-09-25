@@ -201,8 +201,8 @@ impl WindowMode {
         self.undecorated_resize.insert(host_name.to_string(), window_handle);
     }
 
-    pub fn get_active_tab_label(&self, host_name: &str) -> &str {
-        self.active_tab_labels.get(host_name).map(|s| s.as_str()).unwrap_or_default()
+    pub fn get_active_tab_label(&self, host_name: &str) -> Option<&str> {
+        self.active_tab_labels.get(host_name).map(|s| s.as_str())
     }
 
     pub fn update_active_tab_label(&mut self, host_name: &str, label: &str) {
