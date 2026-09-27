@@ -119,8 +119,8 @@
 >
     <div
         class="dialog-container"
-        style:width={width ? `width:${width}px;` : "width:auto;"}
-        style:height={height ? `height:${height}px;` : "height:auto;"}
+        style:width={width ? `${width}px;` : "fit-content;"}
+        style:height={height ? `${height}px;` : "fit-content;"}
         style={`min-width:${minWidth}px; min-height:${minHeight}px; transform: translate(${position.x}px, ${position.y}px);`}
         bind:clientWidth={dialogWidth}
         bind:clientHeight={dialogHeight}
@@ -167,8 +167,6 @@
         box-shadow: 7px 5px 5px var(--shadow);
         outline: 1px solid var(--outline);
         border-radius: 8px;
-        width: fit-content;
-        height: fit-content;
     }
 
     .dialog-header {
