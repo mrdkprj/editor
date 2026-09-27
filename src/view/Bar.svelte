@@ -69,15 +69,20 @@
     tabindex="-1"
 >
     <div class="titlebar-drag-region"></div>
-    <div class="icon-area" class:drag-region={util.isLinux()} {onmousedown} {onmouseup} onkeydown={handleKeyEvent} role="button" tabindex="-1">
-        <img src={icon} alt="" width="20" height="20" />
+    <div class="titlebar-left">
+        <div class="icon-area" class:drag-region={util.isLinux()} {onmousedown} {onmouseup} onkeydown={handleKeyEvent} role="button" tabindex="-1">
+            <img src={icon} alt="" width="20" height="20" />
+        </div>
+        <div class="menu-bar-area" {onmousedown} {onmouseup} role="button" tabindex="-1">
+            <Menubar {label} />
+        </div>
     </div>
-    <div class="menu-bar-area" {onmousedown} {onmouseup} role="button" tabindex="-1">
-        <Menubar {label} />
+    <div class="titlebar-center">
+        <div class="title" class:drag-region={util.isLinux()} title={contentState.fullPath} {onmousedown} {onmouseup} ondragstart={dragWindow} draggable="true" role="button" tabindex="-1">
+            {contentState.fullPath ? path.basename(contentState.fullPath) : contentState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
+        </div>
     </div>
-    <div class="title" class:drag-region={util.isLinux()} title={contentState.fullPath} {onmousedown} {onmouseup} ondragstart={dragWindow} draggable="true" role="button" tabindex="-1">
-        {contentState.fullPath ? path.basename(contentState.fullPath) : contentState.mode == "grep" ? GREP : UNTITLED}{contentState.isDirty ? "*" : ""}
-    </div>
+    <div class="titlebar-right"></div>
     <div class="window-area">
         <div class="minimize" onclick={minimize} onkeydown={handleKeyEvent} role="button" tabindex="-1">&minus;</div>
         <div class="maximize" onclick={toggleMaximize} onkeydown={handleKeyEvent} role="button" tabindex="-1">

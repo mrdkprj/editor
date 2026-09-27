@@ -1,3 +1,5 @@
+import type { DialogColors } from "./view/Dialog.svelte";
+
 export const handleKeyEvent = () => {
     /**/
 };
@@ -42,6 +44,16 @@ export const DEFAULT_PREFERENCE: Mp.Preference = {
 };
 
 export const MAX_HISTORY_COUNT = 100;
+
+export const DIALOG_COLORS: DialogColors = {
+    background: "var(--main-bgcolor)",
+    color: "var(--menu-color)",
+    shadow: "var(--dialog-shadow)",
+    outline: "var(--dialog-border-color)",
+    closeHoverBackground: "var(--close-hover-bgcolor)",
+    closeHoverColor: "var(--close-hover-color)",
+    separator: "var(--dialog-separator)",
+};
 
 export const EDIT_MENU_ITEMS: Mp.MenuItem[] = [
     {

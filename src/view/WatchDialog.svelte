@@ -1,7 +1,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { handleKeyEvent } from "../constants";
     import { IPC } from "../ipc";
+    import Dialog from "./Dialog.svelte";
+    import { DIALOG_COLORS } from "../constants";
 
     let { label, closeDialog }: { label: string; closeDialog: (type: Mp.DialogType) => void } = $props();
 
@@ -9,14 +10,8 @@
     const ipc = new IPC(label);
     let doNotNotify = $state(false);
 
-    const onkeydown = (e: KeyboardEvent) => {
-        if (e.key == "Escape") {
-            close(false);
-        }
-    };
-
-    const setKeyboardFocus = (node: HTMLDivElement) => {
-        node.focus();
+    const onCloseButtonClick = () => {
+        close(false);
     };
 
     const close = (applyChange: boolean) => {
@@ -30,24 +25,38 @@
     });
 </script>
 
-<div class="mp-dialog-overlay" {onkeydown} role="button" tabindex="-1" use:setKeyboardFocus>
-    <div class="mp-dialog-container">
-        <div class="mp-dialog-header">
-            <div class="mp-dialog-close" onclick={() => close(false)} onkeydown={handleKeyEvent} role="button" tabindex="-1">&times;</div>
-        </div>
-        <div class="mp-dialog">
-            <div class="mp-dialog-title-block">Apply Changes?</div>
+<Dialog minWidth={540} minHeight={200} overlayOffet={36} colors={DIALOG_COLORS} close={onCloseButtonClick} focusOnMount={true}>
+    {#snippet content()}
+        <div class="dialog">
+            <div class="dialog-title-block">Apply Changes?</div>
             <div>File content has been changed. Do you apply the changes?</div>
-            <div class="mp-dialog-item-block">
-                <div class="mp-dialog-item">
+            <div class="dialog-item-block">
+                <div class="dialog-item">
                     <input type="checkbox" bind:checked={doNotNotify} id="doNotNotify" /><label for="doNotNotify">Do not notify again</label>
                 </div>
             </div>
-            <div class="mp-dialog-separator"></div>
-            <div class="mp-dialog-action">
-                <button class="mp-dialog-btn-lg" onclick={() => close(true)}>Yes</button>
-                <button class="mp-dialog-btn-lg" onclick={() => close(false)}>No</button>
+            <div class="dialog-separator"></div>
+            <div class="dialog-action">
+                <button class="dialog-btn-lgw" onclick={() => close(true)}>Yes</button>
+                <button class="dialog-btn-lgw" onclick={() => close(false)}>No</button>
             </div>
         </div>
-    </div>
-</div>
+    {/snippet}
+</Dialog>
+
+<style>
+    .dialog input[type="checkbox"] {
+        margin: 5px;
+    }
+
+    .dialog-btn-lgw {
+        background-color: var(--button-bgcolor);
+        color: var(--button-color);
+        border: 1px solid var(--dialog-border-color);
+        border-radius: 4px;
+    }
+
+    .dialog-btn-lgw:hover {
+        background-color: var(--button-hover-color);
+    }
+</style>

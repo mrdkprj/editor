@@ -35,6 +35,41 @@
     -webkit-app-region: drag;
 }
 
+.titlebar-left {
+    order: 0;
+    width: 20%;
+    flex-grow: 2;
+    justify-content: flex-start;
+    display: flex;
+    height: 100%;
+    align-items: center;
+    position:relative;
+}
+
+.titlebar-center{
+    order: 1;
+    width: 60%;
+    max-width: fit-content;
+    min-width: 0px;
+    justify-content: center;
+    display: flex;
+    height: 100%;
+    align-items: center;
+    position:relative;
+}
+
+.titlebar-right{
+    order: 2;
+    width: 20%;
+    min-width: min-content;
+    flex-grow: 2;
+    justify-content: flex-end;
+    display: flex;
+    height: 100%;
+    align-items: center;
+    position:relative;
+}
+
 .title{
     flex: 1 1 auto;
     text-align: center;
@@ -57,7 +92,6 @@
     left: 10px;
     top: 0;
     height: 35px;
-    /* -webkit-app-region: drag; */
     width: 35px;
 }
 
@@ -81,6 +115,9 @@
     justify-content: space-between;
     align-items: center;
     height: 100%;
+    position: relative;
+    min-width: fit-content;
+    order: 3;
 }
 
 .minimize,
@@ -149,139 +186,3 @@
     position: relative;
 }
 
-
-.mp-dialog-overlay {
-    background-color: transparent;
-    width: 100%;
-    height: calc(100% - 36px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    z-index: 9999;
-    top: 36px;
-    left: 0px;
-    outline: none;
-}
-.mp-dialog-container {
-    background-color: var(--main-bgcolor);
-    color: var(--menu-color);
-    display: flex;
-    min-width: 540px;
-    min-height: 200px;
-    width: fit-content;
-    height: fit-content;
-    flex-direction: column;
-    box-shadow: 7px 5px 5px var(--dialog-shadow);
-    outline: 1px solid var(--dialog-border-color);
-    border-radius: 8px;
-}
-.mp-dialog-header {
-    width: 100%;
-    height: 30px;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-}
-
-.mp-dialog {
-    width: calc(100% - 40px);
-    height: calc(100% - 30px);
-    overflow: auto;
-    padding: 0 20px 20px 20px;
-}
-.mp-dialog-item-block {
-    font-size: 14px;
-    margin-bottom: 10px;
-}
-.mp-dialog-separator {
-    height: 1px;
-    border-top: 1px solid var(--dialog-separator);
-    margin: 20px 0 20px 0;
-}
-.mp-dialog-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px;
-}
-.mp-dialog-item label {
-    user-select: none;
-}
-
-.mp-dialog-title-block {
-    font-size: 16px;
-    font-weight: bold;
-    margin: 0 0 10px 0;
-}
-
-.mp-dialog button {
-    background-color: var(--button-bgcolor);
-    color: var(--button-color);
-    border: 1px solid var(--dialog-border-color);
-    border-radius: 4px;
-}
-
-.mp-dialog-action {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-}
-
-.mp-dialog-btn-lg {
-    padding: 8px 20px;
-}
-
-.mp-dialog-btn-lg:hover {
-    background-color: var(--button-hover-color);
-}
-
-.mp-dialog-action button:not(:last-child) {
-    margin-right: 10px;
-}
-
-.mp-dialog-close {
-    align-items: center;
-    display: flex;
-    justify-content: center;
-    width: 45px;
-    height: 100%;
-    text-align: center;
-    user-select: none;
-    -webkit-user-select: none;
-    position: relative;
-    -webkit-app-region: no-drag;
-    line-height: 35px;
-    border-top-right-radius: 4px;
-}
-
-.mp-dialog-close:hover {
-    background-color: var(--close-hover-bgcolor);
-    color: var(--close-hover-color);
-}
-
-.mp-dialog input[type="text"] {
-    width: 100%;
-    line-height: 22px;
-    text-indent: 5px;
-    font-size: 14px;
-    border-radius: 2px;
-    border:1px solid #ccc;
-    padding: 4px;
-}
-
-.mp-dialog input[type="text"]:focus,
-.mp-dialog input[type="text"]:focus-visible {
-    outline: 1px solid var(--input-focus-outline);
-}
-
-.mp-dialog input[type="checkbox"] {
-    margin: 5px;
-}
-
-.mp-dialog-text{
-    position: relative;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    max-width: 500px;
-}

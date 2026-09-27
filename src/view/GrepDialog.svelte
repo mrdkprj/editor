@@ -1,8 +1,9 @@
 <script lang="ts">
-    import { handleKeyEvent } from "../constants";
+    import { DIALOG_COLORS } from "../constants";
     import { appState, dispatch } from "./appStateReducer.svelte";
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
+    import Dialog from "./Dialog.svelte";
 
     let { label, showErrorMessage, executeGrep }: { label: string; executeGrep: (reqeust: Mp.GrepRequest) => void; showErrorMessage: (message: string) => Promise<void> } = $props();
 
@@ -19,10 +20,6 @@
     });
 
     const onkeydown = (e: KeyboardEvent) => {
-        if (e.key == "Escape") {
-            close();
-        }
-
         if (e.key == "Enter") {
             runGrep();
         }
@@ -62,36 +59,30 @@
     });
 </script>
 
-<div class="mp-dialog-overlay" {onkeydown} role="button" tabindex="-1">
-    <div class="mp-dialog-container">
-        <div class="mp-dialog-header">
-            <div class="mp-dialog-close" onclick={close} onkeydown={handleKeyEvent} role="button" tabindex="-1">&times;</div>
+<Dialog minWidth={540} minHeight={200} overlayOffet={36} colors={DIALOG_COLORS} {close} {onkeydown}>
+    {#snippet content()}
+        <div class="dialog-item-block">
+            <div class="dialog-title-block">Condition</div>
+            <div class="dialog-item"><input type="text" bind:value={request.condition} use:setKeyboardFocus /></div>
+            <div class="dialog-item"><input type="checkbox" id="byword" bind:checked={request.match_by_word} /><label for="byword">Matches on word boundaries</label></div>
+            <div class="dialog-item"><input type="checkbox" id="casesensitive" bind:checked={request.case_sensitive} /><label for="casesensitive">Case sensitive</label></div>
+            <div class="dialog-item"><input type="checkbox" id="regexp" bind:checked={request.regexp} /><label for="regexp">Use regular expression</label></div>
         </div>
-        <div class="mp-dialog">
-            <div class="mp-dialog-item-block">
-                <div class="mp-dialog-title-block">Condition</div>
-                <div class="mp-dialog-item"><input type="text" bind:value={request.condition} use:setKeyboardFocus /></div>
-                <div class="mp-dialog-item"><input type="checkbox" id="byword" bind:checked={request.match_by_word} /><label for="byword">Matches on word boundaries</label></div>
-                <div class="mp-dialog-item"><input type="checkbox" id="casesensitive" bind:checked={request.case_sensitive} /><label for="casesensitive">Case sensitive</label></div>
-                <div class="mp-dialog-item"><input type="checkbox" id="regexp" bind:checked={request.regexp} /><label for="regexp">Use regular expression</label></div>
-            </div>
-            <div class="mp-dialog-item-block">
-                <div class="mp-dialog-title-block">Location</div>
-                <div class="mp-dialog-item"><input type="text" bind:value={request.start_directory} required /><button class="select-folder-button" onclick={selectFolder}>...</button></div>
-                <div class="mp-dialog-item"><input type="checkbox" id="recursive" bind:checked={request.recursive} /><label for="recursive">Include sub directories</label></div>
-            </div>
-            <div class="mp-dialog-item-block">
-                <div class="mp-dialog-title-block">File Type</div>
-                <div class="mp-dialog-item"><input type="text" bind:value={request.file_type} /></div>
-            </div>
-            <div class="mp-dialog-separator"></div>
-            <div class="mp-dialog-action">
-                <button class="mp-dialog-btn-lg" onclick={runGrep}>Grep</button>
-                <button class="mp-dialog-btn-lg" onclick={close}>Cancel</button>
-            </div>
+        <div class="dialog-item-block">
+            <div class="dialog-title-block">Location</div>
+            <div class="dialog-item"><input type="text" bind:value={request.start_directory} required /><button class="select-folder-button" onclick={selectFolder}>...</button></div>
+            <div class="dialog-item"><input type="checkbox" id="recursive" bind:checked={request.recursive} /><label for="recursive">Include sub directories</label></div>
         </div>
-    </div>
-</div>
+        <div class="dialog-item-block">
+            <div class="dialog-title-block">File Type</div>
+            <div class="dialog-item"><input type="text" bind:value={request.file_type} /></div>
+        </div>
+    {/snippet}
+    {#snippet action()}
+        <button class="dialog-btn-lgw" onclick={runGrep}>Grep</button>
+        <button class="dialog-btn-lgw" onclick={close}>Cancel</button>
+    {/snippet}
+</Dialog>
 
 <style>
     .select-folder-button {
@@ -99,5 +90,35 @@
         vertical-align: bottom;
         text-align: center;
         line-height: 22px;
+    }
+
+    .dialog-item input[type="text"] {
+        width: 100%;
+        line-height: 22px;
+        text-indent: 5px;
+        font-size: 14px;
+        border-radius: 2px;
+        border: 1px solid #ccc;
+        padding: 4px;
+    }
+
+    .dialog-item input[type="text"]:focus,
+    .dialog-item input[type="text"]:focus-visible {
+        outline: 1px solid var(--input-focus-outline);
+    }
+
+    .dialog-item input[type="checkbox"] {
+        margin: 5px;
+    }
+
+    .dialog-btn-lgw {
+        background-color: var(--button-bgcolor);
+        color: var(--button-color);
+        border: 1px solid var(--dialog-border-color);
+        border-radius: 4px;
+    }
+
+    .dialog-btn-lgw:hover {
+        background-color: var(--button-hover-color);
     }
 </style>

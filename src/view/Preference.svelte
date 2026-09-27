@@ -1,9 +1,10 @@
 <script lang="ts">
-    import { handleKeyEvent } from "../constants";
+    import { DIALOG_COLORS, handleKeyEvent } from "../constants";
     import { settings, textState, temporal, selectedPreference } from "./appStateReducer.svelte";
     import { IPC } from "../ipc";
     import { onMount } from "svelte";
     import { Colors, ColorTokens, dark_colors, lihgt_colors } from "../theme";
+    import Dialog from "./Dialog.svelte";
 
     let { label, closeDialog }: { label: string; closeDialog: (type: Mp.DialogType) => void } = $props();
 
@@ -13,16 +14,6 @@
     const indentSizes = [1, 2, 3, 4, 5, 6, 7, 8];
     let themeColors = $state(settings.theme == "dark" ? $state.snapshot(settings.color["dark"]) : $state.snapshot(settings.color["light"]));
     let preference = $state($state.snapshot(settings.preference[textState.textType]));
-
-    const setKeyboardFocus = (node: HTMLDivElement) => {
-        node.focus();
-    };
-
-    const onkeydown = (e: KeyboardEvent) => {
-        if (e.key == "Escape") {
-            close();
-        }
-    };
 
     const save = () => {
         let colorChanged = false;
@@ -61,12 +52,9 @@
     });
 </script>
 
-<div class="mp-dialog-overlay" role="button" tabindex="-1" {onkeydown} use:setKeyboardFocus>
-    <div class="mp-dialog-container" style="min-height: 500px;position:relative;">
-        <div class="mp-dialog-header">
-            <div class="mp-dialog-close" onclick={close} onkeydown={handleKeyEvent} role="button" tabindex="-1">&times;</div>
-        </div>
-        <div class="mp-dialog preference">
+<Dialog minWidth={540} minHeight={500} overlayOffet={36} colors={DIALOG_COLORS} {close} focusOnMount={true}>
+    {#snippet content()}
+        <div class="dialog preference">
             <div class="tab">
                 <div
                     class="tablinks"
@@ -90,42 +78,42 @@
                 </div>
             </div>
             {#if selectedPreference.tab == "appearance"}
-                <div class="mp-dialog-column">
-                    <div class="mp-dialog-item-block">
-                        <div class="mp-dialog-item"><label for="fontfamily">Font Family</label></div>
-                        <div class="mp-dialog-item"><label for="fontsize">Font Size</label></div>
-                        <div class="mp-dialog-item"><label for="linenumber">Show Line Number</label></div>
-                        <div class="mp-dialog-item"><label for="autoindent">Auto Indent</label></div>
-                        <div class="mp-dialog-item"><label for="wordwrap">Wordwrap</label></div>
-                        <div class="mp-dialog-item"><label for="whitespace">Render White Sapce</label></div>
-                        <div class="mp-dialog-item"><label for="highlight">Line Highlight</label></div>
-                        <div class="mp-dialog-item"><label for="indent">Indent By Space</label></div>
-                        <div class="mp-dialog-item"><label for="indentsize">Indent Size</label></div>
-                        <div class="mp-dialog-item"><label for="showFullpath">Show Fullpath on Titlebar</label></div>
+                <div class="dialog-column">
+                    <div class="dialog-item-block">
+                        <div class="dialog-item"><label for="fontfamily">Font Family</label></div>
+                        <div class="dialog-item"><label for="fontsize">Font Size</label></div>
+                        <div class="dialog-item"><label for="linenumber">Show Line Number</label></div>
+                        <div class="dialog-item"><label for="autoindent">Auto Indent</label></div>
+                        <div class="dialog-item"><label for="wordwrap">Wordwrap</label></div>
+                        <div class="dialog-item"><label for="whitespace">Render White Sapce</label></div>
+                        <div class="dialog-item"><label for="highlight">Line Highlight</label></div>
+                        <div class="dialog-item"><label for="indent">Indent By Space</label></div>
+                        <div class="dialog-item"><label for="indentsize">Indent Size</label></div>
+                        <div class="dialog-item"><label for="showFullpath">Show Fullpath on Titlebar</label></div>
                     </div>
 
-                    <div class="mp-dialog-item-block">
-                        <div class="mp-dialog-item"><input type="text" id="fontfamily" bind:value={preference.fontFamily} /></div>
-                        <div class="mp-dialog-item">
+                    <div class="dialog-item-block">
+                        <div class="dialog-item"><input type="text" id="fontfamily" bind:value={preference.fontFamily} /></div>
+                        <div class="dialog-item">
                             <select id="fontsize" bind:value={preference.fontSize}>
                                 {#each fontSizes as size}
                                     <option value={size}>{size}</option>
                                 {/each}
                             </select>
                         </div>
-                        <div class="mp-dialog-item"><input type="checkbox" id="linenumber" bind:checked={preference.showLineNumber} /></div>
-                        <div class="mp-dialog-item"><input type="checkbox" id="autoindent" bind:checked={preference.autoIndent} /></div>
-                        <div class="mp-dialog-item"><input type="checkbox" id="wordwrap" bind:checked={preference.wordWrap} /></div>
-                        <div class="mp-dialog-item">
+                        <div class="dialog-item"><input type="checkbox" id="linenumber" bind:checked={preference.showLineNumber} /></div>
+                        <div class="dialog-item"><input type="checkbox" id="autoindent" bind:checked={preference.autoIndent} /></div>
+                        <div class="dialog-item"><input type="checkbox" id="wordwrap" bind:checked={preference.wordWrap} /></div>
+                        <div class="dialog-item">
                             <select id="whitespace" bind:value={preference.renderWhitespace}>
                                 <option value="none">None</option>
                                 <option value="selection">Selection</option>
                                 <option value="all">All</option>
                             </select>
                         </div>
-                        <div class="mp-dialog-item"><input type="checkbox" id="highlight" bind:checked={preference.lineHighlight} /></div>
-                        <div class="mp-dialog-item"><input type="checkbox" id="indent" bind:checked={preference.indentBySpaces} /></div>
-                        <div class="mp-dialog-item">
+                        <div class="dialog-item"><input type="checkbox" id="highlight" bind:checked={preference.lineHighlight} /></div>
+                        <div class="dialog-item"><input type="checkbox" id="indent" bind:checked={preference.indentBySpaces} /></div>
+                        <div class="dialog-item">
                             <select id="indentsize" bind:value={preference.indentSize}>
                                 {#each indentSizes as size}
                                     <option value={size}>{size}</option>
@@ -136,20 +124,20 @@
                 </div>
             {/if}
             {#if selectedPreference.tab == "color"}
-                <div class="mp-dialog-column">
-                    <div class="mp-dialog-item-block">
+                <div class="dialog-column">
+                    <div class="dialog-item-block">
                         {#each Object.keys(ColorTokens) as colorKey}
                             {#if colorKey in Colors}
                                 {@const color = Colors[colorKey]}
-                                <div class="mp-dialog-item">{color.label}</div>
+                                <div class="dialog-item">{color.label}</div>
                             {/if}
                         {/each}
                     </div>
-                    <div class="mp-dialog-item-block">
+                    <div class="dialog-item-block">
                         {#each Object.keys(ColorTokens) as colorKey}
                             {#if colorKey in Colors}
                                 {@const color = Colors[colorKey]}
-                                <div class="mp-dialog-item">
+                                <div class="dialog-item">
                                     {#if color.group}
                                         <input type="color" title={themeColors[color.token]} bind:value={themeColors[color.token]} />
                                         <input type="color" title={themeColors[color.group]} bind:value={themeColors[color.group]} />
@@ -166,19 +154,16 @@
                     </div>
                 </div>
             {/if}
-            <div class="mp-dialog-footer">
-                <div class="mp-dialog-separator"></div>
-                <div class="mp-dialog-action">
-                    <button class="mp-dialog-btn-lg" onclick={save}>Save</button>
-                    {#if selectedPreference.tab == "color"}
-                        <button class="mp-dialog-btn-lg" onclick={restore}>Restore Default</button>
-                    {/if}
-                    <button class="mp-dialog-btn-lg" onclick={close}>Cancel</button>
-                </div>
-            </div>
         </div>
-    </div>
-</div>
+    {/snippet}
+    {#snippet action()}
+        <button class="dialog-btn-lgw" onclick={save}>Save</button>
+        {#if selectedPreference.tab == "color"}
+            <button class="dialog-btn-lgw" onclick={restore}>Restore Default</button>
+        {/if}
+        <button class="dialog-btn-lgw" onclick={close}>Cancel</button>
+    {/snippet}
+</Dialog>
 
 <style>
     .empty-color {
@@ -215,20 +200,14 @@
         border-right: 1px solid var(--tab-border);
     }
 
-    .mp-dialog-column {
+    .dialog-column {
         display: flex;
         align-items: flex-start;
         height: 370px;
     }
 
-    .mp-dialog-column .mp-dialog-item {
+    .dialog-column .dialog-item {
         height: 25px;
-    }
-
-    .mp-dialog-footer {
-        width: 100%;
-        left: 0;
-        bottom: 24px;
     }
 
     .preference input[type="text"] {
@@ -236,7 +215,7 @@
         padding: 0;
     }
 
-    .mp-dialog-item-block {
+    .dialog-item-block {
         margin-right: 10px;
     }
 
@@ -259,5 +238,35 @@
     .preference select:focus,
     .preference select:focus-visible {
         outline: 1px solid blue;
+    }
+
+    .dialog input[type="checkbox"] {
+        margin: 5px;
+    }
+
+    .dialog input[type="text"] {
+        width: 100%;
+        line-height: 22px;
+        text-indent: 5px;
+        font-size: 14px;
+        border-radius: 2px;
+        border: 1px solid #ccc;
+        padding: 4px;
+    }
+
+    .dialog input[type="text"]:focus,
+    .dialog input[type="text"]:focus-visible {
+        outline: 1px solid var(--input-focus-outline);
+    }
+
+    .dialog-btn-lgw {
+        background-color: var(--button-bgcolor);
+        color: var(--button-color);
+        border: 1px solid var(--dialog-border-color);
+        border-radius: 4px;
+    }
+
+    .dialog-btn-lgw:hover {
+        background-color: var(--button-hover-color);
     }
 </style>
