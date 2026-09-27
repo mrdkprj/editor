@@ -8,10 +8,10 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    -webkit-app-region: no-drag;
 }
 
 .title-bar{
+    position: relative;
     display: flex;
     justify-content: flex-end;
     align-items: center;
@@ -21,9 +21,18 @@
     color: var(--main-color);
     background-color: var(--bar-bg-color);
     border-bottom: 1px solid var(--bar-border-color);
-    -webkit-app-region: drag;
     user-select: none;
     -webkit-user-select: none;
+}
+
+.titlebar-drag-region {
+    top: 0;
+    left: 0;
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    -webkit-app-region: drag;
 }
 
 .title{
@@ -48,7 +57,7 @@
     left: 10px;
     top: 0;
     height: 35px;
-    -webkit-app-region: drag;
+    /* -webkit-app-region: drag; */
     width: 35px;
 }
 
@@ -64,6 +73,7 @@
     align-items: center;
     justify-content: center;
     height: 100%;
+    -webkit-app-region: no-drag;
 }
 
 .window-area{

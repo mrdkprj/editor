@@ -68,6 +68,7 @@
     role="button"
     tabindex="-1"
 >
+    <div class="titlebar-drag-region"></div>
     <div class="icon-area" class:drag-region={util.isLinux()} {onmousedown} {onmouseup} onkeydown={handleKeyEvent} role="button" tabindex="-1">
         <img src={icon} alt="" width="20" height="20" />
     </div>
