@@ -1,20 +1,20 @@
 use crate::{
     helper::WindowLabels,
     tab::{
-        emit, emit_filter, emit_to, AddTabRequest, AttachRequest, Bounds, DetachRequest, ModeChangedArg, Tab,
+        emit, emit_filter, emit_to, AddTabRequest, AttachRequest, Bounds, ModeChangedArg, Tab,
         TabEvent::{self},
         TabState, ToggleTabModeRequest, WebviewTitle, WindowInset, WindowMode, HOST,
     },
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
-use tauri::{Manager, PhysicalSize, WebviewWindow, WindowEvent};
+use tauri::{Manager, PhysicalSize, WebviewWindow};
 use windows::{
     core::{Free, PCWSTR},
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, POINT, POINTS, RECT, WPARAM},
         Graphics::Gdi::{ClientToScreen, CreateRectRgn, GetWindowRgn, SetWindowRgn, RGN_ERROR},
         UI::{
-            Input::KeyboardAndMouse::{ReleaseCapture, SetFocus},
+            Input::KeyboardAndMouse::ReleaseCapture,
             Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
             WindowsAndMessaging::*,
         },
@@ -132,8 +132,8 @@ pub fn add(window: &tauri::WebviewWindow, request: AddTabRequest) {
         let host = app.get_webview_window(&host_name).unwrap();
         if host.is_minimized().unwrap() {
             host.unminimize().unwrap();
+            let _ = host.set_focus();
         }
-        let _ = host.set_focus();
     })
     .detach();
 }
@@ -213,7 +213,7 @@ pub fn attach(app: &tauri::AppHandle, request: AttachRequest) {
     bring_to_front_async(app, tab, None);
 }
 
-pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
+pub fn detach(app: &tauri::AppHandle, label: String) {
     let app = app.clone();
 
     /* On Windows, window creation must be on a different thread and on the main thread */
@@ -223,29 +223,40 @@ pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
             .run_on_main_thread(move || {
                 let state = app.state::<Mutex<TabState>>();
                 let mut state = state.lock().unwrap();
-                if !state.can_detach(&request.label) {
+                if !state.can_detach(&label) {
                     return;
                 }
 
                 let mode = app.state::<Mutex<WindowMode>>();
                 let mut mode = mode.lock().unwrap();
 
-                let old_tab = state.find(&request.label).unwrap();
+                let old_tab = state.find(&label).unwrap();
                 /* Change active tab of the detached tabs */
                 shift_active_tab(&app, &state, &mut mode, &old_tab.host, &old_tab.label);
 
                 let new_host_name = crate::helper::create_new_host_window(&app);
-                let result = state.reparent(&request.label, &new_host_name);
-                let old_host = app.get_webview_window(&result.previous_host_name).unwrap();
-                /* Make the old host top-most */
-                old_host.set_focus().unwrap();
+                let result = state.reparent(&label, &new_host_name);
 
-                /* Notify this tab is detached */
-                emit_filter(&app, TabEvent::Closed(result.tab.label.clone()), state.tabs(&result.previous_host_name).unwrap());
+                let new_host = app.get_webview_window(&new_host_name).unwrap();
+                let new_host_hwnd = new_host.hwnd().unwrap();
 
-                /* Reset tab data on frontend */
+                let undecorated_resize = prepare(&app, &mut mode, new_host_name.clone());
+                install_subclass(&app, new_host_hwnd, &new_host_name, undecorated_resize, false);
+
+                let activator_window = app.get_webview_window(&label).unwrap();
+                let size = activator_window.outer_size().unwrap();
+                let mut pos = activator_window.outer_position().unwrap();
+
                 let tab = result.tab;
                 let tabs = state.tabs(&tab.host).unwrap();
+
+                let child = activator_window.hwnd().unwrap();
+                reparent(child, new_host_hwnd, &tab, size);
+
+                /* Notify this tab is detached */
+                emit_filter(&app, TabEvent::Closed(label), state.tabs(&result.previous_host_name).unwrap());
+
+                /* Reset tab data on frontend */
                 let webviews = tabs
                     .iter()
                     .map(|tab| WebviewTitle {
@@ -262,19 +273,6 @@ pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
                     }),
                     tabs,
                 );
-
-                let new_host = app.get_webview_window(&new_host_name).unwrap();
-                let new_host_hwnd = new_host.hwnd().unwrap();
-
-                let undecorated_resize = prepare(&app, &mut mode, new_host_name.clone());
-                install_subclass(&app, new_host_hwnd, &new_host_name, undecorated_resize, false);
-
-                let activator_window = app.get_webview_window(&request.label).unwrap();
-                let size = activator_window.outer_size().unwrap();
-                let mut pos = activator_window.outer_position().unwrap();
-
-                let child = activator_window.hwnd().unwrap();
-                reparent(child, new_host_hwnd, &tab, size);
 
                 new_host.set_size(size).unwrap();
                 let mut lppoint = POINT::default();
@@ -412,6 +410,7 @@ pub fn minimize(window: &tauri::WebviewWindow) {
     }
 }
 
+/* This must be called before any child is added */
 pub(crate) fn prepare(app: &tauri::AppHandle, mode: &mut WindowMode, host_name: String) -> isize {
     let host = app.get_webview_window(&host_name).unwrap();
 
@@ -485,6 +484,7 @@ fn install_subclass(app: &tauri::AppHandle, host: HWND, host_name: &str, undecor
         if (current_style & WS_CLIPCHILDREN.0) == 0 {
             SetWindowLongPtrW(host, GWL_STYLE, (current_style | WS_CLIPCHILDREN.0) as isize);
         }
+        let _ = SetWindowPos(host, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOSIZE);
     }
 
     let resize_data = ResizeData {
@@ -493,21 +493,6 @@ fn install_subclass(app: &tauri::AppHandle, host: HWND, host_name: &str, undecor
         maximized,
     };
 
-    let app = app.clone();
-    let host_name = host_name.to_string();
-    app.clone().get_webview_window(&host_name).unwrap().on_window_event(move |e| {
-        if let WindowEvent::Focused(focused) = e {
-            if *focused {
-                let mode = app.state::<Mutex<WindowMode>>();
-                if let Ok(mode) = mode.try_lock() {
-                    if let Some(label) = mode.get_active_tab_label(&host_name) {
-                        let _ = app.get_webview_window(label).unwrap().set_focus();
-                        emit_to(&app, TabEvent::Activated, label);
-                    }
-                };
-            }
-        }
-    });
     let _ = unsafe { SetWindowSubclass(host, Some(subclass_parent), vtoi(host) as usize, Box::into_raw(Box::new(resize_data)) as _) };
     let _ = unsafe { SetWindowSubclass(to_hwnd(undecorated_resize), Some(resize_subclass), undecorated_resize as usize, host.0 as _) };
 }
@@ -590,6 +575,7 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab, width: i32, height: i
     style &= !(WS_POPUP.0);
     style |= WS_CLIPSIBLINGS.0;
     style |= WS_CHILD.0;
+    style |= WS_TABSTOP.0;
     unsafe { SetWindowLongPtrW(child, GWL_STYLE, style as isize) };
     let ex_style = unsafe { GetWindowLongPtrW(child, GWL_EXSTYLE) } as u32;
     unsafe { SetWindowLongPtrW(child, GWL_EXSTYLE, (ex_style | WS_EX_LAYERED.0) as isize) };
@@ -611,7 +597,6 @@ fn bring_to_front(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowMod
 
         let _ = unsafe { SetWindowPos(to_hwnd(tab.window_handle), Some(HWND_TOP), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE) };
         emit_to(app, TabEvent::Activated, label);
-        let _ = unsafe { SetFocus(Some(to_hwnd(tab.window_handle))) };
 
         mode.update_active_tab_label(&tab.host, label);
     }
@@ -747,6 +732,21 @@ unsafe extern "system" fn subclass_parent(hwnd: HWND, umsg: u32, wparam: WPARAM,
             if let Ok(state) = state.try_lock() {
                 if let Some(tabs) = state.tabs(&data.host_name) {
                     on_resized(tabs, width, height);
+                }
+            };
+        }
+    }
+
+    if umsg == WM_SETFOCUS {
+        let foreground = GetForegroundWindow();
+        if foreground == hwnd {
+            let item_data_ptr = dwrefdata as *const ResizeData;
+            let data = &*item_data_ptr;
+            let app = &data.app;
+            let mode = app.state::<Mutex<WindowMode>>();
+            if let Ok(mode) = mode.try_lock() {
+                if let Some(label) = mode.get_active_tab_label(&data.host_name) {
+                    emit_to(app, TabEvent::Activated, label);
                 }
             };
         }

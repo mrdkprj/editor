@@ -41,7 +41,7 @@ pub enum TabRequest {
     ToggleTabMode(ToggleTabModeRequest),
     Close,
     Attach(AttachRequest),
-    Detach(DetachRequest),
+    Detach(String),
     ToggleMaximize,
     Minimize,
     StartDrag,
@@ -95,13 +95,6 @@ pub struct AttachRequest {
     pub to: String,
     pub attach_target: Option<String>,
     pub attach_before: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DetachRequest {
-    pub label: String,
-    pub offset_x: i32,
-    pub offset_y: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -426,7 +419,7 @@ pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
     match req {
         TabRequest::Add(request) => platform_impl::add(window, request),
         TabRequest::Attach(request) => platform_impl::attach(window.app_handle(), request),
-        TabRequest::Detach(request) => platform_impl::detach(window.app_handle(), request),
+        TabRequest::Detach(label) => platform_impl::detach(window.app_handle(), label),
         TabRequest::Cancel => platform_impl::cancel(window.app_handle()),
         TabRequest::Select(label) => platform_impl::select_tab(window.app_handle(), label),
         TabRequest::SelectNext => platform_impl::select(window, true),

@@ -73,12 +73,6 @@ declare global {
             attach_before: boolean;
         };
 
-        type DetachRequest = {
-            label: string;
-            offset_x: number;
-            offset_y: number;
-        };
-
         type TabEvent =
             | { name: "maximized"; data?: never }
             | { name: "unmaximized"; data?: never }
@@ -102,7 +96,7 @@ declare global {
             | { name: "update"; data: WebviewTitle }
             | { name: "add"; data: AddTabRequest }
             | { name: "attach"; data: AttachRequest }
-            | { name: "detach"; data: DetachRequest }
+            | { name: "detach"; data: string }
             | { name: "close"; data?: never }
             | { name: "minimize"; data?: never }
             | { name: "toggleMaximize"; data?: never }

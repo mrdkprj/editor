@@ -157,14 +157,14 @@
         if (!dragState.insideWindow) {
             switch (effect) {
                 case "none":
-                    ipc.invoke("tab_request", { name: "detach", data: { label: dragState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
+                    ipc.invoke("tab_request", { name: "detach", data: dragState.startLabel });
                     break;
 
                 case "move":
                 case "copy":
                     setTimeout(() => {
                         if (dragState.needsDetach) {
-                            ipc.invoke("tab_request", { name: "detach", data: { label: dragState.startLabel, offset_x: e.screenX, offset_y: e.screenY } });
+                            ipc.invoke("tab_request", { name: "detach", data: dragState.startLabel });
                         }
                     }, 50);
                     break;
