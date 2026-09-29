@@ -1,6 +1,6 @@
 use crate::{
     helper::WindowLabels,
-    tab::{emit, emit_filter, emit_to, AddTabRequest, AttachRequest, Bounds, DetachRequest, ModeChangedArg, Tab, TabEvent, TabState, ToggleTabModeRequest, WebviewTitle, WindowMode, HOST},
+    tab::{emit, emit_filter, emit_to, AddTabRequest, AttachRequest, Bounds, ModeChangedArg, Tab, TabEvent, TabState, ToggleTabModeRequest, WebviewTitle, WindowMode, HOST},
 };
 use gtk::{
     ffi::GtkWidget,
@@ -185,20 +185,20 @@ pub fn attach(app: &tauri::AppHandle, request: AttachRequest) {
     bring_to_front_async(app, tab, None);
 }
 
-pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
+pub fn detach(app: &tauri::AppHandle, label: String) {
     let app = app.clone();
 
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
-    if !state.can_detach(&request.label) {
+    if !state.can_detach(&label) {
         return;
     }
 
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
 
-    let old_tab = state.find(&request.label).unwrap();
+    let old_tab = state.find(&label).unwrap();
     /* Change active tab of the detached tabs */
     shift_active_tab(&app, &state, &mut mode, &old_tab.host, &old_tab.label);
 
@@ -206,7 +206,7 @@ pub fn detach(app: &tauri::AppHandle, request: DetachRequest) {
     let new_host = app.get_webview_window(&new_host_name).unwrap();
     change_to_overlay(&new_host, &mut mode);
 
-    let result = state.reparent(&request.label, &new_host_name);
+    let result = state.reparent(&label, &new_host_name);
     let old_host = app.get_webview_window(&result.previous_host_name).unwrap();
     /* Make the old host top-most */
     old_host.set_focus().unwrap();
