@@ -1,6 +1,7 @@
-use crate::{
-    helper::WindowLabels,
-    tab::{emit, emit_filter, emit_to, AddTabRequest, AttachRequest, Bounds, ModeChangedArg, Tab, TabEvent, TabState, ToggleTabModeRequest, WebviewTitle, WindowMode, HOST},
+use crate::manager::{
+    create_new_host_window,
+    tab::{emit, emit_filter, emit_to, AddTabRequest, AttachRequest, Bounds, ModeChangedArg, Tab, TabEvent, TabState, ToggleTabModeRequest, WebviewTitle, HOST},
+    WindowLabels, WindowMode,
 };
 use gtk::{
     ffi::GtkWidget,
@@ -202,7 +203,7 @@ pub fn detach(app: &tauri::AppHandle, label: String) {
     /* Change active tab of the detached tabs */
     shift_active_tab(&app, &state, &mut mode, &old_tab.host, &old_tab.label);
 
-    let new_host_name = crate::helper::create_new_host_window(&app);
+    let new_host_name = create_new_host_window(&app, &mode);
     let new_host = app.get_webview_window(&new_host_name).unwrap();
     change_to_overlay(&new_host, &mut mode);
 

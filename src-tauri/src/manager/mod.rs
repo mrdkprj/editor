@@ -1,4 +1,6 @@
 pub use crate::manager::tab::TabRequest;
+#[cfg(not(windows))]
+use gtk::{gdk::WindowState, traits::WidgetExt};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -8,6 +10,7 @@ use std::{
     },
 };
 use tauri::{AppHandle, Emitter, EventTarget, Manager, WebviewWindow};
+#[cfg(windows)]
 use windows::Win32::{
     Foundation::{HWND, LPARAM, LRESULT, WPARAM},
     UI::{
@@ -250,17 +253,6 @@ pub(crate) fn create_new_window(app: &AppHandle, label: String) {
     }
 }
 
-fn listen_resize(window: &WebviewWindow) {
-    let app = window.app_handle().clone();
-
-    let data = WindowStateChangeData {
-        app,
-        label: window.label().to_string(),
-        maximized: window.is_maximized().unwrap_or_default(),
-    };
-    let _ = unsafe { SetWindowSubclass(window.hwnd().unwrap(), Some(child_window_subclass), window.hwnd().unwrap().0 as usize, Box::into_raw(Box::new(data)) as usize) };
-}
-
 pub(crate) fn create_new_host_window(app: &AppHandle, mode: &WindowMode) -> String {
     let id = UUID.fetch_add(1, Relaxed);
     let config = &app.config().app.windows[0];
@@ -319,12 +311,56 @@ impl WindowMode {
     }
 }
 
+fn listen_resize(window: &WebviewWindow) {
+    let app = window.app_handle().clone();
+
+    #[cfg(windows)]
+    {
+        let data = WindowStateChangeData {
+            app,
+            label: window.label().to_string(),
+            maximized: window.is_maximized().unwrap_or_default(),
+        };
+        let _ = unsafe { SetWindowSubclass(window.hwnd().unwrap(), Some(child_window_subclass), window.hwnd().unwrap().0 as usize, Box::into_raw(Box::new(data)) as usize) };
+    }
+    #[cfg(not(windows))]
+    {
+        let label = window.label().to_string();
+
+        let _ = window.gtk_window().unwrap().connect_window_state_event(move |_, e| {
+            let maximized = e.new_window_state().contains(WindowState::MAXIMIZED);
+            let should_handle = maximized || (e.changed_mask().contains(WindowState::MAXIMIZED) && !e.new_window_state().contains(WindowState::MAXIMIZED));
+            if should_handle {
+                let mode = app.state::<Mutex<WindowMode>>();
+                if let Ok(mode) = mode.try_lock() {
+                    if !mode.is_tab_mode {
+                        let _ = app.emit_to(
+                            EventTarget::WebviewWindow {
+                                label: label.clone(),
+                            },
+                            WINDOW_STATE_CHANGE_EVENT,
+                            if maximized {
+                                ChangeWindowStateResult::Maximized
+                            } else {
+                                ChangeWindowStateResult::Unmaximized
+                            },
+                        );
+                    }
+                };
+            }
+            gtk::glib::Propagation::Proceed
+        });
+    }
+}
+
+#[cfg(windows)]
 struct WindowStateChangeData {
     app: AppHandle,
     label: String,
     maximized: bool,
 }
 
+#[cfg(windows)]
 unsafe extern "system" fn child_window_subclass(hwnd: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
     if umsg == WM_SIZE {
         let flag = wparam.0 as u32;
