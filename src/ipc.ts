@@ -79,9 +79,9 @@ type TauriCommandMap = {
     abort_grep: TauriCommand<undefined, undefined>;
     is_file: TauriCommand<string, boolean>;
     change_encoding: TauriCommand<Mp.EncodeArg, string>;
-    update_title: TauriCommand<Mp.WindowTitle, null>;
     is_file_opened: TauriCommand<string, string | null>;
     tab_request: TauriCommand<Tab.TabRequest, boolean>;
+    change_window_state: TauriCommand<Ws.ChangeWindowStateRequest, null>;
 };
 
 export class IPCBase {

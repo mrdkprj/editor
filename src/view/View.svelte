@@ -53,47 +53,16 @@
     };
 
     const toggleMaximize = async () => {
-        if (settings.tabMode) {
-            return ipc.invoke("tab_request", { name: "toggleMaximize" });
-        }
-
-        const view = getCurrentWebviewWindow();
-        const maximized = await view.isMaximized();
-        if (maximized) {
-            view.unmaximize();
-            view.setPosition(util.toPhysicalPosition(settings.bounds));
-            view.setSize(util.toPhysicalSize(settings.bounds));
-        } else {
-            const position = await view.innerPosition();
-            const size = await view.innerSize();
-            settings.bounds = util.toBounds(position, size);
-            await view.maximize();
-        }
-        settings.isMaximized = !maximized;
-        dispatch({ type: "isMaximized", value: !$appState.isMaximized });
-    };
-
-    const onWindowSizeChanged = async () => {
-        if (settings.tabMode) return;
-
-        const isMaximized = await getCurrentWebviewWindow().isMaximized();
-        dispatch({ type: "isMaximized", value: isMaximized });
+        await ipc.invoke("change_window_state", { name: "toggleMaximize" });
     };
 
     const minimize = async () => {
-        if (settings.tabMode) {
-            return ipc.invoke("tab_request", { name: "minimize" });
-        }
-
-        const view = getCurrentWebviewWindow();
-        const position = await view.innerPosition();
-        const size = await view.innerSize();
-        settings.bounds = util.toBounds(position, size);
-        await view.minimize();
+        await ipc.invoke("change_window_state", { name: "minimize" });
     };
 
-    const onTabWindowSizeChangeEvent = async (isMaximized: boolean) => {
-        dispatch({ type: "isMaximized", value: isMaximized });
+    const onWindowSizeChanged = (maximized: boolean) => {
+        dispatch({ type: "isMaximized", value: maximized });
+        settings.isMaximized = maximized;
     };
 
     const handleContextMenuEvent = async (e: Mp.ContextMenuEvent) => {
@@ -556,11 +525,11 @@
                 break;
             }
             case "maximized": {
-                onTabWindowSizeChangeEvent(true);
+                onWindowSizeChanged(true);
                 return;
             }
             case "unmaximized": {
-                onTabWindowSizeChangeEvent(false);
+                onWindowSizeChanged(false);
                 return;
             }
             case "titleChanged": {
@@ -609,7 +578,7 @@
         tabState.scrollLeft = scrollLeft;
     };
 
-    const updateTabTitle = (e: Tab.WebviewTitle) => {
+    const updateTabTitle = (e: Ws.WebviewTitle) => {
         tabState.tabs
             .filter((tab) => tab.label == e.label)
             .forEach((tab) => {
@@ -623,7 +592,7 @@
         const path = contentState.fullPath;
         const webviewTitle = { label, title, path };
         updateTabTitle(webviewTitle);
-        ipc.invoke("update_title", webviewTitle);
+        ipc.invoke("change_window_state", { name: "updateTitle", data: webviewTitle });
         await getCurrentWebviewWindow().setTitle(title);
     };
 
@@ -631,6 +600,34 @@
         const mark = isDirty ? "*" : "";
         const title = fullPath ? `${path.basename(fullPath)}${mark}` : mode == "grep" ? `${GREP}${mark}` : `${UNTITLED}${mark}`;
         return title;
+    };
+
+    const onWindowStateChanged = async (e: Ws.ChangeWindowStateResult) => {
+        switch (e.name) {
+            case "toggled": {
+                const bounds = e.data;
+                if (bounds) {
+                    settings.bounds = bounds;
+                } else {
+                    const view = getCurrentWebviewWindow();
+                    view.setPosition(util.toPhysicalPosition(settings.bounds));
+                    view.setSize(util.toPhysicalSize(settings.bounds));
+                }
+                break;
+            }
+            case "maximized": {
+                onWindowSizeChanged(true);
+                return;
+            }
+            case "unmaximized": {
+                onWindowSizeChanged(false);
+                return;
+            }
+            case "minimized": {
+                settings.bounds = e.data;
+                break;
+            }
+        }
     };
 
     const prepare = async () => {
@@ -679,13 +676,12 @@
     onMount(() => {
         prepare();
         ipc.receiveTauri("tauri://close-requested", beforeClose);
-        ipc.receiveTauri("tauri://resize", onWindowSizeChanged);
         ipc.receive("contextmenu_event", handleContextMenuEvent);
         ipc.receiveTauri<Mp.FileDropEvent>("tauri://drag-drop", onFileDrop);
         ipc.receive("grep_progress", onGrepProgress);
-        ipc.receive("tabWindowSizeChange", onTabWindowSizeChangeEvent);
         ipc.receive("settingChanged", onSettingsChange);
         ipc.receive("reloadSettings", onReloadSettings);
+        ipc.receive("window-state-changed", onWindowStateChanged);
         ipc.receive("tab_event", onTabEvent);
         ipc.receive("scrollTab", scrollTab);
 

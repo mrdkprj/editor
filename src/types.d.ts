@@ -9,7 +9,6 @@ declare global {
         load: boolean;
         minimize: null;
         toggleMaximize: null;
-        tabWindowSizeChange: boolean;
         contextmenu_event: Mp.ContextMenuEvent;
         watch_event: Mp.WatchEvent;
         watch_confirm_event: Mp.WatchConfirmEvent;
@@ -27,7 +26,19 @@ declare global {
         startDrag: Tab.StartDragEvent;
         endDrag: null;
         dropHandled: null;
+        "window-state-changed": Ws.ChangeWindowStateResult;
     };
+
+    namespace Ws {
+        type WebviewTitle = {
+            label: string;
+            title: string;
+            path: string;
+        };
+
+        type ChangeWindowStateRequest = { name: "minimize"; data?: never } | { name: "toggleMaximize"; data?: never } | { name: "updateTitle"; data: WebviewTitle };
+        type ChangeWindowStateResult = { name: "maximized"; data?: never } | { name: "unmaximized"; data?: never } | { name: "toggled"; data?: Mp.Bounds } | { name: "minimized"; data: Mp.Bounds };
+    }
 
     namespace Tab {
         type TabState = {
@@ -36,12 +47,6 @@ declare global {
             willStartDrag: boolean;
             dragging: boolean;
             added: boolean;
-        };
-
-        type WebviewTitle = {
-            label: string;
-            title: string;
-            path: string;
         };
 
         type ToggleTabModeRequest = {
@@ -76,24 +81,24 @@ declare global {
         type TabEvent =
             | { name: "maximized"; data?: never }
             | { name: "unmaximized"; data?: never }
-            | { name: "titleChanged"; data: WebviewTitle }
-            | { name: "reordered"; data: WebviewTitle[] }
+            | { name: "titleChanged"; data: Ws.WebviewTitle }
+            | { name: "reordered"; data: Ws.WebviewTitle[] }
             | { name: "closed"; data: string }
-            | { name: "modeChanged"; data: { tab_mode: boolean; webviews: WebviewTitle[] } }
+            | { name: "modeChanged"; data: { tab_mode: boolean; webviews: Ws.WebviewTitle[] } }
             | { name: "close"; data?: never }
             | { name: "scrolled"; data: number }
             | { name: "activated"; data?: never }
-            | { name: "attached"; data: WebviewTitle[] }
-            | { name: "added"; data: WebviewTitle };
+            | { name: "attached"; data: Ws.WebviewTitle[] }
+            | { name: "added"; data: Ws.WebviewTitle };
 
         type TabRequest =
             | { name: "select"; data: string }
             | { name: "selectNext"; data?: never }
             | { name: "selectPrevious"; data?: never }
-            | { name: "reorder"; data: WebviewTitle[] }
+            | { name: "reorder"; data: Ws.WebviewTitle[] }
             | { name: "closeAll"; data?: never }
             | { name: "cancel"; data?: never }
-            | { name: "update"; data: WebviewTitle }
+            | { name: "update"; data: Ws.WebviewTitle }
             | { name: "add"; data: AddTabRequest }
             | { name: "attach"; data: AttachRequest }
             | { name: "detach"; data: string }

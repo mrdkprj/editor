@@ -5,6 +5,8 @@ use std::{
 };
 use tauri::{Emitter, EventTarget, Manager};
 
+use crate::manager::Bounds;
+
 #[cfg(target_os = "linux")]
 #[path = "gtk.rs"]
 mod platform_impl;
@@ -49,16 +51,6 @@ pub enum TabRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct WindowMode {
-    is_tab_mode: bool,
-    active_tab_labels: HashMap<String, String>,
-    #[cfg(windows)]
-    undecorated_resize: HashMap<String, isize>,
-    #[cfg(not(windows))]
-    host_signals: HashMap<String, u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TabState {
     tab_map: HashMap<String, Vec<Tab>>,
     closing: Vec<Tab>,
@@ -98,14 +90,6 @@ pub struct AttachRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct Bounds {
-    width: u32,
-    height: u32,
-    x: i32,
-    y: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub(crate) struct Tab {
     host: String,
     window_handle: isize,
@@ -142,10 +126,11 @@ pub fn init(app: &tauri::AppHandle, host_name: &str) {
     let _ = HOST.set(host_name.to_string());
 
     app.manage(Mutex::new(TabState::default()));
-    app.manage(Mutex::new(WindowMode::default()));
 
     #[cfg(windows)]
     {
+        use crate::manager::WindowMode;
+
         let mode = app.state::<Mutex<WindowMode>>();
         let mut mode = mode.lock().unwrap();
         platform_impl::prepare(app, &mut mode, host_name.to_string());
@@ -160,47 +145,12 @@ pub fn remove(app: &tauri::AppHandle, label: &str) {
     platform_impl::remove(app, label);
 }
 
-impl WindowMode {
-    pub fn can_toggle_mode(&self, new_mode: bool) -> bool {
-        self.is_tab_mode != new_mode
-    }
+pub fn toggle_maximize(window: &tauri::WebviewWindow) -> Option<Bounds> {
+    platform_impl::toggle_maximize(window)
+}
 
-    pub fn is_tab_mode(&self) -> bool {
-        self.is_tab_mode
-    }
-
-    pub fn enter(&mut self) {
-        self.is_tab_mode = true;
-    }
-
-    pub fn exit(&mut self) {
-        self.is_tab_mode = false;
-        self.active_tab_labels.clear();
-    }
-
-    pub fn remove(&mut self, host_name: &str) {
-        self.active_tab_labels.remove(host_name);
-        #[cfg(windows)]
-        self.undecorated_resize.remove(host_name);
-    }
-
-    #[cfg(windows)]
-    pub fn get_undecorated_resize(&self, host_name: &str) -> isize {
-        *self.undecorated_resize.get(host_name).unwrap()
-    }
-
-    #[cfg(windows)]
-    pub fn update_undecorated_resize(&mut self, host_name: &str, window_handle: isize) {
-        self.undecorated_resize.insert(host_name.to_string(), window_handle);
-    }
-
-    pub fn get_active_tab_label(&self, host_name: &str) -> Option<&str> {
-        self.active_tab_labels.get(host_name).map(|s| s.as_str())
-    }
-
-    pub fn update_active_tab_label(&mut self, host_name: &str, label: &str) {
-        self.active_tab_labels.insert(host_name.to_string(), label.to_string());
-    }
+pub fn minimize(window: &tauri::WebviewWindow) -> Bounds {
+    platform_impl::minimize(window)
 }
 
 pub struct ReparentResult {
@@ -415,8 +365,8 @@ fn emit_filter(app: &tauri::AppHandle, event: TabEvent, tabs: &[Tab]) {
     }
 }
 
-pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
-    match req {
+pub fn handle_request(window: &tauri::WebviewWindow, request: TabRequest) -> bool {
+    match request {
         TabRequest::Add(request) => platform_impl::add(window, request),
         TabRequest::Attach(request) => platform_impl::attach(window.app_handle(), request),
         TabRequest::Detach(label) => platform_impl::detach(window.app_handle(), label),
@@ -428,8 +378,12 @@ pub fn handle_request(window: &tauri::WebviewWindow, req: TabRequest) -> bool {
         TabRequest::CloseAll => platform_impl::close_all(window),
         TabRequest::Update(webview_title) => platform_impl::update(window.app_handle(), &webview_title.label, &webview_title.title, &webview_title.path),
         TabRequest::Close => platform_impl::close(window.app_handle(), window.label()),
-        TabRequest::ToggleMaximize => platform_impl::toggle_maximize(window),
-        TabRequest::Minimize => platform_impl::minimize(window),
+        TabRequest::ToggleMaximize => {
+            let _ = platform_impl::toggle_maximize(window);
+        }
+        TabRequest::Minimize => {
+            let _ = platform_impl::minimize(window);
+        }
         TabRequest::StartDrag => platform_impl::start_drag(window),
         TabRequest::StartResizeDrag(direction) => platform_impl::start_resize_dragging(window, direction),
         TabRequest::ToggleTabMode(request) => return platform_impl::toggle_tab_mode(window, request),

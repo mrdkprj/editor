@@ -331,7 +331,7 @@ pub fn cancel(app: &tauri::AppHandle) {
     state.cancel_close_all();
 }
 
-pub fn toggle_maximize(window: &tauri::WebviewWindow) {
+pub fn toggle_maximize(window: &tauri::WebviewWindow) -> Option<Bounds> {
     /* Prevent state lock blocking */
     let host_name = {
         let app = window.app_handle();
@@ -342,18 +342,37 @@ pub fn toggle_maximize(window: &tauri::WebviewWindow) {
     let host = window.get_webview_window(&host_name).unwrap();
     if host.is_maximized().unwrap_or_default() {
         let _ = host.unmaximize();
+        None
     } else {
+        let size = host.inner_size().unwrap();
+        let position = host.inner_position().unwrap();
         let _ = host.maximize();
+        Some(Bounds {
+            width: size.width as _,
+            height: size.height as _,
+            x: position.x,
+            y: position.y,
+        })
     }
 }
 
-pub fn minimize(window: &tauri::WebviewWindow) {
+pub fn minimize(window: &tauri::WebviewWindow) -> Bounds {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
     if let Some(tab) = state.find(window.label()) {
         let host = window.get_webview_window(&tab.host).unwrap();
+        let size = host.inner_size().unwrap();
+        let position = host.inner_position().unwrap();
         let _ = host.minimize();
+        Bounds {
+            width: size.width as _,
+            height: size.height as _,
+            x: position.x,
+            y: position.y,
+        }
+    } else {
+        Bounds::default()
     }
 }
 

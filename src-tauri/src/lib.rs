@@ -9,8 +9,8 @@ use zouni::*;
 mod dialog;
 mod fgrep;
 mod helper;
+mod manager;
 mod menu;
-mod tab;
 mod watcher;
 
 #[cfg(target_os = "linux")]
@@ -107,7 +107,7 @@ fn change_theme(window: WebviewWindow, payload: String) {
         _ => (tauri::Theme::Light, wcpopup::config::Theme::System),
     };
     let _ = window.set_theme(Some(tauri_theme));
-    helper::change_theme(window.app_handle(), tauri_theme == tauri::Theme::Dark);
+    manager::change_theme(window.app_handle(), tauri_theme == tauri::Theme::Dark);
     menu::change_menu_theme(window.app_handle(), menu_theme);
 }
 
@@ -259,24 +259,24 @@ fn change_encoding(payload: helper::EncodeArg) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn update_title(app: AppHandle, payload: helper::WindowTitle) {
-    helper::update_title(&app, payload);
-}
-
-#[tauri::command]
 fn is_file_opened(window: WebviewWindow, payload: String) -> bool {
     helper::is_file_opened(window.app_handle(), window.label(), Some(payload))
 }
 
 #[tauri::command]
-fn tab_request(window: WebviewWindow, payload: tab::TabRequest) -> bool {
-    tab::handle_request(&window, payload)
+fn tab_request(window: WebviewWindow, payload: manager::TabRequest) -> bool {
+    manager::on_tab_request(&window, payload)
+}
+
+#[tauri::command]
+fn change_window_state(window: WebviewWindow, payload: manager::ChangeWindowStateRequest) {
+    manager::change_window_state(&window, payload)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app_handel, args, _| helper::handle_second_instance(app_handel, args)))
+        .plugin(tauri_plugin_single_instance::init(|app_handle, args, _| helper::handle_second_instance(app_handle, args)))
         .setup(|app| {
             let args: Vec<String> = env::args().collect();
             helper::start(app.handle());
@@ -285,13 +285,12 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                helper::remove_window(window.app_handle(), window.label())
+                helper::on_destroy(window.app_handle(), window.label())
             }
         })
         .invoke_handler(tauri::generate_handler![
             prepare_menu,
             open_list_context_menu,
-            update_title,
             is_file_opened,
             exists,
             is_file,
@@ -320,6 +319,7 @@ pub fn run() {
             abort_grep,
             change_encoding,
             tab_request,
+            change_window_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

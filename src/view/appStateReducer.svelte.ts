@@ -109,7 +109,6 @@ type SelectedPreferenceTab = {
 export const selectedPreference: SelectedPreferenceTab = $state({ tab: "appearance" });
 
 /* Tabs */
-
 export const tabState: Tab.TabState = $state({ tabs: [], scrollLeft: 0, willStartDrag: false, dragging: false, added: false });
 
 /* Grep Progress */
