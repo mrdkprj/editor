@@ -126,10 +126,10 @@ pub fn add(window: &WebviewWindow, request: AddTabRequest) {
     smol::spawn(async move {
         smol::Timer::after(Duration::from_millis(5)).await;
         let host = app.get_webview_window(&host_name).unwrap();
-        if host.is_minimized().unwrap() {
-            host.unminimize().unwrap();
-            let _ = host.set_focus();
+        if host.is_minimized().unwrap_or_default() {
+            let _ = host.unminimize();
         }
+        let _ = host.set_focus();
     })
     .detach();
 }
