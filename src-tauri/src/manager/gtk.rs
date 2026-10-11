@@ -269,6 +269,14 @@ pub fn select_tab(app: &tauri::AppHandle, label: String) {
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
     bring_to_front(app, &state, &mut mode, &label);
+
+    let host_name = state.find_host(app, &label);
+    let host = app.get_webview_window(&host_name).unwrap();
+    if host.is_minimized().unwrap_or_default() {
+        let _ = host.unminimize();
+    }
+    let _ = host.set_focus();
+    emit_to(app, TabEvent::Activated, &label);
 }
 
 pub fn select(window: &tauri::WebviewWindow, next: bool) {
