@@ -98,8 +98,19 @@ class Util {
                 label: "History",
                 type: "submenu",
                 submenuId: "History",
-                items: history
-                    .map((history) => {
+                items: [
+                    ...([
+                        {
+                            id: "clearHistory",
+                            label: "Clear Opened",
+                            type: "text",
+                            submenuId: "History",
+                        },
+                        {
+                            type: "separator",
+                        },
+                    ] as Mp.MenuItem[]),
+                    ...(history.map((history) => {
                         return {
                             id: "History",
                             label: history,
@@ -107,18 +118,8 @@ class Util {
                             value: history,
                             submenuId: "History",
                         } as Mp.MenuItem;
-                    })
-                    .concat([
-                        {
-                            type: "separator",
-                        },
-                        {
-                            id: "clearHistory",
-                            label: "Clear Opened",
-                            type: "text",
-                            submenuId: "History",
-                        },
-                    ]),
+                    }) as Mp.MenuItem[]),
+                ],
             },
         ];
     }
