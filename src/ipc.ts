@@ -67,7 +67,7 @@ type TauriCommandMap = {
     watch: TauriCommand<string, undefined>;
     unwatch: TauriCommand<string, undefined>;
     message: TauriCommand<DialogOptions, Mp.MessageResult>;
-    show_open_dialog: TauriCommand<DialogOptions, Mp.OpenFileResult | null>;
+    show_open_dialog: TauriCommand<DialogOptions, string | null>;
     show_folder_dialog: TauriCommand<DialogOptions, string | null>;
     show_save_dialog: TauriCommand<DialogOptions, string | null>;
     get_args: TauriCommand<undefined, InitArgs>;

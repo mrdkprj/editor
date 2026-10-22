@@ -21,7 +21,7 @@
     });
 </script>
 
-<Dialog minWidth={540} minHeight={200} overlayOffet={36} colors={DIALOG_COLORS} {close} focusOnMount={true}>
+<Dialog width={540} minWidth={540} height={220} minHeight={220} overlayOffet={36} colors={DIALOG_COLORS} {close} focusOnMount={true}>
     {#snippet content()}
         <div class="dialog-item-block">
             <div class="dialog-title-block">Processing...</div>
@@ -45,5 +45,11 @@
 
     .dialog-btn-lgw:hover {
         background-color: var(--button-hover-color);
+    }
+
+    .dialog-text {
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
     }
 </style>

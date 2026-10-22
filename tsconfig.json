@@ -7,9 +7,6 @@
     "skipLibCheck": true,
     "allowJs": true,
     "outDir": "dist",
-    "paths": {
-      "*": ["./node_modules/*"],
-    },
     "types": ["vite/client"],
 
     /* Bundler mode */

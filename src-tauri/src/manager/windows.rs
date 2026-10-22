@@ -8,7 +8,7 @@ use crate::manager::{
     WindowLabels, WindowMode,
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
-use tauri::{AppHandle, Manager, PhysicalSize, WebviewWindow};
+use tauri::{AppHandle, Manager, PhysicalSize, WebviewWindow, WindowEvent};
 use windows::{
     core::{Free, PCWSTR},
     Win32::{
@@ -234,6 +234,18 @@ pub fn detach(app: &AppHandle, label: String) {
                 let result = state.reparent(&label, &new_host_name);
 
                 let new_host = app.get_webview_window(&new_host_name).unwrap();
+                let app_cloned = app.clone();
+                let new_host_name_cloned = new_host_name.clone();
+                new_host.on_window_event(move |e| {
+                    if let WindowEvent::CloseRequested {
+                        api,
+                        ..
+                    } = e
+                    {
+                        api.prevent_close();
+                        on_close_requested(&app_cloned, new_host_name_cloned.as_str());
+                    }
+                });
                 let new_host_hwnd = new_host.hwnd().unwrap();
 
                 let undecorated_resize = prepare(&app, &mut mode, new_host_name.clone());
@@ -311,11 +323,43 @@ pub fn close(app: &AppHandle, label: &str) {
     }
 }
 
+pub fn close_all(window: &WebviewWindow) {
+    let app = window.app_handle();
+    let state = app.state::<Mutex<TabState>>();
+    let mut state = state.lock().unwrap();
+    state.close_all(window.label());
+    if let Some(tab) = state.closing.pop() {
+        emit_to(app, TabEvent::Close, &tab.label);
+    }
+}
+
+pub fn cancel(app: &AppHandle) {
+    let state = app.state::<Mutex<TabState>>();
+    let mut state = state.lock().unwrap();
+    state.cancel_close_all();
+}
+
+pub(crate) fn on_close_requested(app: &AppHandle, host_name: &str) {
+    let host = app.get_webview_window(host_name).unwrap();
+    if host.is_minimized().unwrap_or_default() {
+        let _ = host.unminimize();
+    }
+    let state = app.state::<Mutex<TabState>>();
+    let mut state = state.lock().unwrap();
+    if let Some(first_tab) = state.first(host_name) {
+        state.close_all(&first_tab.label);
+        if let Some(tab) = state.closing.pop() {
+            emit_to(app, TabEvent::Close, &tab.label);
+        }
+    }
+}
+
 pub fn select_tab(app: &AppHandle, label: String) {
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
+
     bring_to_front(app, &state, &mut mode, &label);
 
     let host_name = state.find_host(app, &label);
@@ -324,6 +368,7 @@ pub fn select_tab(app: &AppHandle, label: String) {
         let _ = host.unminimize();
     }
     let _ = host.set_focus();
+
     emit_to(app, TabEvent::Activated, &label);
 }
 
@@ -370,22 +415,6 @@ pub fn reorder_tab(window: &WebviewWindow, reordered_tabs: Vec<WebviewTitle>) {
     }
     state.update(&host_name, new_tabs.clone());
     emit_filter(app, TabEvent::Reordered(reordered_tabs), &new_tabs);
-}
-
-pub fn close_all(window: &WebviewWindow) {
-    let app = window.app_handle();
-    let state = app.state::<Mutex<TabState>>();
-    let mut state = state.lock().unwrap();
-    state.close_all(window.label());
-    if let Some(tab) = state.closing.pop() {
-        emit_to(app, TabEvent::Close, &tab.label);
-    }
-}
-
-pub fn cancel(app: &AppHandle) {
-    let state = app.state::<Mutex<TabState>>();
-    let mut state = state.lock().unwrap();
-    state.cancel_close_all();
 }
 
 pub fn toggle_maximize(window: &WebviewWindow) -> Option<Bounds> {
@@ -742,23 +771,6 @@ fn detach_from_tab(removed: &Tab, size: Option<PhysicalSize<u32>>) {
 }
 
 unsafe extern "system" fn subclass_parent(hwnd: HWND, umsg: u32, wparam: WPARAM, lparam: LPARAM, _uidsubclass: usize, dwrefdata: usize) -> LRESULT {
-    if umsg == WM_WINDOWPOSCHANGED {
-        let mut rect = RECT::default();
-
-        if GetClientRect(hwnd, &mut rect).is_ok() {
-            let width = rect.right - rect.left;
-            let height = rect.bottom - rect.top;
-            let item_data_ptr = dwrefdata as *const ResizeData;
-            let data = &*item_data_ptr;
-            let state = data.app.state::<Mutex<TabState>>();
-            if let Ok(state) = state.try_lock() {
-                if let Some(tabs) = state.tabs(&data.host_name) {
-                    on_resized(tabs, width, height);
-                }
-            };
-        }
-    }
-
     if umsg == WM_SETFOCUS {
         let foreground = GetForegroundWindow();
         if foreground == hwnd {
@@ -779,8 +791,8 @@ unsafe extern "system" fn subclass_parent(hwnd: HWND, umsg: u32, wparam: WPARAM,
         let item_data_ptr = dwrefdata as *mut ResizeData;
         let data = &mut *item_data_ptr;
         let maximized = flag == SIZE_MAXIMIZED;
-        let should_handle = maximized || (flag == SIZE_RESTORED && data.maximized);
-        if should_handle {
+        let maximized_state_changed = maximized || (flag == SIZE_RESTORED && data.maximized);
+        if maximized_state_changed {
             data.maximized = maximized;
             let state = data.app.state::<Mutex<TabState>>();
             if let Ok(state) = state.try_lock() {
@@ -792,6 +804,20 @@ unsafe extern "system" fn subclass_parent(hwnd: HWND, umsg: u32, wparam: WPARAM,
                     }
                 }
             };
+        }
+        let resized = maximized_state_changed || flag == SIZE_RESTORED;
+        if resized {
+            let mut rect = RECT::default();
+            if GetClientRect(hwnd, &mut rect).is_ok() {
+                let width = rect.right - rect.left;
+                let height = rect.bottom - rect.top;
+                let state = data.app.state::<Mutex<TabState>>();
+                if let Ok(state) = state.try_lock() {
+                    if let Some(tabs) = state.tabs(&data.host_name) {
+                        on_resized(tabs, width, height);
+                    }
+                };
+            }
         }
     }
 

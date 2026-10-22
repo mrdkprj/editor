@@ -15,7 +15,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@tauri-apps/api": "^2.11.0"
+    "@tauri-apps/api": "^2.11.0",
+    "monaco-editor": "^0.57.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
@@ -27,7 +28,6 @@
     "eslint": "^9.17.0",
     "eslint-plugin-svelte": "^2.46.1",
     "globals": "^17.6.0",
-    "monaco-editor": "^0.55.1",
     "prettier-plugin-svelte": "^3.3.2",
     "svelte": "^5.43.0",
     "svelte-check": "^4.0.0",

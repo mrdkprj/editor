@@ -170,6 +170,9 @@
         box-shadow: 7px 5px 5px var(--shadow);
         outline: 1px solid var(--outline);
         border-radius: 8px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .dialog-header {

@@ -263,6 +263,37 @@ pub fn close(app: &tauri::AppHandle, label: &str) {
     }
 }
 
+pub fn close_all(window: &tauri::WebviewWindow) {
+    let app = window.app_handle();
+    let state = app.state::<Mutex<TabState>>();
+    let mut state = state.lock().unwrap();
+    state.close_all(window.label());
+    if let Some(tab) = state.closing.pop() {
+        emit_to(app, TabEvent::Close, &tab.label);
+    }
+}
+
+pub fn cancel(app: &tauri::AppHandle) {
+    let state = app.state::<Mutex<TabState>>();
+    let mut state = state.lock().unwrap();
+    state.cancel_close_all();
+}
+
+pub(crate) fn on_close_requested(app: &AppHandle, host_name: &str) {
+    let host = app.get_webview_window(host_name).unwrap();
+    if host.is_minimized().unwrap_or_default() {
+        let _ = host.unminimize();
+    }
+    let state = app.state::<Mutex<TabState>>();
+    let mut state = state.lock().unwrap();
+    if let Some(first_tab) = state.first(host_name) {
+        state.close_all(&first_tab.label);
+        if let Some(tab) = state.closing.pop() {
+            emit_to(app, TabEvent::Close, &tab.label);
+        }
+    }
+}
+
 pub fn select_tab(app: &tauri::AppHandle, label: String) {
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
@@ -322,22 +353,6 @@ pub fn reorder_tab(window: &tauri::WebviewWindow, reordered_tabs: Vec<WebviewTit
     }
     state.update(&host_name, new_tabs.clone());
     emit_filter(app, TabEvent::Reordered(reordered_tabs), &new_tabs);
-}
-
-pub fn close_all(window: &tauri::WebviewWindow) {
-    let app = window.app_handle();
-    let state = app.state::<Mutex<TabState>>();
-    let mut state = state.lock().unwrap();
-    state.close_all(window.label());
-    if let Some(tab) = state.closing.pop() {
-        emit_to(app, TabEvent::Close, &tab.label);
-    }
-}
-
-pub fn cancel(app: &tauri::AppHandle) {
-    let state = app.state::<Mutex<TabState>>();
-    let mut state = state.lock().unwrap();
-    state.cancel_close_all();
 }
 
 pub fn toggle_maximize(window: &tauri::WebviewWindow) -> Option<Bounds> {

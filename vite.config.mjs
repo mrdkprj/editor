@@ -37,4 +37,15 @@ export default defineConfig(async () => ({
             },
         },
     },
+    optimizeDeps: {
+        exclude: ["monaco-editor"],
+    },
+    resolve: {
+        alias: [
+            {
+                find: /^monaco-editor\/esm\/vs\//,
+                replacement: resolve(__dirname, "node_modules/monaco-editor/esm/vs/") + "/",
+            },
+        ],
+    },
 }));

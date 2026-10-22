@@ -153,25 +153,9 @@ async fn message(payload: DialogOptions) -> zouni::dialog::MessageResult {
     dialog::show(payload).await
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct OpenFileResult {
-    file_path: String,
-    content: String,
-    encoding: String,
-}
 #[tauri::command]
-async fn show_open_dialog(payload: DialogOptions) -> Option<OpenFileResult> {
-    let result = dialog::show_file_dialog(payload).await;
-    if let Some(file_path) = result {
-        let read_result = helper::read_to_string(&file_path).unwrap();
-        Some(OpenFileResult {
-            file_path,
-            content: read_result.content,
-            encoding: read_result.encoding,
-        })
-    } else {
-        None
-    }
+async fn show_open_dialog(payload: DialogOptions) -> Option<String> {
+    dialog::show_file_dialog(payload).await
 }
 
 #[tauri::command]

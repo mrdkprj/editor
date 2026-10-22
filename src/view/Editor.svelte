@@ -1,7 +1,8 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { appState, contentState, dispatch, textState, settings, temporal, tabState } from "./appStateReducer.svelte";
     import type monaco from "monaco-editor";
-    import { onMount } from "svelte";
+    import * as Monaco from "monaco-editor";
     import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
     import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
     import cssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
@@ -11,7 +12,7 @@
     import { IPC } from "../ipc";
     import Deferred from "../deferred";
     import { BROWSER_SHORTCUT_KEYS, LANGUAGES, LINE_ENDINGS, SINGLE_BROWSER_SHORTCUT_KEYS } from "../constants";
-    import { KeyCode, KeyMod } from "monaco-editor";
+
     import util from "../util";
     import { getThemeData } from "../theme";
 
@@ -45,7 +46,6 @@
 
     let root: HTMLDivElement;
     let editor: monaco.editor.IStandaloneCodeEditor;
-    let Monaco: typeof monaco;
     let model: monaco.editor.ITextModel;
     let watchDialogPromise: Deferred<Mp.WatchConfirmEvent> | null;
     let state: monaco.editor.ICodeEditorViewState | null = null;
@@ -172,6 +172,7 @@
         if (contentState.mode != "grep") return;
 
         e.preventDefault();
+        e.stopPropagation();
         const position = editor.getPosition();
         if (!position) return;
 
@@ -367,6 +368,9 @@
     };
 
     const onGrepResults = () => {
+        if (editor.getOption(Monaco.editor.EditorOption.doubleClickSelectsBlock)) {
+            editor.updateOptions({ doubleClickSelectsBlock: false, selectionHighlight: false });
+        }
         editor.focus();
         const lineCount = model.getLineCount();
         const content = getContent();
@@ -445,7 +449,7 @@
         editor.focus();
     };
 
-    const createEditor = async () => {
+    const createEditor = () => {
         // @ts-ignore
         self.MonacoEnvironment = {
             getWorker: function (_moduleId: any, label: string) {
@@ -472,6 +476,7 @@
 
         model = Monaco.editor.createModel(content, undefined, Monaco.Uri.file(path.basename(contentState.fullPath)));
         const language = model.getLanguageId();
+
         const isPlainText = contentState.mode == "grep" || language == "plaintext";
         textState.textType = isPlainText ? "plain" : "code";
 
@@ -483,7 +488,7 @@
         editor = Monaco.editor.create(root, {
             model,
             theme: settings.theme == "dark" ? DARK : LIGHT,
-            hover: { enabled: false },
+            hover: { enabled: "off" },
             contextmenu: false,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
@@ -524,6 +529,9 @@
             renderLineHighlight: preference.lineHighlight ? "line" : "none",
             find: { seedSearchStringFromSelection: "selection", addExtraSpaceOnTop: true, loop: true },
             dropIntoEditor: { enabled: false },
+            dragAndDrop: false,
+            doubleClickSelectsBlock: contentState.mode != "grep",
+            selectionHighlight: contentState.mode != "grep",
         });
 
         if (startLine) {
@@ -567,24 +575,23 @@
         });
     };
 
-    const init = async () => {
-        Monaco = await import("monaco-editor");
+    const init = () => {
         Monaco.editor.addKeybindingRules([
             {
-                keybinding: KeyMod.CtrlCmd | KeyCode.KeyG,
+                keybinding: Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KeyG,
                 command: "",
             },
             {
-                keybinding: KeyMod.CtrlCmd | KeyCode.KeyI,
+                keybinding: Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KeyI,
                 command: "",
             },
 
             {
-                keybinding: KeyMod.CtrlCmd | KeyCode.KeyD,
+                keybinding: Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KeyD,
                 command: "",
             },
             {
-                keybinding: KeyCode.F1,
+                keybinding: Monaco.KeyCode.F1,
                 command: "",
             },
         ]);
@@ -625,7 +632,7 @@
                 };
             },
         });
-        await createEditor();
+        createEditor();
     };
 
     onMount(() => {

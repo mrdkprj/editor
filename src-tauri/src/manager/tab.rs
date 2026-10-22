@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock},
 };
-use tauri::{Emitter, EventTarget, Manager};
+use tauri::{Emitter, EventTarget, Manager, WindowEvent};
 
 use crate::manager::Bounds;
 
@@ -135,6 +135,18 @@ pub fn init(app: &tauri::AppHandle, host_name: &str) {
         let mut mode = mode.lock().unwrap();
         platform_impl::prepare(app, &mut mode, host_name.to_string());
     }
+
+    let app_cloned = app.clone();
+    app.get_webview_window(HOST.get().unwrap()).unwrap().on_window_event(move |e| {
+        if let WindowEvent::CloseRequested {
+            api,
+            ..
+        } = e
+        {
+            api.prevent_close();
+            platform_impl::on_close_requested(&app_cloned, HOST.get().unwrap());
+        }
+    });
 }
 
 pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
@@ -202,6 +214,14 @@ impl TabState {
             }
         }
         None
+    }
+
+    pub fn first(&self, host_name: &str) -> Option<Tab> {
+        if let Some(tabs) = self.tab_map.get(host_name) {
+            tabs.first().cloned()
+        } else {
+            None
+        }
     }
 
     pub fn find_with_mut(&mut self, label: &str) -> Option<(&mut Tab, Vec<Tab>)> {

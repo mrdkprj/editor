@@ -251,7 +251,11 @@
         dispatch({ type: "grepResult", value: results });
         closeDialog("progress");
         await ipc.sendTo(label, "grep_end", null);
-        await getCurrentWebviewWindow().setFocus();
+        if (settings.tabMode) {
+            await getCurrentWebview().setFocus();
+        } else {
+            await getCurrentWebviewWindow().setFocus();
+        }
         onSettingsChange();
     };
 
@@ -277,22 +281,21 @@
     };
 
     const openFile = async (filePath?: string) => {
-        if (!filePath) {
-            return await helper.openFile();
-        }
+        let fullPath = filePath ?? (await helper.openFile());
+        if (!fullPath) return;
 
         if (!contentState.fullPath && !contentState.isDirty && contentState.mode != "grep") {
-            const alreadyOpened = await ipc.invoke("is_file_opened", filePath);
+            const alreadyOpened = await ipc.invoke("is_file_opened", fullPath);
             if (alreadyOpened) {
                 return;
             }
 
-            const data = await helper.readFile(filePath);
+            const data = await helper.readFile(fullPath);
             if (data) {
                 await loadFileContent(data.file_path, data.content, data.encoding);
             }
         } else {
-            await openNewWindow(filePath);
+            await openNewWindow(fullPath);
         }
     };
 
@@ -432,10 +435,12 @@
     const beforeClose = async () => {
         if (!contentState.isDirty) return destroy();
 
-        const thisWindow = getCurrentWebviewWindow();
-        const isMinimized = await thisWindow.isMinimized();
-        if (isMinimized) {
-            await thisWindow.unminimize();
+        if (!settings.tabMode) {
+            const thisWindow = getCurrentWebviewWindow();
+            const isMinimized = await thisWindow.isMinimized();
+            if (isMinimized) {
+                await thisWindow.unminimize();
+            }
         }
         const name = contentState.fullPath ? path.basename(contentState.fullPath) : UNTITLED;
         const shouldSave = await helper.confirm(`"${name}" is changed. Do you want to save?`);
@@ -665,7 +670,7 @@
         if (settings.tabMode) {
             const toggled = await ipc.invoke("tab_request", { name: "toggleTabMode", data: { tab_mode: settings.tabMode, bounds: settings.bounds } });
             if (!toggled) {
-                await ipc.invoke("tab_request", { name: "add", data: { opener: e.opener, bounds: settings.bounds } });
+                ipc.invoke("tab_request", { name: "add", data: { opener: e.opener, bounds: settings.bounds } });
             }
         } else {
             await thisWindow.show();
