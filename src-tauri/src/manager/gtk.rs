@@ -16,9 +16,9 @@ use gtk::{
     traits::{BinExt, BoxExt, ContainerExt, GtkWindowExt, OverlayExt, WidgetExt},
 };
 use std::{collections::HashMap, sync::Mutex, time::Duration};
-use tauri::{Manager, PhysicalSize, WebviewWindow};
+use tauri::{AppHandle, Manager, PhysicalSize, WebviewWindow};
 
-pub fn toggle_tab_mode(window: &tauri::WebviewWindow, request: ToggleTabModeRequest) -> bool {
+pub fn toggle_tab_mode(window: &WebviewWindow, request: ToggleTabModeRequest) -> bool {
     let app = window.app_handle();
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
@@ -61,7 +61,7 @@ pub fn toggle_tab_mode(window: &tauri::WebviewWindow, request: ToggleTabModeRequ
     changed
 }
 
-pub fn add(window: &tauri::WebviewWindow, request: AddTabRequest) {
+pub fn add(window: &WebviewWindow, request: AddTabRequest) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
@@ -112,7 +112,7 @@ pub fn add(window: &tauri::WebviewWindow, request: AddTabRequest) {
     .detach();
 }
 
-pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
+pub fn update(app: &AppHandle, label: &str, title: &str, path: &str) {
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
 
@@ -131,7 +131,7 @@ pub fn update(app: &tauri::AppHandle, label: &str, title: &str, path: &str) {
     }
 }
 
-pub fn attach(app: &tauri::AppHandle, request: AttachRequest) {
+pub fn attach(app: &AppHandle, request: AttachRequest) {
     let mode = app.state::<Mutex<WindowMode>>();
     let mut mode = mode.lock().unwrap();
     let state = app.state::<Mutex<TabState>>();
@@ -186,7 +186,7 @@ pub fn attach(app: &tauri::AppHandle, request: AttachRequest) {
     bring_to_front_async(app, tab, None);
 }
 
-pub fn detach(app: &tauri::AppHandle, label: String) {
+pub fn detach(app: &AppHandle, label: String) {
     let app = app.clone();
 
     let state = app.state::<Mutex<TabState>>();
@@ -242,7 +242,7 @@ pub fn detach(app: &tauri::AppHandle, label: String) {
     bring_to_front(&app, &state, &mut mode, &tab.label);
 }
 
-pub fn close(app: &tauri::AppHandle, label: &str) {
+pub fn close(app: &AppHandle, label: &str) {
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
 
@@ -263,7 +263,7 @@ pub fn close(app: &tauri::AppHandle, label: &str) {
     }
 }
 
-pub fn close_all(window: &tauri::WebviewWindow) {
+pub fn close_all(window: &WebviewWindow) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
@@ -273,7 +273,7 @@ pub fn close_all(window: &tauri::WebviewWindow) {
     }
 }
 
-pub fn cancel(app: &tauri::AppHandle) {
+pub fn cancel(app: &AppHandle) {
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
     state.cancel_close_all();
@@ -294,7 +294,7 @@ pub(crate) fn on_close_requested(app: &AppHandle, host_name: &str) {
     }
 }
 
-pub fn select_tab(app: &tauri::AppHandle, label: String) {
+pub fn select_tab(app: &AppHandle, label: String) {
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
     let mode = app.state::<Mutex<WindowMode>>();
@@ -310,7 +310,7 @@ pub fn select_tab(app: &tauri::AppHandle, label: String) {
     emit_to(app, TabEvent::Activated, &label);
 }
 
-pub fn select(window: &tauri::WebviewWindow, next: bool) {
+pub fn select(window: &WebviewWindow, next: bool) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
@@ -338,7 +338,7 @@ pub fn select(window: &tauri::WebviewWindow, next: bool) {
     }
 }
 
-pub fn reorder_tab(window: &tauri::WebviewWindow, reordered_tabs: Vec<WebviewTitle>) {
+pub fn reorder_tab(window: &WebviewWindow, reordered_tabs: Vec<WebviewTitle>) {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let mut state = state.lock().unwrap();
@@ -355,7 +355,7 @@ pub fn reorder_tab(window: &tauri::WebviewWindow, reordered_tabs: Vec<WebviewTit
     emit_filter(app, TabEvent::Reordered(reordered_tabs), &new_tabs);
 }
 
-pub fn toggle_maximize(window: &tauri::WebviewWindow) -> Option<Bounds> {
+pub fn toggle_maximize(window: &WebviewWindow) -> Option<Bounds> {
     /* Prevent state lock blocking */
     let host_name = {
         let app = window.app_handle();
@@ -380,7 +380,7 @@ pub fn toggle_maximize(window: &tauri::WebviewWindow) -> Option<Bounds> {
     }
 }
 
-pub fn minimize(window: &tauri::WebviewWindow) -> Bounds {
+pub fn minimize(window: &WebviewWindow) -> Bounds {
     let app = window.app_handle();
     let state = app.state::<Mutex<TabState>>();
     let state = state.lock().unwrap();
@@ -400,7 +400,7 @@ pub fn minimize(window: &tauri::WebviewWindow) -> Bounds {
     }
 }
 
-fn shift_active_tab(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowMode, host_name: &str, label: &str) {
+fn shift_active_tab(app: &AppHandle, state: &TabState, mode: &mut WindowMode, host_name: &str, label: &str) {
     if let Some(index) = state.position(label) {
         if mode.get_active_tab_label(host_name).unwrap_or_default() == label {
             let tabs = state.tabs(host_name).unwrap();
@@ -416,13 +416,13 @@ fn shift_active_tab(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowM
     }
 }
 
-fn hide_host(app: &tauri::AppHandle, host_name: &str) -> bool {
+fn hide_host(app: &AppHandle, host_name: &str) -> bool {
     let host = app.get_webview_window(host_name).unwrap();
     let _ = host.hide();
     host_name != HOST.get().unwrap()
 }
 
-fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut WindowMode, activator: &str, request: ToggleTabModeRequest) {
+fn enter_tab_mode(app: &AppHandle, state: &mut TabState, mode: &mut WindowMode, activator: &str, request: ToggleTabModeRequest) {
     mode.enter();
 
     let host_name = HOST.get().unwrap();
@@ -467,7 +467,7 @@ fn enter_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut Windo
     host.show().unwrap();
 }
 
-fn change_to_overlay(host: &tauri::WebviewWindow, mode: &mut WindowMode) {
+fn change_to_overlay(host: &WebviewWindow, mode: &mut WindowMode) {
     /*
         Change Window's child from Box to Overlay
         Tauri expects this hierarchy
@@ -506,7 +506,7 @@ fn change_to_overlay(host: &tauri::WebviewWindow, mode: &mut WindowMode) {
     }
 }
 
-fn restore_box(host: &tauri::WebviewWindow) {
+fn restore_box(host: &WebviewWindow) {
     let host_window = host.gtk_window().unwrap();
     let overlay = get_overlay(host);
     let children = overlay.children();
@@ -518,7 +518,7 @@ fn restore_box(host: &tauri::WebviewWindow) {
     host_window.add(&host_box);
 }
 
-fn reparent(old: &tauri::WebviewWindow, new: &tauri::WebviewWindow, tab: &Tab) {
+fn reparent(old: &WebviewWindow, new: &WebviewWindow, tab: &Tab) {
     let old_overlay = get_overlay(old);
     let webview = to_widget(tab.window_handle);
     old_overlay.remove(&webview);
@@ -526,7 +526,7 @@ fn reparent(old: &tauri::WebviewWindow, new: &tauri::WebviewWindow, tab: &Tab) {
     new_overlay.add_overlay(&webview);
 }
 
-fn exit_tab_mode(app: &tauri::AppHandle, state: &mut TabState, mode: &mut WindowMode) {
+fn exit_tab_mode(app: &AppHandle, state: &mut TabState, mode: &mut WindowMode) {
     mode.exit();
 
     for (host_name, tabs) in state.all() {
@@ -566,7 +566,7 @@ fn attach_to_tab(parent_window: &WebviewWindow, tab: &Tab) {
     let _ = child.hide();
 }
 
-fn bring_to_front(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowMode, label: &str) {
+fn bring_to_front(app: &AppHandle, state: &TabState, mode: &mut WindowMode, label: &str) {
     if let Some(tab) = state.find(label) {
         if mode.get_active_tab_label(&tab.host).unwrap_or_default() == label {
             return;
@@ -581,7 +581,7 @@ fn bring_to_front(app: &tauri::AppHandle, state: &TabState, mode: &mut WindowMod
     }
 }
 
-fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab, emit_targets: Option<Vec<Tab>>) {
+fn bring_to_front_async(app: &AppHandle, tab: Tab, emit_targets: Option<Vec<Tab>>) {
     let app = app.clone();
     smol::spawn(async move {
         smol::Timer::after(Duration::from_millis(50)).await;
@@ -608,7 +608,7 @@ fn bring_to_front_async(app: &tauri::AppHandle, tab: Tab, emit_targets: Option<V
     .detach();
 }
 
-pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
+pub(crate) fn remove(app: &AppHandle, label: &str) {
     let mode = app.state::<Mutex<WindowMode>>();
     let mode = mode.lock().unwrap();
 
@@ -632,7 +632,7 @@ pub(crate) fn remove(app: &tauri::AppHandle, label: &str) {
     }
 }
 
-pub(crate) fn start_drag(window: &tauri::WebviewWindow) {
+pub(crate) fn start_drag(window: &WebviewWindow) {
     let app = window.app_handle();
     let mode = app.state::<Mutex<WindowMode>>();
     let mode = mode.lock().unwrap();
@@ -660,7 +660,7 @@ fn get_resize_edge(direction: &str) -> WindowEdge {
     }
 }
 
-pub(crate) fn start_resize_dragging(window: &tauri::WebviewWindow, direction: String) {
+pub(crate) fn start_resize_dragging(window: &WebviewWindow, direction: String) {
     let app = window.app_handle();
     let mode = app.state::<Mutex<WindowMode>>();
     let mode = mode.lock().unwrap();
@@ -679,7 +679,7 @@ pub(crate) fn start_resize_dragging(window: &tauri::WebviewWindow, direction: St
     }
 }
 
-fn detach_from_tab(app: &tauri::AppHandle, removed: &Tab, show: bool) {
+fn detach_from_tab(app: &AppHandle, removed: &Tab, show: bool) {
     if let Some(window) = app.get_webview_window(&removed.label) {
         let host = app.get_webview_window(&removed.host).unwrap();
         let overlay = get_overlay(&host);
@@ -715,7 +715,7 @@ fn detach_from_tab(app: &tauri::AppHandle, removed: &Tab, show: bool) {
     }
 }
 
-fn get_bounds(window: &tauri::WebviewWindow) -> Bounds {
+fn get_bounds(window: &WebviewWindow) -> Bounds {
     let pos = window.outer_position().unwrap();
     let size = window.outer_size().unwrap();
     Bounds {
@@ -726,7 +726,7 @@ fn get_bounds(window: &tauri::WebviewWindow) -> Bounds {
     }
 }
 
-fn new_tab(app: &tauri::AppHandle, window: &tauri::WebviewWindow, host_name: Option<&str>) -> Tab {
+fn new_tab(app: &AppHandle, window: &WebviewWindow, host_name: Option<&str>) -> Tab {
     let host = host_name.unwrap_or(HOST.get().unwrap()).to_string();
 
     let state = app.state::<Mutex<WindowLabels>>();
@@ -750,7 +750,7 @@ fn new_tab(app: &tauri::AppHandle, window: &tauri::WebviewWindow, host_name: Opt
     }
 }
 
-fn get_overlay(window: &tauri::WebviewWindow) -> gtk::Overlay {
+fn get_overlay(window: &WebviewWindow) -> gtk::Overlay {
     let vbox: gtk::Overlay = window.gtk_window().unwrap().child().unwrap().dynamic_cast().unwrap();
     vbox
 }

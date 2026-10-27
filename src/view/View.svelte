@@ -150,6 +150,11 @@
     const onkeyup = async (e: KeyboardEvent) => {
         if (util.isWin()) return;
 
+        if (e.key == "F12") {
+            ipc.invoke("open_dev_tool", null);
+            return;
+        }
+
         if (!handleKeyUp) return;
 
         if (e.key == "Control") {
@@ -166,6 +171,11 @@
 
         if (e.key == "Escape") {
             closeMenu();
+        }
+
+        if (e.key == "F12") {
+            ipc.invoke("open_dev_tool", null);
+            return;
         }
 
         if ((e.ctrlKey && BROWSER_SHORTCUT_KEYS.includes(e.key)) || SINGLE_BROWSER_SHORTCUT_KEYS.includes(e.key)) {

@@ -257,6 +257,12 @@ fn change_window_state(window: WebviewWindow, payload: manager::ChangeWindowStat
     manager::change_window_state(&window, payload)
 }
 
+#[tauri::command]
+fn open_dev_tool(window: WebviewWindow) {
+    println!("here");
+    window.open_devtools();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -274,6 +280,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             prepare_menu,
+            open_dev_tool,
             open_list_context_menu,
             is_file_opened,
             exists,

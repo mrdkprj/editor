@@ -52,6 +52,7 @@ type ReadResult = {
 
 type TauriCommandMap = {
     prepare_menu: TauriCommand<undefined, undefined>;
+    open_dev_tool: TauriCommand<null, null>;
     open_list_context_menu: TauriCommand<Mp.OpenContextMenuRequest, undefined>;
     new_window: TauriCommand<string[], undefined>;
     exists: TauriCommand<string, boolean>;
