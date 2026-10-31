@@ -259,7 +259,6 @@ fn change_window_state(window: WebviewWindow, payload: manager::ChangeWindowStat
 
 #[tauri::command]
 fn open_dev_tool(window: WebviewWindow) {
-    println!("here");
     window.open_devtools();
 }
 
